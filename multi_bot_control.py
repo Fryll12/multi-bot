@@ -45,7 +45,6 @@ def create_bot(token, is_main=False):
                 mentions = msg.get("mentions", [])
 
                 if author == karuta_id and channel == main_channel_id:
-
                     if "is dropping" not in content and not mentions and auto_grab_enabled:
                         emoji = random.choice(["1️⃣", "2️⃣", "3️⃣"])
                         delay = {"1️⃣": 1.3, "2️⃣": 2.3, "3️⃣": 3}[emoji]
