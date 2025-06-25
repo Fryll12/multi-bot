@@ -32,35 +32,35 @@ def create_bot(token, is_main=False):
             except Exception as e:
                 print(f"Lỗi lấy user_id: {e}")
 
-    @bot.gateway.command
-    def on_message(resp):
-        global auto_grab_enabled
+    if is_main:
+        @bot.gateway.command
+        def on_message(resp):
+            global auto_grab_enabled
 
-        if resp.event.message:
-            msg = resp.parsed.auto()
-            author = msg.get("author", {}).get("id")
-            content = msg.get("content", "")
-            channel = msg.get("channel_id")
-            mentions = msg.get("mentions", [])
+            if resp.event.message:
+                msg = resp.parsed.auto()
+                author = msg.get("author", {}).get("id")
+                content = msg.get("content", "")
+                channel = msg.get("channel_id")
+                mentions = msg.get("mentions", [])
 
-            if author == karuta_id and channel == main_channel_id:
+                if author == karuta_id and channel == main_channel_id:
 
-                # Trường hợp tự drop: không có "is dropping 3 cards!" và mentions rỗng
-                if "is dropping" not in content and not mentions and auto_grab_enabled:
-                    emoji = random.choice(["1️⃣", "2️⃣", "3️⃣"])
-                    delay = {"1️⃣": 1.3, "2️⃣": 2.3, "3️⃣": 3}[emoji]
-                    print(f"Phát hiện tự drop → Chọn emoji {emoji} → Grab sau {delay}s")
+                    if "is dropping" not in content and not mentions and auto_grab_enabled:
+                        emoji = random.choice(["1️⃣", "2️⃣", "3️⃣"])
+                        delay = {"1️⃣": 1.3, "2️⃣": 2.3, "3️⃣": 3}[emoji]
+                        print(f"Phát hiện tự drop → Chọn emoji {emoji} → Grab sau {delay}s")
 
-                    def grab():
-                        try:
-                            bot.addReaction(channel, msg["id"], emoji)
-                            print("Đã thả emoji grab!")
-                            bot.sendMessage(ktb_channel_id, "kt b")
-                            print("Đã nhắn 'kt b'!")
-                        except Exception as e:
-                            print(f"Lỗi khi grab hoặc nhắn kt b: {e}")
+                        def grab():
+                            try:
+                                bot.addReaction(channel, msg["id"], emoji)
+                                print("Đã thả emoji grab!")
+                                bot.sendMessage(ktb_channel_id, "kt b")
+                                print("Đã nhắn 'kt b'!")
+                            except Exception as e:
+                                print(f"Lỗi khi grab hoặc nhắn kt b: {e}")
 
-                    threading.Timer(delay, grab).start()
+                        threading.Timer(delay, grab).start()
 
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
@@ -68,7 +68,7 @@ def create_bot(token, is_main=False):
 main_bot = create_bot(main_token, is_main=True)
 
 for token in tokens:
-    bots.append(create_bot(token))
+    bots.append(create_bot(token, is_main=False))
 
 app = Flask(__name__)
 
