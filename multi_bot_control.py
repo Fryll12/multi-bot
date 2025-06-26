@@ -101,6 +101,20 @@ HTML = """
     <button name="toggle" value="off" type="submit">Tắt</button>
 </form>
 <p>Trạng thái hiện tại: <b>{status}</b></p>
+<hr>
+<h3>Gửi danh sách mã theo acc chọn</h3>
+<form method="POST">
+    <label>Chọn acc:</label>
+    <select name="acc_index">
+""" + "".join(f'<option value="{i}">Acc {i+1}</option>' for i in range(len(bots))) + """
+    </select>
+    <br><br>
+    <input type="text" name="prefix" placeholder="Nội dung mẫu (vd: kt n)" style="width:300px">
+    <br><br>
+    <textarea name="codes" placeholder="Danh sách mã, cách nhau dấu phẩy" style="width:300px; height:100px"></textarea>
+    <br><br>
+    <button type="submit" name="send_codes" value="1">Gửi</button>
+</form>
 """
 
 @app.route("/", methods=["GET", "POST"])
@@ -112,6 +126,7 @@ def index():
         msg = request.form.get("message")
         quickmsg = request.form.get("quickmsg")
         toggle = request.form.get("toggle")
+        send_codes = request.form.get("send_codes")
 
         if msg:
             for idx, bot in enumerate(bots):
@@ -132,6 +147,32 @@ def index():
         if toggle:
             auto_grab_enabled = toggle == "on"
             msg_status = f"Tự grab {'đã bật' if auto_grab_enabled else 'đã tắt'}"
+
+        if send_codes:
+            acc_index = int(request.form.get("acc_index", 0))
+            prefix = request.form.get("prefix", "").strip()
+            codes_raw = request.form.get("codes", "")
+
+            if acc_index < 0 or acc_index >= len(bots):
+                return "Acc không hợp lệ!"
+
+            codes = [c.strip() for c in codes_raw.split(",") if c.strip()]
+            if not prefix or not codes:
+                return "Thiếu nội dung mẫu hoặc danh sách mã!"
+
+            bot = bots[acc_index]
+
+            def send_sequence():
+                for i, code in enumerate(codes):
+                    try:
+                        time.sleep(11 * i)
+                        bot.sendMessage(other_channel_id, f"{prefix} {code}")
+                        print(f"[Acc {acc_index+1}] → Đã gửi: {prefix} {code}")
+                    except Exception as e:
+                        print(f"Lỗi gửi mã: {e}")
+
+            threading.Thread(target=send_sequence, daemon=True).start()
+            msg_status = "Đã bắt đầu gửi mã!"
 
     status = "Đang bật" if auto_grab_enabled else "Đang tắt"
     return HTML.format(status=status) + (f"<p>{msg_status}</p>" if msg_status else "")
