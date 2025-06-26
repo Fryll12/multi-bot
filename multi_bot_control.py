@@ -20,6 +20,11 @@ bots = []
 main_bot = None
 auto_grab_enabled = False
 
+acc_names = [
+    "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
+    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker"
+]
+
 def create_bot(token, is_main=False):
     bot = discum.Client(token=token, log=False)
 
@@ -106,12 +111,14 @@ HTML = """
 <form method="POST">
     <label>Chọn acc:</label>
     <select name="acc_index">
-""" + "".join(f'<option value="{i}">Acc {i+1}</option>' for i in range(len(bots))) + """
+""" + "".join(f'<option value="{i}">{acc_names[i]}</option>' for i in range(len(bots))) + """
     </select>
     <br><br>
     <input type="text" name="prefix" placeholder="Nội dung mẫu (vd: kt n)" style="width:300px">
     <br><br>
     <textarea name="codes" placeholder="Danh sách mã, cách nhau dấu phẩy" style="width:300px; height:100px"></textarea>
+    <br><br>
+    <input type="number" name="delay" placeholder="Thời gian giữa các tin nhắn (giây)" min="1" value="11">
     <br><br>
     <button type="submit" name="send_codes" value="1">Gửi</button>
 </form>
@@ -152,6 +159,7 @@ def index():
             acc_index = int(request.form.get("acc_index", 0))
             prefix = request.form.get("prefix", "").strip()
             codes_raw = request.form.get("codes", "")
+            delay = float(request.form.get("delay", 11))
 
             if acc_index < 0 or acc_index >= len(bots):
                 return "Acc không hợp lệ!"
@@ -165,9 +173,9 @@ def index():
             def send_sequence():
                 for i, code in enumerate(codes):
                     try:
-                        time.sleep(11 * i)
+                        time.sleep(delay * i)
                         bot.sendMessage(other_channel_id, f"{prefix} {code}")
-                        print(f"[Acc {acc_index+1}] → Đã gửi: {prefix} {code}")
+                        print(f"[{acc_names[acc_index]}] → Đã gửi: {prefix} {code}")
                     except Exception as e:
                         print(f"Lỗi gửi mã: {e}")
 
