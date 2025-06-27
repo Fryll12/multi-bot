@@ -19,7 +19,6 @@ karuta_id = "646937666251915264"
 bots = []
 main_bot = None
 auto_grab_enabled = False
-
 acc_names = [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
     "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker"
@@ -111,14 +110,15 @@ HTML = """
 <form method="POST">
     <label>Chọn acc:</label>
     <select name="acc_index">
-""" + "".join(f'<option value="{i}">{acc_names[i]}</option>' for i in range(len(bots))) + """
+""" + "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names)) + """
     </select>
     <br><br>
     <input type="text" name="prefix" placeholder="Nội dung mẫu (vd: kt n)" style="width:300px">
     <br><br>
     <textarea name="codes" placeholder="Danh sách mã, cách nhau dấu phẩy" style="width:300px; height:100px"></textarea>
     <br><br>
-    <input type="number" name="delay" placeholder="Thời gian giữa các tin nhắn (giây)" min="1" value="11">
+    <label>Thời gian cách nhau (giây):</label>
+    <input type="number" step="0.1" name="delay" placeholder="11" value="11">
     <br><br>
     <button type="submit" name="send_codes" value="1">Gửi</button>
 </form>
@@ -159,7 +159,7 @@ def index():
             acc_index = int(request.form.get("acc_index", 0))
             prefix = request.form.get("prefix", "").strip()
             codes_raw = request.form.get("codes", "")
-            delay = float(request.form.get("delay", 11))
+            delay = float(request.form.get("delay", "11"))
 
             if acc_index < 0 or acc_index >= len(bots):
                 return "Acc không hợp lệ!"
@@ -169,17 +169,15 @@ def index():
                 return "Thiếu nội dung mẫu hoặc danh sách mã!"
 
             bot = bots[acc_index]
+            acc_name = acc_names[acc_index]
 
-            def send_sequence():
-                for i, code in enumerate(codes):
-                    try:
-                        time.sleep(delay * i)
-                        bot.sendMessage(other_channel_id, f"{prefix} {code}")
-                        print(f"[{acc_names[acc_index]}] → Đã gửi: {prefix} {code}")
-                    except Exception as e:
-                        print(f"Lỗi gửi mã: {e}")
+            for i, code in enumerate(codes):
+                try:
+                    threading.Timer(delay * i, bot.sendMessage, args=(other_channel_id, f"{prefix} {code}")).start()
+                    print(f"[{acc_name}] → Đã lên lịch gửi sau {delay * i}s: {prefix} {code}")
+                except Exception as e:
+                    print(f"Lỗi gửi mã: {e}")
 
-            threading.Thread(target=send_sequence, daemon=True).start()
             msg_status = "Đã bắt đầu gửi mã!"
 
     status = "Đang bật" if auto_grab_enabled else "Đang tắt"
