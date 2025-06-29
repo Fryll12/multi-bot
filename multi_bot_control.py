@@ -103,7 +103,7 @@ HTML = """
     <button type="submit">Gửi</button>
 </form>
 <hr>
-<h3>Tự grab khi Karuta tự drop</h3>
+<h3>Auto Grab</h3>
 <form method="POST">
     <button name="toggle" value="on" type="submit">Bật</button>
     <button name="toggle" value="off" type="submit">Tắt</button>
@@ -127,7 +127,7 @@ HTML = """
     <button type="submit" name="send_codes" value="1">Gửi</button>
 </form>
 <hr>
-<h3>Spam 2 phút - 12 acc nhắn cách nhau 2s</h3>
+<h3>Spam </h3>
 <form method="POST">
     <input type="text" name="spammsg" placeholder="Nội dung spam" style="width:300px" value="{spammsg}">
     <button name="spamtoggle" value="on" type="submit">Bật</button>
@@ -214,7 +214,7 @@ def spam_loop():
                     time.sleep(2)
                 except Exception as e:
                     print(f"Lỗi gửi spam: {e}")
-        time.sleep(120)
+        time.sleep(180)
 
 threading.Thread(target=spam_loop, daemon=True).start()
 
