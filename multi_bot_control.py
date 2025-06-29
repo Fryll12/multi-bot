@@ -214,7 +214,7 @@ def spam_loop():
                     time.sleep(2)
                 except Exception as e:
                     print(f"Lỗi gửi spam: {e}")
-        time.sleep(180)
+        time.sleep(30)
 
 threading.Thread(target=spam_loop, daemon=True).start()
 
