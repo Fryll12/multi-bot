@@ -24,6 +24,10 @@ acc_names = [
     "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker"
 ]
 
+spam_enabled = False
+spam_message = ""
+spam_channel_id = "1388802151723302912"
+
 def create_bot(token, is_main=False):
     bot = discum.Client(token=token, log=False)
 
@@ -122,11 +126,19 @@ HTML = """
     <br><br>
     <button type="submit" name="send_codes" value="1">Gửi</button>
 </form>
+<hr>
+<h3>Spam 2 phút - 12 acc nhắn cách nhau 2s</h3>
+<form method="POST">
+    <input type="text" name="spammsg" placeholder="Nội dung spam" style="width:300px" value="{spammsg}">
+    <button name="spamtoggle" value="on" type="submit">Bật</button>
+    <button name="spamtoggle" value="off" type="submit">Tắt</button>
+</form>
+<p>Spam hiện tại: <b>{spamstatus}</b></p>
 """
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global auto_grab_enabled
+    global auto_grab_enabled, spam_enabled, spam_message
     msg_status = ""
 
     if request.method == "POST":
@@ -134,6 +146,8 @@ def index():
         quickmsg = request.form.get("quickmsg")
         toggle = request.form.get("toggle")
         send_codes = request.form.get("send_codes")
+        spamtoggle = request.form.get("spamtoggle")
+        spammsg = request.form.get("spammsg", "")
 
         if msg:
             for idx, bot in enumerate(bots):
@@ -180,8 +194,29 @@ def index():
 
             msg_status = "Đã bắt đầu gửi mã!"
 
+        if spamtoggle:
+            spam_enabled = spamtoggle == "on"
+            spam_message = spammsg.strip()
+            msg_status = f"Spam {'đã bật' if spam_enabled else 'đã tắt'}"
+
     status = "Đang bật" if auto_grab_enabled else "Đang tắt"
-    return HTML.format(status=status) + (f"<p>{msg_status}</p>" if msg_status else "")
+    spamstatus = "Đang bật" if spam_enabled else "Đang tắt"
+    return HTML.format(status=status, spamstatus=spamstatus, spammsg=spam_message) + (f"<p>{msg_status}</p>" if msg_status else "")
+
+def spam_loop():
+    global spam_enabled, spam_message
+    while True:
+        if spam_enabled and spam_message:
+            for idx, bot in enumerate(bots):
+                try:
+                    bot.sendMessage(spam_channel_id, spam_message)
+                    print(f"[{acc_names[idx]}] đã gửi: {spam_message}")
+                    time.sleep(2)
+                except Exception as e:
+                    print(f"Lỗi gửi spam: {e}")
+        time.sleep(120)
+
+threading.Thread(target=spam_loop, daemon=True).start()
 
 def keep_alive():
     app.run(host="0.0.0.0", port=8080)
