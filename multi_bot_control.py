@@ -22,9 +22,6 @@ kribbit_id = "1274445226064220273"
 bots = []
 main_bot = None
 auto_grab_enabled = False
-waiting_kribbit = False
-last_drop_msg_id = None
-
 acc_names = [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
     "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker"
@@ -36,6 +33,7 @@ spam_channel_id = "1388802151723302912"
 
 def create_bot(token, is_main=False):
     bot = discum.Client(token=token, log=False)
+    bot.listen_for_kribbit = False
 
     @bot.gateway.command
     def on_ready(resp):
@@ -49,7 +47,7 @@ def create_bot(token, is_main=False):
     if is_main:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled, waiting_kribbit, last_drop_msg_id
+            global auto_grab_enabled
 
             if resp.event.message:
                 msg = resp.parsed.auto()
@@ -60,23 +58,25 @@ def create_bot(token, is_main=False):
 
                 if author == karuta_id and channel == main_channel_id:
                     if "is dropping" not in content and not mentions and auto_grab_enabled:
-                        waiting_kribbit = True
-                        last_drop_msg_id = msg["id"]
-                        print("[Bot chính] Phát hiện tự drop → Chờ tin nhắn Kribbit...")
+                        print(f"Phát hiện tự drop → Chờ 0.5s rồi đọc tin nhắn Kribbit...")
 
-                if waiting_kribbit and author == kribbit_id and channel == main_channel_id:
-                    desc = msg.get("content", "")
-                    hearts = re.findall(r'❤️\s*(\d+)', desc)
+                        def wait_and_listen():
+                            time.sleep(0.5)
+                            bot.listen_for_kribbit = True
+
+                        threading.Thread(target=wait_and_listen, daemon=True).start()
+
+                if author == kribbit_id and channel == main_channel_id and bot.listen_for_kribbit:
+                    hearts = re.findall(r'❤️\s*(\d+)', content)
                     if len(hearts) >= 3:
-                        nums = list(map(int, hearts[:3]))
-                        max_index = nums.index(max(nums)) + 1
-                        emoji = f"{max_index}\u20E3"
-                        delay = {1: 1.3, 2: 2.3, 3: 3}[max_index]
-                        print(f"[Bot chính] Phân tích Kribbit: {nums} → Chọn emoji {emoji} sau {delay}s")
+                        max_heart = max((int(h), i+1) for i, h in enumerate(hearts))[1]
+                        emoji = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣"}[max_heart]
+                        delay = {"1️⃣": 1.3, "2️⃣": 2.3, "3️⃣": 3}[emoji]
+                        print(f"Phát hiện Kribbit → Số tim: {hearts} → Chọn {emoji} → Grab sau {delay}s")
 
                         def grab():
                             try:
-                                bot.addReaction(channel, last_drop_msg_id, emoji)
+                                bot.addReaction(channel, msg["id"], emoji)
                                 print("Đã thả emoji grab!")
                                 bot.sendMessage(ktb_channel_id, "kt b")
                                 print("Đã nhắn 'kt b'!")
@@ -84,7 +84,7 @@ def create_bot(token, is_main=False):
                                 print(f"Lỗi khi grab hoặc nhắn kt b: {e}")
 
                         threading.Timer(delay, grab).start()
-                        waiting_kribbit = False
+                        bot.listen_for_kribbit = False
 
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
