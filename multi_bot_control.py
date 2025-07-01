@@ -3,8 +3,6 @@ import threading
 import time
 import os
 import random
-import re
-import requests
 from flask import Flask, request, render_template_string
 from dotenv import load_dotenv
 
@@ -30,7 +28,6 @@ spam_enabled = False
 spam_message = ""
 spam_channel_id = "1388802151723302912"
 
-# ----- Phần bot tự grab acc chính -----
 def create_bot(token, is_main=False):
     bot = discum.Client(token=token, log=False)
 
@@ -80,7 +77,6 @@ main_bot = create_bot(main_token, is_main=True)
 for token in tokens:
     bots.append(create_bot(token, is_main=False))
 
-# ----- Phần web điều khiển -----
 app = Flask(__name__)
 
 HTML = """
@@ -227,6 +223,5 @@ def keep_alive():
 
 threading.Thread(target=keep_alive, daemon=True).start()
 
-# ----- Phần giữ sống cũ -----
 while True:
     time.sleep(60)
