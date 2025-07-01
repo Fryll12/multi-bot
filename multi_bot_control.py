@@ -29,9 +29,19 @@ spam_enabled = False
 spam_message = ""
 spam_channel_id = "1388802151723302912"
 
+def extract_heart_counts(content):
+    lines = content.split("\n")
+    heart_counts = {}
+    for line in lines:
+        match = re.match(r"(\d+)\. .*?❤️\s*(\d+)", line)
+        if match:
+            idx = int(match.group(1))
+            count = int(match.group(2))
+            heart_counts[idx] = count
+    return heart_counts
+
 def create_bot(token, is_main=False):
     bot = discum.Client(token=token, log=False)
-    waiting_for_kribbit = {"status": False, "msg_id": None, "timestamp": 0}
 
     @bot.gateway.command
     def on_ready(resp):
@@ -56,43 +66,29 @@ def create_bot(token, is_main=False):
 
                 if author == karuta_id and channel == main_channel_id:
                     if "is dropping" not in content and not mentions and auto_grab_enabled:
-                        waiting_for_kribbit["status"] = True
-                        waiting_for_kribbit["msg_id"] = msg["id"]
-                        waiting_for_kribbit["timestamp"] = time.time()
-                        print("Phát hiện tự drop → Chờ tin nhắn Kribbit...")
+                        print("Phát hiện tự drop → Chờ nội dung Kribbit...")
 
-                # Phát hiện tin nhắn Kribbit
-                if waiting_for_kribbit["status"] and channel == main_channel_id and author != karuta_id:
-                    desc = msg.get("content", "")
-                    if "❤️" in desc and "1." in desc and "2." in desc and "3." in desc:
-                        try:
-                            lines = desc.split("\n")
-                            hearts = []
-                            for line in lines:
-                                match = re.search(r"❤️\s*(\d+)", line)
-                                if match:
-                                    hearts.append(int(match.group(1)))
+                if author == "800447559389388810" and channel == main_channel_id and auto_grab_enabled:
+                    if "❤️" in content and "1." in content and "2." in content and "3." in content:
+                        heart_counts = extract_heart_counts(content)
+                        if heart_counts:
+                            best_idx = max(heart_counts, key=lambda x: heart_counts[x])
+                            emoji_map = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣"}
+                            emoji = emoji_map.get(best_idx)
+                            delay = {"1️⃣": 1.3, "2️⃣": 2.3, "3️⃣": 3}[emoji]
 
-                            if len(hearts) >= 3:
-                                max_index = hearts.index(max(hearts))
-                                emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
-                                delay = {"1️⃣": 1.3, "2️⃣": 2.3, "3️⃣": 3}[emoji]
-                                print(f"Đã đọc Kribbit → Chọn emoji {emoji} ({hearts}) → Grab sau {delay}s")
+                            print(f"Phát hiện Kribbit → Số tim cao nhất là thẻ {best_idx} ({heart_counts[best_idx]}❤️) → Thả emoji {emoji} sau {delay}s")
 
-                                def grab():
-                                    try:
-                                        bot.addReaction(channel, waiting_for_kribbit["msg_id"], emoji)
-                                        print("Đã thả emoji grab!")
-                                        bot.sendMessage(ktb_channel_id, "kt b")
-                                        print("Đã nhắn 'kt b'!")
-                                    except Exception as e:
-                                        print(f"Lỗi khi grab hoặc nhắn kt b: {e}")
+                            def grab():
+                                try:
+                                    bot.addReaction(channel, msg["id"], emoji)
+                                    print("Đã thả emoji grab!")
+                                    bot.sendMessage(ktb_channel_id, "kt b")
+                                    print("Đã nhắn 'kt b'!")
+                                except Exception as e:
+                                    print(f"Lỗi khi grab hoặc nhắn kt b: {e}")
 
-                                threading.Timer(delay, grab).start()
-
-                                waiting_for_kribbit["status"] = False
-                        except Exception as e:
-                            print(f"Lỗi đọc Kribbit: {e}")
+                            threading.Timer(delay, grab).start()
 
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
