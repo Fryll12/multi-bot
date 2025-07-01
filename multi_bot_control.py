@@ -216,20 +216,7 @@ def spam_loop():
                     print(f"Lỗi gửi spam: {e}")
         time.sleep(30)
 
-def acc_sequence_loop():
-    while True:
-        for idx, bot in enumerate(bots):
-            try:
-                bot.sendMessage(other_channel_id, "kc o:ef")
-                print(f"[{acc_names[idx]}] đã gửi kc o:ef")
-                time.sleep(60)
-            except Exception as e:
-                print(f"Lỗi acc {acc_names[idx]}: {e}")
-        print("Đã xong 12 acc, đợi 12 tiếng 15 phút")
-        time.sleep(12 * 3600 + 15 * 60)
-
 threading.Thread(target=spam_loop, daemon=True).start()
-threading.Thread(target=acc_sequence_loop, daemon=True).start()
 
 def keep_alive():
     app.run(host="0.0.0.0", port=8080)
