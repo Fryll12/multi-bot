@@ -3,7 +3,6 @@ import threading
 import time
 import os
 import random
-import re
 from flask import Flask, request, render_template_string
 from dotenv import load_dotenv
 
@@ -17,8 +16,6 @@ other_channel_id = "1387406577040101417"
 ktb_channel_id = "1376777071279214662"
 
 karuta_id = "646937666251915264"
-kribbit_id = "1274445226064220273"
-
 bots = []
 main_bot = None
 auto_grab_enabled = False
@@ -33,7 +30,6 @@ spam_channel_id = "1388802151723302912"
 
 def create_bot(token, is_main=False):
     bot = discum.Client(token=token, log=False)
-    bot.listen_for_kribbit = False
 
     @bot.gateway.command
     def on_ready(resp):
@@ -58,21 +54,9 @@ def create_bot(token, is_main=False):
 
                 if author == karuta_id and channel == main_channel_id:
                     if "is dropping" not in content and not mentions and auto_grab_enabled:
-                        print(f"Phát hiện tự drop → Chờ 0.5s rồi đọc tin nhắn Kribbit...")
-
-                        def wait_and_listen():
-                            time.sleep(0.5)
-                            bot.listen_for_kribbit = True
-
-                        threading.Thread(target=wait_and_listen, daemon=True).start()
-
-                if author == kribbit_id and channel == main_channel_id and bot.listen_for_kribbit:
-                    hearts = re.findall(r'❤️\s*(\d+)', content)
-                    if len(hearts) >= 3:
-                        max_heart = max((int(h), i+1) for i, h in enumerate(hearts))[1]
-                        emoji = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣"}[max_heart]
+                        emoji = random.choice(["1️⃣", "2️⃣", "3️⃣"])
                         delay = {"1️⃣": 1.3, "2️⃣": 2.3, "3️⃣": 3}[emoji]
-                        print(f"Phát hiện Kribbit → Số tim: {hearts} → Chọn {emoji} → Grab sau {delay}s")
+                        print(f"Phát hiện tự drop → Chọn emoji {emoji} → Grab sau {delay}s")
 
                         def grab():
                             try:
@@ -84,7 +68,6 @@ def create_bot(token, is_main=False):
                                 print(f"Lỗi khi grab hoặc nhắn kt b: {e}")
 
                         threading.Timer(delay, grab).start()
-                        bot.listen_for_kribbit = False
 
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
