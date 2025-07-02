@@ -118,8 +118,6 @@ main_bot = create_bot(main_token, is_main=True)
 for token in tokens:
     bots.append(create_bot(token, is_main=False))
 
-bots.append(main_bot)
-
 app = Flask(__name__)
 
 HTML = """
@@ -233,15 +231,19 @@ def index():
             codes_raw = request.form.get("codes", "")
             delay = float(request.form.get("delay", "11"))
 
-            if acc_index < 0 or acc_index >= len(bots):
+            if acc_index < 0 or acc_index > len(bots):
                 return "Acc không hợp lệ!"
 
             codes = [c.strip() for c in codes_raw.split(",") if c.strip()]
             if not prefix or not codes:
                 return "Thiếu nội dung mẫu hoặc danh sách mã!"
 
-            bot = bots[acc_index]
             acc_name = acc_names[acc_index]
+
+            if acc_index == len(bots):  # sly_dd
+                bot = main_bot
+            else:
+                bot = bots[acc_index]
 
             for i, code in enumerate(codes):
                 try:
