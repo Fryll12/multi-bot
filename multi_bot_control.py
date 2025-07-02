@@ -62,7 +62,7 @@ def create_bot(token, is_main=False):
                         last_drop_msg_id = msg["id"]  # Lưu lại ID tin nhắn drop
 
                         def read_karibbit():
-                            time.sleep(1)
+                            time.sleep(0.2)
                             messages = bot.getMessages(main_channel_id, num=5).json()
                             for msg in messages:
                                 author_id = msg.get("author", {}).get("id")
