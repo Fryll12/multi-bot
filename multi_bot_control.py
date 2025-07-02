@@ -25,7 +25,7 @@ heart_threshold = 50
 last_drop_msg_id = ""
 acc_names = [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
-    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker"
+    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "sly_dd"
 ]
 
 spam_enabled = False
@@ -59,10 +59,10 @@ def create_bot(token, is_main=False):
                 if author == karuta_id and channel == main_channel_id:
                     if "is dropping" not in content and not mentions and auto_grab_enabled:
                         print("\n[Bot] Phát hiện tự drop! Đọc tin nhắn Karibbit...\n")
-                        last_drop_msg_id = msg["id"]  # Lưu lại ID tin nhắn drop
+                        last_drop_msg_id = msg["id"]
 
                         def read_karibbit():
-                            time.sleep(0.4)
+                            time.sleep(0.5)
                             messages = bot.getMessages(main_channel_id, num=5).json()
                             for msg in messages:
                                 author_id = msg.get("author", {}).get("id")
@@ -92,7 +92,7 @@ def create_bot(token, is_main=False):
                                         else:
                                             max_index = heart_numbers.index(max_num)
                                             emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
-                                            delay = {"1️⃣": 0.5, "2️⃣": 1.7, "3️⃣": 2.2}[emoji]
+                                            delay = {"1️⃣": 0.5, "2️⃣": 1.5, "3️⃣": 2.2}[emoji]
                                             print(f"[Bot] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
 
                                             def grab():
@@ -117,6 +117,8 @@ main_bot = create_bot(main_token, is_main=True)
 
 for token in tokens:
     bots.append(create_bot(token, is_main=False))
+
+bots.append(main_bot)
 
 app = Flask(__name__)
 
