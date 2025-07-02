@@ -22,6 +22,7 @@ bots = []
 main_bot = None
 auto_grab_enabled = False
 heart_threshold = 50
+last_drop_msg_id = ""
 acc_names = [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
     "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker"
@@ -46,7 +47,7 @@ def create_bot(token, is_main=False):
     if is_main:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled, heart_threshold
+            global auto_grab_enabled, heart_threshold, last_drop_msg_id
 
             if resp.event.message:
                 msg = resp.parsed.auto()
@@ -58,6 +59,7 @@ def create_bot(token, is_main=False):
                 if author == karuta_id and channel == main_channel_id:
                     if "is dropping" not in content and not mentions and auto_grab_enabled:
                         print("\n[Bot] Phát hiện tự drop! Đọc tin nhắn Karibbit...\n")
+                        last_drop_msg_id = msg["id"]  # Lưu lại ID tin nhắn drop
 
                         def read_karibbit():
                             time.sleep(1)
@@ -95,7 +97,7 @@ def create_bot(token, is_main=False):
 
                                             def grab():
                                                 try:
-                                                    bot.addReaction(main_channel_id, msg["id"], emoji)
+                                                    bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
                                                     print("Đã thả emoji grab!")
                                                     bot.sendMessage(ktb_channel_id, "kt b")
                                                     print("Đã nhắn 'kt b'!")
