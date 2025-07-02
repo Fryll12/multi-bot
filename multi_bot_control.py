@@ -62,7 +62,7 @@ def create_bot(token, is_main=False):
                         last_drop_msg_id = msg["id"]  # Lưu lại ID tin nhắn drop
 
                         def read_karibbit():
-                            time.sleep(0.2)
+                            time.sleep(0.4)
                             messages = bot.getMessages(main_channel_id, num=5).json()
                             for msg in messages:
                                 author_id = msg.get("author", {}).get("id")
@@ -92,7 +92,7 @@ def create_bot(token, is_main=False):
                                         else:
                                             max_index = heart_numbers.index(max_num)
                                             emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
-                                            delay = {"1️⃣": 0.9, "2️⃣": 1.7, "3️⃣": 2.2}[emoji]
+                                            delay = {"1️⃣": 0.5, "2️⃣": 1.7, "3️⃣": 2.2}[emoji]
                                             print(f"[Bot] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
 
                                             def grab():
