@@ -3,9 +3,9 @@ import threading
 import time
 import os
 import random
-from flask import Flask, request, render_template_string
-from dotenv import load_dotenv
 import re
+from flask import Flask, request
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -16,25 +16,22 @@ main_channel_id = "1386973916563767396"
 other_channel_id = "1387406577040101417"
 ktb_channel_id = "1376777071279214662"
 karibbit_id = "1274445226064220273"
-
 karuta_id = "646937666251915264"
+
 bots = []
 main_bot = None
 auto_grab_enabled = False
+heart_mode_enabled = False
+heart_threshold = 50
+waiting_karibbit = False
+last_drop_msg_id = ""
+spam_enabled = False
+spam_message = ""
+spam_channel_id = "1388802151723302912"
 acc_names = [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
     "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker"
 ]
-
-spam_enabled = False
-spam_message = ""
-spam_channel_id = "1388802151723302912"
-
-heart_mode_enabled = False
-heart_threshold = 50
-
-waiting_karibbit = False
-last_drop_msg_id = ""
 
 def create_bot(token, is_main=False):
     bot = discum.Client(token=token, log=False)
@@ -88,8 +85,7 @@ def read_karibbit(bot):
                 for line in lines[:3]:
                     match = re.findall(r'`(\d+)`', line)
                     if len(match) >= 2:
-                        heart = int(match[1])
-                        heart_numbers.append(heart)
+                        heart_numbers.append(int(match[1]))
                     else:
                         heart_numbers.append(0)
 
@@ -117,7 +113,6 @@ def read_karibbit(bot):
     waiting_karibbit = False
 
 main_bot = create_bot(main_token, is_main=True)
-
 for token in tokens:
     bots.append(create_bot(token))
 
@@ -207,6 +202,7 @@ def index():
     status = "Đang bật" if auto_grab_enabled else "Đang tắt"
     spamstatus = "Đang bật" if spam_enabled else "Đang tắt"
     heart_status = "Đang bật" if heart_mode_enabled else "Đang tắt"
+
     return HTML.format(status=status, spamstatus=spamstatus, spammsg=spam_message, heart_status=heart_status, heart_threshold=heart_threshold) + (f"<p>{msg_status}</p>" if msg_status else "")
 
 def spam_loop():
@@ -223,7 +219,6 @@ def spam_loop():
         time.sleep(30)
 
 threading.Thread(target=spam_loop, daemon=True).start()
-
 app.run(host="0.0.0.0", port=8080)
 
 while True:
