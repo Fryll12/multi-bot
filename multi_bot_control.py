@@ -92,7 +92,7 @@ def create_bot(token, is_main=False):
                                         else:
                                             max_index = heart_numbers.index(max_num)
                                             emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
-                                            delay = {"1️⃣": 1.3, "2️⃣": 2.3, "3️⃣": 3}[emoji]
+                                            delay = {"1️⃣": 0.9, "2️⃣": 1.7, "3️⃣": 2.2}[emoji]
                                             print(f"[Bot] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
 
                                             def grab():
