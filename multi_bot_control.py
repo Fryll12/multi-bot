@@ -73,41 +73,39 @@ def read_karibbit(bot):
     try:
         messages = bot.getMessages(main_channel_id, num=5).json()
         for msg in messages:
-            if msg.get("author", {}).get("id") == karibbit_id:
-                content = msg.get("content", "")
-                print("[Bot] ===== Tin nhắn Karibbit đọc được =====")
-                print(content)
-                print("[Bot] ===== Kết thúc tin nhắn =====")
+            if msg.get("author", {}).get("id") == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
+                desc = msg["embeds"][0].get("description", "")
+                print("\n[Bot] ===== Tin nhắn Karibbit đọc được =====\n" + desc + "\n[Bot] ===== Kết thúc tin nhắn =====\n")
 
-                lines = content.split('\n')
+                lines = desc.split('\n')
                 heart_numbers = []
 
-                for line in lines[:3]:
-                    match = re.findall(r'`(\d+)`', line)
-                    if len(match) >= 2:
-                        heart_numbers.append(int(match[1]))
+                for i, line in enumerate(lines[:3]):
+                    matches = re.findall(r'`([^`]*)`', line)
+                    if len(matches) >= 2 and matches[1].isdigit():
+                        num = int(matches[1])
+                        heart_numbers.append(num)
+                        print(f"[Bot] Dòng {i+1} số tim: {num}")
                     else:
                         heart_numbers.append(0)
-
-                print(f"[Bot] Số tim: {heart_numbers}")
+                        print(f"[Bot] Dòng {i+1} không tìm thấy số tim, mặc định 0")
 
                 if sum(heart_numbers) == 0:
                     print("[Bot] Không có số tim nào, bỏ qua.\n")
                     break
 
-                max_heart = max(heart_numbers)
-                max_index = heart_numbers.index(max_heart)
+                max_num = max(heart_numbers)
+                max_index = heart_numbers.index(max_num)
                 emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
+                print(f"[Bot] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji}\n")
 
-                if heart_mode_enabled and max_heart < heart_threshold:
-                    print(f"[Bot] Số tim cao nhất {max_heart} < {heart_threshold}, bỏ qua.\n")
-                else:
-                    delay = {"1️⃣": 1.3, "2️⃣": 2.3, "3️⃣": 3}[emoji]
-                    print(f"[Bot] Chọn emoji {emoji} → Grab sau {delay}s")
-                    time.sleep(delay)
-                    bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                    print("[Bot] Đã thả emoji grab!\n")
+                delay = {"1️⃣": 1.3, "2️⃣": 2.3, "3️⃣": 3}[emoji]
+                print(f"[Bot] Sẽ thả emoji {emoji} sau {delay} giây...\n")
+                time.sleep(delay)
+                bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                print(f"[Bot] Đã thả emoji {emoji}!\n")
                 break
+
     except Exception as e:
         print(f"[Bot] Lỗi đọc Karibbit: {e}")
     waiting_karibbit = False
@@ -119,9 +117,68 @@ for token in tokens:
 app = Flask(__name__)
 
 HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>Tool Karuta Deep</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    color: #333;
+}
+.container {
+    display: flex;
+    flex-wrap: wrap;
+    max-width: 1000px;
+    margin: 30px auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+.left, .right {
+    flex: 1 1 400px;
+    padding: 10px;
+    min-width: 300px;
+}
+.left {
+    border-right: 1px solid #ccc;
+}
+h2, h3 {
+    color: #007BFF;
+}
+button {
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    margin-top: 5px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+button:hover {
+    background-color: #0056b3;
+}
+input, textarea, select {
+    margin-top: 5px;
+    width: 100%;
+    padding: 5px;
+    margin-bottom: 10px;
+}
+p {
+    background: #e9ecef;
+    padding: 5px;
+    border-radius: 4px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="left">
 <h2>Điều khiển bot nhắn tin</h2>
 <form method="POST">
-    <input type="text" name="message" placeholder="Nhập nội dung..." style="width:300px">
+    <input type="text" name="message" placeholder="Nhập nội dung...">
     <button type="submit">Gửi thủ công</button>
 </form>
 <hr>
@@ -142,30 +199,14 @@ HTML = """
     <button type="submit">Gửi</button>
 </form>
 <hr>
-<h3>Gửi danh sách mã theo acc chọn</h3>
-<form method="POST">
-    <label>Chọn acc:</label>
-    <select name="acc_index">
-""" + "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names)) + """
-    </select>
-    <br><br>
-    <input type="text" name="prefix" placeholder="Nội dung mẫu (vd: kt n)" style="width:300px">
-    <br><br>
-    <textarea name="codes" placeholder="Danh sách mã, cách nhau dấu phẩy" style="width:300px; height:100px"></textarea>
-    <br><br>
-    <label>Thời gian cách nhau (giây):</label>
-    <input type="number" step="0.1" name="delay" placeholder="11" value="11">
-    <br><br>
-    <button type="submit" name="send_codes" value="1">Gửi</button>
-</form>
-<hr>
 <h3>Auto Grab</h3>
 <form method="POST">
     <button name="toggle" value="on" type="submit">Bật</button>
     <button name="toggle" value="off" type="submit">Tắt</button>
 </form>
 <p>Trạng thái hiện tại: <b>{status}</b></p>
-<hr>
+</div>
+<div class="right">
 <h3>Chế độ tiêu chuẩn số tim</h3>
 <form method="POST">
     <button name="heartmode" value="on" type="submit">Bật</button>
@@ -177,11 +218,15 @@ HTML = """
 <hr>
 <h3>Spam </h3>
 <form method="POST">
-    <input type="text" name="spammsg" placeholder="Nội dung spam" style="width:300px" value="{spammsg}">
+    <input type="text" name="spammsg" placeholder="Nội dung spam" value="{spammsg}">
     <button name="spamtoggle" value="on" type="submit">Bật</button>
     <button name="spamtoggle" value="off" type="submit">Tắt</button>
 </form>
 <p>Spam hiện tại: <b>{spamstatus}</b></p>
+</div>
+</div>
+</body>
+</html>
 """
 
 @app.route("/", methods=["GET", "POST"])
@@ -195,7 +240,6 @@ def index():
         spammsg = request.form.get("spammsg", "")
         heartmode = request.form.get("heartmode")
         heartthres = request.form.get("heartthreshold")
-        send_codes = request.form.get("send_codes")
 
         if toggle:
             auto_grab_enabled = toggle == "on"
@@ -217,36 +261,11 @@ def index():
             except:
                 msg_status = "Lỗi: tiêu chuẩn số tim phải là số nguyên!"
 
-        if send_codes:
-            acc_index = int(request.form.get("acc_index", 0))
-            prefix = request.form.get("prefix", "").strip()
-            codes_raw = request.form.get("codes", "")
-            delay = float(request.form.get("delay", "11"))
-
-            if acc_index < 0 or acc_index >= len(bots):
-                return "Acc không hợp lệ!"
-
-            codes = [c.strip() for c in codes_raw.split(",") if c.strip()]
-            if not prefix or not codes:
-                return "Thiếu nội dung mẫu hoặc danh sách mã!"
-
-            bot = bots[acc_index]
-            acc_name = acc_names[acc_index]
-
-            for i, code in enumerate(codes):
-                try:
-                    threading.Timer(delay * i, bot.sendMessage, args=(other_channel_id, f"{prefix} {code}")).start()
-                    print(f"[{acc_name}] → Đã lên lịch gửi sau {delay * i}s: {prefix} {code}")
-                except Exception as e:
-                    print(f"Lỗi gửi mã: {e}")
-
-            msg_status = "Đã bắt đầu gửi mã!"
-
     status = "Đang bật" if auto_grab_enabled else "Đang tắt"
     spamstatus = "Đang bật" if spam_enabled else "Đang tắt"
     heart_status = "Đang bật" if heart_mode_enabled else "Đang tắt"
 
-    return HTML.format(status=status, spamstatus=spamstatus, spammsg=spam_message, heart_status=heart_status, heart_threshold=heart_threshold) + (f"<p>{msg_status}</p>" if msg_status else "")
+    return HTML.format(status=status, spamstatus=spamstatus, spammsg=spam_message, heart_status=heart_status, heart_threshold=heart_threshold) + (f"<p style='text-align:center;'>{msg_status}</p>" if msg_status else "")
 
 def spam_loop():
     global spam_enabled, spam_message
