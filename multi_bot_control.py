@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 main_token = os.getenv("MAIN_TOKEN")
-tokens = os.getenv("TOKENS").split(",")
+tokens = os.getenv("TOKENS").split(",") if os.getenv("TOKENS") else []
 
 main_channel_id = "1386973916563767396"
 other_channel_id = "1387406577040101417"
@@ -117,7 +117,8 @@ def create_bot(token, is_main=False):
 main_bot = create_bot(main_token, is_main=True)
 
 for token in tokens:
-    bots.append(create_bot(token, is_main=False))
+    if token.strip():
+        bots.append(create_bot(token.strip(), is_main=False))
 
 app = Flask(__name__)
 
@@ -132,21 +133,21 @@ HTML = """
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         /* Global Styles */
-        * {
+        * {{
             box-sizing: border-box;
-        }
+        }}
 
-        body {
+        body {{
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #ffffff;
             margin: 0;
             padding: 20px 0;
-        }
+        }}
 
         /* Header Styles */
-        .header-section {
+        .header-section {{
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border-radius: 20px;
@@ -154,9 +155,9 @@ HTML = """
             margin-bottom: 2rem;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
+        }}
 
-        .header-section h1 {
+        .header-section h1 {{
             font-size: 2.5rem;
             font-weight: 700;
             background: linear-gradient(45deg, #00d4ff, #ff9500);
@@ -165,16 +166,16 @@ HTML = """
             background-clip: text;
             margin-bottom: 0.5rem;
             text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-        }
+        }}
 
-        .header-section p {
+        .header-section p {{
             font-size: 1.1rem;
             color: #b0b0b0;
             margin-bottom: 0;
-        }
+        }}
 
         /* Control Card Styles */
-        .control-card {
+        .control-card {{
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border-radius: 20px;
@@ -183,34 +184,34 @@ HTML = """
             transition: all 0.3s ease;
             overflow: hidden;
             margin-bottom: 2rem;
-        }
+        }}
 
-        .control-card:hover {
+        .control-card:hover {{
             transform: translateY(-5px);
             box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
             border-color: rgba(0, 212, 255, 0.3);
-        }
+        }}
 
-        .control-card .card-header {
+        .control-card .card-header {{
             background: linear-gradient(45deg, rgba(0, 212, 255, 0.2), rgba(255, 149, 0, 0.2));
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding: 1.5rem;
             border-radius: 20px 20px 0 0;
-        }
+        }}
 
-        .control-card .card-header h5 {
+        .control-card .card-header h5 {{
             color: #ffffff;
             font-weight: 600;
             margin: 0;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        }
+        }}
 
-        .control-card .card-body {
+        .control-card .card-body {{
             padding: 1.5rem;
-        }
+        }}
 
         /* Form Styles */
-        .form-control {
+        .form-control {{
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 12px;
@@ -218,20 +219,20 @@ HTML = """
             padding: 12px 16px;
             font-size: 1rem;
             transition: all 0.3s ease;
-        }
+        }}
 
-        .form-control:focus {
+        .form-control:focus {{
             background: rgba(255, 255, 255, 0.15);
             border-color: #00d4ff;
             box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.25);
             color: #ffffff;
-        }
+        }}
 
-        .form-control::placeholder {
+        .form-control::placeholder {{
             color: #b0b0b0;
-        }
+        }}
 
-        .form-select {
+        .form-select {{
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 12px;
@@ -239,35 +240,35 @@ HTML = """
             padding: 12px 16px;
             font-size: 1rem;
             transition: all 0.3s ease;
-        }
+        }}
 
-        .form-select:focus {
+        .form-select:focus {{
             background: rgba(255, 255, 255, 0.15);
             border-color: #00d4ff;
             box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.25);
             color: #ffffff;
-        }
+        }}
 
-        .form-select option {
+        .form-select option {{
             background: #1a1a2e;
             color: #ffffff;
-        }
+        }}
 
-        .form-label {
+        .form-label {{
             color: #ffffff;
             font-weight: 500;
             margin-bottom: 0.5rem;
-        }
+        }}
 
-        .input-group-text {
+        .input-group-text {{
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: #ffffff;
             border-radius: 12px 0 0 12px;
-        }
+        }}
 
         /* Button Styles */
-        .btn {
+        .btn {{
             border-radius: 12px;
             padding: 12px 24px;
             font-weight: 500;
@@ -278,9 +279,9 @@ HTML = """
             border: none;
             position: relative;
             overflow: hidden;
-        }
+        }}
 
-        .btn::before {
+        .btn::before {{
             content: '';
             position: absolute;
             top: 0;
@@ -289,56 +290,56 @@ HTML = """
             height: 100%;
             background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
             transition: left 0.5s ease;
-        }
+        }}
 
-        .btn:hover::before {
+        .btn:hover::before {{
             left: 100%;
-        }
+        }}
 
-        .btn-primary {
+        .btn-primary {{
             background: linear-gradient(45deg, #00d4ff, #0099cc);
             color: #ffffff;
             box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
-        }
+        }}
 
-        .btn-primary:hover {
+        .btn-primary:hover {{
             background: linear-gradient(45deg, #0099cc, #00d4ff);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0, 212, 255, 0.6);
-        }
+        }}
 
-        .btn-success {
+        .btn-success {{
             background: linear-gradient(45deg, #28a745, #20c997);
             color: #ffffff;
             box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
-        }
+        }}
 
-        .btn-success:hover {
+        .btn-success:hover {{
             background: linear-gradient(45deg, #20c997, #28a745);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
-        }
+        }}
 
-        .btn-danger {
+        .btn-danger {{
             background: linear-gradient(45deg, #dc3545, #e83e8c);
             color: #ffffff;
             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
-        }
+        }}
 
-        .btn-danger:hover {
+        .btn-danger:hover {{
             background: linear-gradient(45deg, #e83e8c, #dc3545);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(220, 53, 69, 0.6);
-        }
+        }}
 
         /* Status Indicators */
-        .status-indicator {
+        .status-indicator {{
             display: flex;
             align-items: center;
             margin-bottom: 1rem;
-        }
+        }}
 
-        .status-badge {
+        .status-badge {{
             display: inline-flex;
             align-items: center;
             padding: 8px 16px;
@@ -348,96 +349,96 @@ HTML = """
             text-transform: uppercase;
             letter-spacing: 0.5px;
             transition: all 0.3s ease;
-        }
+        }}
 
-        .status-active {
+        .status-active {{
             background: linear-gradient(45deg, #28a745, #20c997);
             color: #ffffff;
             box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
-        }
+        }}
 
-        .status-inactive {
+        .status-inactive {{
             background: linear-gradient(45deg, #dc3545, #e83e8c);
             color: #ffffff;
             box-shadow: 0 0 20px rgba(220, 53, 69, 0.3);
-        }
+        }}
 
         /* Alert Styles */
-        .alert {
+        .alert {{
             background: rgba(40, 167, 69, 0.2);
             border: 1px solid rgba(40, 167, 69, 0.3);
             border-radius: 12px;
             color: #ffffff;
             backdrop-filter: blur(10px);
             margin-bottom: 1rem;
-        }
+        }}
 
-        .alert-success {
+        .alert-success {{
             background: rgba(40, 167, 69, 0.2);
             border-color: rgba(40, 167, 69, 0.3);
-        }
+        }}
 
         /* Animation */
-        @keyframes fadeInUp {
-            from {
+        @keyframes fadeInUp {{
+            from {{
                 opacity: 0;
                 transform: translateY(30px);
-            }
-            to {
+            }}
+            to {{
                 opacity: 1;
                 transform: translateY(0);
-            }
-        }
+            }}
+        }}
 
-        .control-card {
+        .control-card {{
             animation: fadeInUp 0.6s ease-out;
-        }
+        }}
 
-        .quick-commands {
+        .quick-commands {{
             margin-top: 1.5rem;
             padding-top: 1.5rem;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
+        }}
 
-        .quick-commands h6 {
+        .quick-commands h6 {{
             color: #ffffff;
             font-weight: 600;
             margin-bottom: 1rem;
-        }
+        }}
 
-        .heart-threshold {
+        .heart-threshold {{
             margin-top: 1.5rem;
             padding-top: 1.5rem;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
+        }}
 
-        .heart-threshold h6 {
+        .heart-threshold h6 {{
             color: #ffffff;
             font-weight: 600;
             margin-bottom: 1rem;
-        }
+        }}
 
         /* Responsive Design */
-        @media (max-width: 768px) {
-            .header-section {
+        @media (max-width: 768px) {{
+            .header-section {{
                 padding: 1.5rem;
                 margin-bottom: 1.5rem;
-            }
+            }}
             
-            .header-section h1 {
+            .header-section h1 {{
                 font-size: 2rem;
-            }
+            }}
             
             .control-card .card-header,
-            .control-card .card-body {
+            .control-card .card-body {{
                 padding: 1rem;
-            }
+            }}
             
-            .btn {
+            .btn {{
                 padding: 10px 20px;
                 font-size: 0.9rem;
-            }
-        }
+            }}
+        }}
     </style>
 </head>
 <body>
@@ -657,14 +658,6 @@ HTML = """
                                 </div>
                             </div>
                         </form>
-
-                        <div class="mt-3">
-                            <form method="POST">
-                                <button type="submit" name="spam_delay" value="{spam_delay}" class="btn btn-primary">
-                                    <i class="fas fa-save me-1"></i>Cập nhật thời gian
-                                </button>
-                            </form>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -719,31 +712,28 @@ def index():
                 msg_status = "Mức tim không hợp lệ!"
 
         if send_codes:
-            acc_index = int(request.form.get("acc_index", 0))
-            prefix = request.form.get("prefix", "").strip()
-            codes_raw = request.form.get("codes", "")
-            delay = float(request.form.get("delay", "11"))
+            acc_index = request.form.get("acc_index")
+            delay = request.form.get("delay")
+            prefix = request.form.get("prefix")
+            codes = request.form.get("codes")
 
-            if acc_index < 0 or acc_index > len(bots):
-                return "Acc không hợp lệ!"
-
-            codes = [c.strip() for c in codes_raw.split(",") if c.strip()]
-            if not prefix or not codes:
-                return "Thiếu nội dung mẫu hoặc danh sách mã!"
-
-            acc_name = acc_names[acc_index]
-
-            if acc_index == len(bots):  # sly_dd
-                bot = main_bot
-            else:
-                bot = bots[acc_index]
-
-            for i, code in enumerate(codes):
+            if acc_index and delay and codes:
                 try:
-                    threading.Timer(delay * i, bot.sendMessage, args=(other_channel_id, f"{prefix} {code}")).start()
-                    print(f"[{acc_name}] → Đã lên lịch gửi sau {delay * i}s: {prefix} {code}")
+                    acc_idx = int(acc_index)
+                    delay_val = float(delay)
+                    codes_list = codes.split(",")
+                    
+                    if acc_idx < len(bots):
+                        for i, code in enumerate(codes_list):
+                            code = code.strip()
+                            if code:
+                                final_msg = f"{prefix} {code}" if prefix else code
+                                try:
+                                    threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
+                                except Exception as e:
+                                    print(f"Lỗi gửi mã: {e}")
                 except Exception as e:
-                    print(f"Lỗi gửi mã: {e}")
+                    print(f"Lỗi xử lý codes: {e}")
 
             msg_status = "Đã bắt đầu gửi mã!"
 
@@ -759,19 +749,10 @@ def index():
             except:
                 msg_status = "Thời gian spam không hợp lệ!"
 
-    # Prepare template variables
-    alert_section = ""
     if msg_status:
-        alert_section = f"""
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="fas fa-check-circle me-2"></i>{msg_status}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            </div>
-        </div>
-        """
+        alert_section = f'<div class="row"><div class="col-12"><div class="alert alert-success">{msg_status}</div></div></div>'
+    else:
+        alert_section = ""
 
     auto_grab_status = "status-active" if auto_grab_enabled else "status-inactive"
     auto_grab_text = "Đang bật" if auto_grab_enabled else "Đang tắt"
@@ -806,12 +787,17 @@ def spam_loop():
                     print(f"Lỗi gửi spam: {e}")
         time.sleep(spam_delay)
 
-threading.Thread(target=spam_loop, daemon=True).start()
-
 def keep_alive():
-    app.run(host="0.0.0.0", port=5000)
+    while True:
+        try:
+            if main_bot:
+                # Gửi tin nhắn để giữ bot hoạt động
+                pass
+            time.sleep(random.randint(60, 120))
+        except:
+            pass
 
-threading.Thread(target=keep_alive, daemon=True).start()
-
-while True:
-    time.sleep(60)
+if __name__ == "__main__":
+    threading.Thread(target=spam_loop, daemon=True).start()
+    threading.Thread(target=keep_alive, daemon=True).start()
+    app.run(host="0.0.0.0", port=5000, debug=True)
