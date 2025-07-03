@@ -448,7 +448,7 @@ HTML = """
                 <div class="header-section">
                     <h1 class="text-center mb-0">
                         <i class="fas fa-robot me-3"></i>
-                        Discord Bot Control Panel
+                        Karuta Deep
                     </h1>
                     <p class="text-center text-muted">Quản lý bot Discord với giao diện hiện đại</p>
                 </div>
