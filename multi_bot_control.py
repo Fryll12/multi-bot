@@ -4,6 +4,7 @@ import time
 import os
 import random
 import re
+import requests
 from flask import Flask, request, render_template_string
 from dotenv import load_dotenv
 
@@ -36,6 +37,12 @@ spam_enabled = False
 spam_message = ""
 spam_delay = 10  # thời gian vòng lặp spam (giây)
 spam_channel_id = "1388802151723302912"
+
+# Auto Work variables
+auto_work_enabled = False
+work_channel_id = "1389250541590413363"
+work_delay_between_acc = 10
+work_delay_after_all = 44100
 
 def create_bot(token, is_main=False, is_main_2=False):
     bot = discum.Client(token=token, log=False)
@@ -193,6 +200,146 @@ for token in tokens:
     if token.strip():
         bots.append(create_bot(token.strip(), is_main=False))
 
+# Auto Work Functions
+def run_work_bot(token, acc_index):
+    bot = discum.Client(token=token, log={"console": False, "file": False})
+
+    headers = {
+        "Authorization": token,
+        "Content-Type": "application/json"
+    }
+
+    step = {"value": 0}
+
+    def send_karuta_command():
+        print(f"[Work Acc {acc_index}] Gửi lệnh 'kc o:ef'...")
+        bot.sendMessage(work_channel_id, "kc o:ef")
+
+    def send_kn_command():
+        print(f"[Work Acc {acc_index}] Gửi lệnh 'kn'...")
+        bot.sendMessage(work_channel_id, "kn")
+
+    def send_kw_command():
+        print(f"[Work Acc {acc_index}] Gửi lệnh 'kw'...")
+        bot.sendMessage(work_channel_id, "kw")
+        step["value"] = 2
+
+    def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
+        try:
+            payload = {
+                "type": 3,
+                "guild_id": guild_id,
+                "channel_id": channel_id,
+                "message_id": message_id,
+                "application_id": application_id,
+                "session_id": "a",
+                "data": {
+                    "component_type": 2,
+                    "custom_id": custom_id
+                }
+            }
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
+            if r.status_code == 204:
+                print(f"[Work Acc {acc_index}] Click tick thành công!")
+            else:
+                print(f"[Work Acc {acc_index}] Click thất bại! Mã lỗi: {r.status_code}, Nội dung: {r.text}")
+        except Exception as e:
+            print(f"[Work Acc {acc_index}] Lỗi click tick: {str(e)}")
+
+    @bot.gateway.command
+    def on_message(resp):
+        if resp.event.message:
+            m = resp.parsed.auto()
+            if str(m.get('channel_id')) != work_channel_id:
+                return
+
+            author_id = str(m.get('author', {}).get('id', ''))
+            guild_id = m.get('guild_id')
+
+            if step["value"] == 0 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
+                desc = m['embeds'][0].get('description', '')
+                card_codes = re.findall(r'\bv[a-zA-Z0-9]{6}\b', desc)
+                if card_codes and len(card_codes) >= 10:
+                    first_5 = card_codes[:5]
+                    last_5 = card_codes[-5:]
+
+                    print(f"[Work Acc {acc_index}] Mã đầu: {', '.join(first_5)}")
+                    print(f"[Work Acc {acc_index}] Mã cuối: {', '.join(last_5)}")
+
+                    for i, code in enumerate(last_5):
+                        suffix = chr(97 + i)
+                        if i == 0:
+                            time.sleep(2)
+                        else:
+                            time.sleep(1.5)
+                        bot.sendMessage(work_channel_id, f"kjw {code} {suffix}")
+
+                    for i, code in enumerate(first_5):
+                        suffix = chr(97 + i)
+                        time.sleep(1.5)
+                        bot.sendMessage(work_channel_id, f"kjw {code} {suffix}")
+
+                    time.sleep(1)
+                    send_kn_command()
+                    step["value"] = 1
+
+            elif step["value"] == 1 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
+                desc = m['embeds'][0].get('description', '')
+                lines = desc.split('\n')
+                if len(lines) >= 2:
+                    match = re.search(r'\d+\.\s*`([^`]+)`', lines[1])
+                    if match:
+                        resource = match.group(1)
+                        print(f"[Work Acc {acc_index}] Tài nguyên chọn: {resource}")
+                        time.sleep(2)
+                        bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
+                        time.sleep(1)
+                        send_kw_command()
+
+            elif step["value"] == 2 and author_id == karuta_id and 'components' in m:
+                message_id = m['id']
+                application_id = m.get('application_id', karuta_id)
+                last_custom_id = None
+                for comp in m['components']:
+                    if comp['type'] == 1:
+                        for btn in comp['components']:
+                            if btn['type'] == 2:
+                                last_custom_id = btn['custom_id']
+                                print(f"[Work Acc {acc_index}] Phát hiện button, custom_id: {last_custom_id}")
+
+                if last_custom_id:
+                    click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
+                    step["value"] = 3
+                    bot.gateway.close()
+
+    print(f"[Work Acc {acc_index}] Bắt đầu hoạt động...")
+    threading.Thread(target=bot.gateway.run, daemon=True).start()
+    time.sleep(3)
+    send_karuta_command()
+
+    timeout = time.time() + 90
+    while step["value"] != 3 and time.time() < timeout:
+        time.sleep(1)
+
+    bot.gateway.close()
+    print(f"[Work Acc {acc_index}] Đã hoàn thành, chuẩn bị tới acc tiếp theo.")
+
+def auto_work_loop():
+    global auto_work_enabled
+    while True:
+        if auto_work_enabled:
+            for i, token in enumerate(tokens):
+                if token.strip():
+                    print(f"[Auto Work] Đang chạy acc {i+1}...")
+                    run_work_bot(token.strip(), i+1)
+                    print(f"[Auto Work] Acc {i+1} xong, chờ {work_delay_between_acc} giây...")
+                    time.sleep(work_delay_between_acc)
+            
+            print(f"[Auto Work] Hoàn thành tất cả acc, chờ {work_delay_after_all} giây để lặp lại...")
+            time.sleep(work_delay_after_all)
+        else:
+            time.sleep(10)
+
 app = Flask(__name__)
 
 HTML = """
@@ -201,7 +348,7 @@ HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Discord Bot Control Panel</title>
+    <title>Karuta Deep</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -579,7 +726,45 @@ HTML = """
                 </div>
             </div>
 
-            <!-- Auto Grab Section - Acc Chính 1 -->
+            <!-- Auto Work Section -->
+            <div class="col-lg-6">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-briefcase me-2"></i>
+                            Auto Work
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-indicator mb-3">
+                            <span class="status-badge {auto_work_status}">
+                                <i class="fas fa-circle me-1"></i>
+                                {auto_work_text}
+                            </span>
+                        </div>
+
+                        <form method="POST" class="mb-4">
+                            <div class="btn-group w-100" role="group">
+                                <button name="auto_work_toggle" value="on" type="submit" class="btn btn-success">
+                                    <i class="fas fa-play me-1"></i>Bật
+                                </button>
+                                <button name="auto_work_toggle" value="off" type="submit" class="btn btn-danger">
+                                    <i class="fas fa-stop me-1"></i>Tắt
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Tự động làm việc cho tất cả account
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auto Grab Section - Row with both accounts -->
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
@@ -630,7 +815,6 @@ HTML = """
                 </div>
             </div>
 
-            <!-- Auto Grab Section - Acc Chính 2 -->
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
@@ -801,7 +985,7 @@ HTML = """
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global auto_grab_enabled, auto_grab_enabled_2, spam_enabled, spam_message, spam_delay, heart_threshold, heart_threshold_2
+    global auto_grab_enabled, auto_grab_enabled_2, spam_enabled, spam_message, spam_delay, heart_threshold, heart_threshold_2, auto_work_enabled
     msg_status = ""
 
     if request.method == "POST":
@@ -815,6 +999,7 @@ def index():
         spam_delay_form = request.form.get("spam_delay")
         heart_threshold_form = request.form.get("heart_threshold")
         heart_threshold_2_form = request.form.get("heart_threshold_2")
+        auto_work_toggle = request.form.get("auto_work_toggle")
 
         if msg:
             for idx, bot in enumerate(bots):
@@ -892,6 +1077,10 @@ def index():
             except:
                 msg_status = "Thời gian spam không hợp lệ!"
 
+        if auto_work_toggle:
+            auto_work_enabled = auto_work_toggle == "on"
+            msg_status = f"Auto Work {'đã bật' if auto_work_enabled else 'đã tắt'}"
+
     if msg_status:
         alert_section = f'<div class="row"><div class="col-12"><div class="alert alert-success">{msg_status}</div></div></div>'
     else:
@@ -906,6 +1095,9 @@ def index():
     spam_status = "status-active" if spam_enabled else "status-inactive"
     spam_text = "Đang bật" if spam_enabled else "Đang tắt"
 
+    auto_work_status = "status-active" if auto_work_enabled else "status-inactive"
+    auto_work_text = "Đang bật" if auto_work_enabled else "Đang tắt"
+
     acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names))
 
     return render_template_string(HTML.format(
@@ -916,6 +1108,8 @@ def index():
         auto_grab_text_2=auto_grab_text_2,
         spam_status=spam_status,
         spam_text=spam_text,
+        auto_work_status=auto_work_status,
+        auto_work_text=auto_work_text,
         heart_threshold=heart_threshold,
         heart_threshold_2=heart_threshold_2,
         spam_message=spam_message,
@@ -949,4 +1143,5 @@ def keep_alive():
 if __name__ == "__main__":
     threading.Thread(target=spam_loop, daemon=True).start()
     threading.Thread(target=keep_alive, daemon=True).start()
+    threading.Thread(target=auto_work_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=5000, debug=True)
