@@ -1098,7 +1098,12 @@ def index():
     auto_work_status = "status-active" if auto_work_enabled else "status-inactive"
     auto_work_text = "Đang bật" if auto_work_enabled else "Đang tắt"
 
-    acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names))
+    # Tạo danh sách acc options với main bot ở cuối
+    acc_options_list = acc_names[:len(bots)]  # Chỉ lấy tên cho số lượng bot phụ
+    if main_bot:
+        acc_options_list.append("Main Bot")  # Thêm main bot vào cuối
+    
+    acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_options_list))
 
     return render_template_string(HTML.format(
         alert_section=alert_section,
