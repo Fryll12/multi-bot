@@ -30,6 +30,7 @@ acc_names = [
 
 spam_enabled = False
 spam_message = ""
+spam_delay = 10  # thời gian vòng lặp spam (giây)
 spam_channel_id = "1388802151723302912"
 
 def create_bot(token, is_main=False):
@@ -121,72 +122,563 @@ for token in tokens:
 app = Flask(__name__)
 
 HTML = """
-<h2>Điều khiển bot nhắn tin</h2>
-<form method="POST">
-    <input type="text" name="message" placeholder="Nhập nội dung..." style="width:300px">
-    <button type="submit">Gửi thủ công</button>
-</form>
-<hr>
-<h3>Menu nhanh</h3>
-<form method="POST">
-    <select name="quickmsg">
-        <option value="kc o:w">kc o:w</option>
-        <option value="kc o:ef">kc o:ef</option>
-        <option value="kc o:p">kc o:p</option>
-        <option value="kc e:1">kc e:1</option>
-        <option value="kc e:2">kc e:2</option>
-        <option value="kc e:3">kc e:3</option>
-        <option value="kc e:4">kc e:4</option>
-        <option value="kc e:5">kc e:5</option>
-        <option value="kc e:6">kc e:6</option>
-        <option value="kc e:7">kc e:7</option>
-    </select>
-    <button type="submit">Gửi</button>
-</form>
-<hr>
-<h3>Auto Grab</h3>
-<form method="POST">
-    <button name="toggle" value="on" type="submit">Bật</button>
-    <button name="toggle" value="off" type="submit">Tắt</button>
-</form>
-<p>Trạng thái hiện tại: <b>{status}</b></p>
-<hr>
-<h3>Thiết lập mức tim tiêu chuẩn</h3>
-<form method="POST">
-    <label>Mức tim hiện tại:</label>
-    <input type="number" name="heart_threshold" value="{heart_threshold}" min="0">
-    <button type="submit">Cập nhật</button>
-</form>
-<hr>
-<h3>Gửi danh sách mã theo acc chọn</h3>
-<form method="POST">
-    <label>Chọn acc:</label>
-    <select name="acc_index">
-""" + "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names)) + """
-    </select>
-    <br><br>
-    <input type="text" name="prefix" placeholder="Nội dung mẫu (vd: kt n)" style="width:300px">
-    <br><br>
-    <textarea name="codes" placeholder="Danh sách mã, cách nhau dấu phẩy" style="width:300px; height:100px"></textarea>
-    <br><br>
-    <label>Thời gian cách nhau (giây):</label>
-    <input type="number" step="0.1" name="delay" placeholder="11" value="11">
-    <br><br>
-    <button type="submit" name="send_codes" value="1">Gửi</button>
-</form>
-<hr>
-<h3>Spam </h3>
-<form method="POST">
-    <input type="text" name="spammsg" placeholder="Nội dung spam" style="width:300px" value="{spammsg}">
-    <button name="spamtoggle" value="on" type="submit">Bật</button>
-    <button name="spamtoggle" value="off" type="submit">Tắt</button>
-</form>
-<p>Spam hiện tại: <b>{spamstatus}</b></p>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Bot Control Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* Global Styles */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px 0;
+        }
+
+        /* Header Styles */
+        .header-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-section h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, #00d4ff, #ff9500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .header-section p {
+            font-size: 1.1rem;
+            color: #b0b0b0;
+            margin-bottom: 0;
+        }
+
+        /* Control Card Styles */
+        .control-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .control-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+            border-color: rgba(0, 212, 255, 0.3);
+        }
+
+        .control-card .card-header {
+            background: linear-gradient(45deg, rgba(0, 212, 255, 0.2), rgba(255, 149, 0, 0.2));
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .control-card .card-header h5 {
+            color: #ffffff;
+            font-weight: 600;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-card .card-body {
+            padding: 1.5rem;
+        }
+
+        /* Form Styles */
+        .form-control {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: #ffffff;
+            padding: 12px 16px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #00d4ff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.25);
+            color: #ffffff;
+        }
+
+        .form-control::placeholder {
+            color: #b0b0b0;
+        }
+
+        .form-select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: #ffffff;
+            padding: 12px 16px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-select:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #00d4ff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.25);
+            color: #ffffff;
+        }
+
+        .form-select option {
+            background: #1a1a2e;
+            color: #ffffff;
+        }
+
+        .form-label {
+            color: #ffffff;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .input-group-text {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            border-radius: 12px 0 0 12px;
+        }
+
+        /* Button Styles */
+        .btn {
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-weight: 500;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(45deg, #0099cc, #00d4ff);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.6);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: #ffffff;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(45deg, #20c997, #28a745);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #dc3545, #e83e8c);
+            color: #ffffff;
+            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(45deg, #e83e8c, #dc3545);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.6);
+        }
+
+        /* Status Indicators */
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s ease;
+        }
+
+        .status-active {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: #ffffff;
+            box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
+        }
+
+        .status-inactive {
+            background: linear-gradient(45deg, #dc3545, #e83e8c);
+            color: #ffffff;
+            box-shadow: 0 0 20px rgba(220, 53, 69, 0.3);
+        }
+
+        /* Alert Styles */
+        .alert {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid rgba(40, 167, 69, 0.3);
+            border-radius: 12px;
+            color: #ffffff;
+            backdrop-filter: blur(10px);
+            margin-bottom: 1rem;
+        }
+
+        .alert-success {
+            background: rgba(40, 167, 69, 0.2);
+            border-color: rgba(40, 167, 69, 0.3);
+        }
+
+        /* Animation */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .control-card {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .quick-commands {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .quick-commands h6 {
+            color: #ffffff;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .heart-threshold {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .heart-threshold h6 {
+            color: #ffffff;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .header-section {
+                padding: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+            
+            .header-section h1 {
+                font-size: 2rem;
+            }
+            
+            .control-card .card-header,
+            .control-card .card-body {
+                padding: 1rem;
+            }
+            
+            .btn {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="header-section">
+                    <h1 class="text-center mb-0">
+                        <i class="fas fa-robot me-3"></i>
+                        Discord Bot Control Panel
+                    </h1>
+                    <p class="text-center text-muted">Quản lý bot Discord với giao diện hiện đại</p>
+                </div>
+            </div>
+        </div>
+
+        {alert_section}
+
+        <div class="row g-4">
+            <!-- Manual Message Section -->
+            <div class="col-lg-6">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-paper-plane me-2"></i>
+                            Điều khiển bot nhắn tin
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" class="mb-4">
+                            <div class="input-group">
+                                <input type="text" 
+                                       class="form-control" 
+                                       name="message" 
+                                       placeholder="Nhập nội dung tin nhắn...">
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-send me-1"></i>Gửi thủ công
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="quick-commands">
+                            <h6 class="mb-3">Menu nhanh</h6>
+                            <form method="POST">
+                                <div class="input-group">
+                                    <select name="quickmsg" class="form-select">
+                                        <option value="kc o:w">kc o:w</option>
+                                        <option value="kc o:ef">kc o:ef</option>
+                                        <option value="kc o:p">kc o:p</option>
+                                        <option value="kc e:1">kc e:1</option>
+                                        <option value="kc e:2">kc e:2</option>
+                                        <option value="kc e:3">kc e:3</option>
+                                        <option value="kc e:4">kc e:4</option>
+                                        <option value="kc e:5">kc e:5</option>
+                                        <option value="kc e:6">kc e:6</option>
+                                        <option value="kc e:7">kc e:7</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-bolt me-1"></i>Gửi
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Auto Grab Section -->
+            <div class="col-lg-6">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-magic me-2"></i>
+                            Auto Grab
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-indicator mb-3">
+                            <span class="status-badge {auto_grab_status}">
+                                <i class="fas fa-circle me-1"></i>
+                                {auto_grab_text}
+                            </span>
+                        </div>
+
+                        <form method="POST" class="mb-4">
+                            <div class="btn-group w-100" role="group">
+                                <button name="toggle" value="on" type="submit" class="btn btn-success">
+                                    <i class="fas fa-play me-1"></i>Bật
+                                </button>
+                                <button name="toggle" value="off" type="submit" class="btn btn-danger">
+                                    <i class="fas fa-stop me-1"></i>Tắt
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="heart-threshold">
+                            <h6 class="mb-3">Thiết lập mức tim tiêu chuẩn</h6>
+                            <form method="POST">
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-heart text-danger"></i>
+                                    </span>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           name="heart_threshold" 
+                                           value="{heart_threshold}" 
+                                           min="0"
+                                           placeholder="Mức tim">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>Cập nhật
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Code Sending Section -->
+            <div class="col-12">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-code me-2"></i>
+                            Gửi danh sách mã theo acc chọn
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Chọn acc:</label>
+                                    <select name="acc_index" class="form-select">
+                                        {acc_options}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Thời gian cách nhau (giây):</label>
+                                    <input type="number" 
+                                           step="0.1" 
+                                           name="delay" 
+                                           class="form-control" 
+                                           value="11" 
+                                           placeholder="11">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Nội dung mẫu:</label>
+                                    <input type="text" 
+                                           name="prefix" 
+                                           class="form-control" 
+                                           placeholder="vd: kt n">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Danh sách mã:</label>
+                                    <textarea name="codes" 
+                                              class="form-control" 
+                                              rows="4" 
+                                              placeholder="Danh sách mã, cách nhau dấu phẩy"></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" name="send_codes" value="1" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-paper-plane me-2"></i>Gửi danh sách mã
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spam Control Section -->
+            <div class="col-12">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-repeat me-2"></i>
+                            Spam Control
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-indicator mb-3">
+                            <span class="status-badge {spam_status}">
+                                <i class="fas fa-circle me-1"></i>
+                                {spam_text}
+                            </span>
+                        </div>
+
+                        <form method="POST">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Nội dung spam:</label>
+                                    <input type="text" 
+                                           name="spammsg" 
+                                           class="form-control" 
+                                           placeholder="Nội dung spam" 
+                                           value="{spam_message}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Thời gian lặp (giây):</label>
+                                    <input type="number" 
+                                           name="spam_delay" 
+                                           class="form-control" 
+                                           value="{spam_delay}" 
+                                           min="1"
+                                           placeholder="10">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Điều khiển:</label>
+                                    <div class="btn-group w-100" role="group">
+                                        <button name="spamtoggle" value="on" type="submit" class="btn btn-success">
+                                            <i class="fas fa-play me-1"></i>Bật
+                                        </button>
+                                        <button name="spamtoggle" value="off" type="submit" class="btn btn-danger">
+                                            <i class="fas fa-stop me-1"></i>Tắt
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+
+                        <div class="mt-3">
+                            <form method="POST">
+                                <button type="submit" name="spam_delay" value="{spam_delay}" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i>Cập nhật thời gian
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
 """
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global auto_grab_enabled, spam_enabled, spam_message, heart_threshold
+    global auto_grab_enabled, spam_enabled, spam_message, spam_delay, heart_threshold
     msg_status = ""
 
     if request.method == "POST":
@@ -196,6 +688,7 @@ def index():
         send_codes = request.form.get("send_codes")
         spamtoggle = request.form.get("spamtoggle")
         spammsg = request.form.get("spammsg", "")
+        spam_delay_form = request.form.get("spam_delay")
         heart_threshold_form = request.form.get("heart_threshold")
 
         if msg:
@@ -259,12 +752,49 @@ def index():
             spam_message = spammsg.strip()
             msg_status = f"Spam {'đã bật' if spam_enabled else 'đã tắt'}"
 
-    status = "Đang bật" if auto_grab_enabled else "Đang tắt"
-    spamstatus = "Đang bật" if spam_enabled else "Đang tắt"
-    return HTML.format(status=status, spamstatus=spamstatus, spammsg=spam_message, heart_threshold=heart_threshold) + (f"<p>{msg_status}</p>" if msg_status else "")
+        if spam_delay_form:
+            try:
+                spam_delay = int(spam_delay_form)
+                msg_status = f"Đã cập nhật thời gian spam: {spam_delay} giây"
+            except:
+                msg_status = "Thời gian spam không hợp lệ!"
+
+    # Prepare template variables
+    alert_section = ""
+    if msg_status:
+        alert_section = f"""
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>{msg_status}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            </div>
+        </div>
+        """
+
+    auto_grab_status = "status-active" if auto_grab_enabled else "status-inactive"
+    auto_grab_text = "Đang bật" if auto_grab_enabled else "Đang tắt"
+    
+    spam_status = "status-active" if spam_enabled else "status-inactive"
+    spam_text = "Đang bật" if spam_enabled else "Đang tắt"
+
+    acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names))
+
+    return render_template_string(HTML.format(
+        alert_section=alert_section,
+        auto_grab_status=auto_grab_status,
+        auto_grab_text=auto_grab_text,
+        spam_status=spam_status,
+        spam_text=spam_text,
+        heart_threshold=heart_threshold,
+        spam_message=spam_message,
+        spam_delay=spam_delay,
+        acc_options=acc_options
+    ))
 
 def spam_loop():
-    global spam_enabled, spam_message
+    global spam_enabled, spam_message, spam_delay
     while True:
         if spam_enabled and spam_message:
             for idx, bot in enumerate(bots):
@@ -274,12 +804,12 @@ def spam_loop():
                     time.sleep(2)
                 except Exception as e:
                     print(f"Lỗi gửi spam: {e}")
-        time.sleep(10)
+        time.sleep(spam_delay)
 
 threading.Thread(target=spam_loop, daemon=True).start()
 
 def keep_alive():
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host="0.0.0.0", port=5000)
 
 threading.Thread(target=keep_alive, daemon=True).start()
 
