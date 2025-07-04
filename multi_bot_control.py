@@ -1,6 +1,3 @@
-Got it\! Here's your optimized code, with the changes I mentioned previously focusing on robustness and functionality, while keeping your original variable naming and structure.
-
-```python
 import discum
 import threading
 import time
@@ -1203,4 +1200,3 @@ if __name__ == "__main__":
     threading.Thread(target=keep_alive, daemon=True).start()
     threading.Thread(target=auto_work_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=5000, debug=True)
-```
