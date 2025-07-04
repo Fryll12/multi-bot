@@ -1,3 +1,6 @@
+Got it\! Here's your optimized code, with the changes I mentioned previously focusing on robustness and functionality, while keeping your original variable naming and structure.
+
+```python
 import discum
 import threading
 import time
@@ -20,7 +23,7 @@ ktb_channel_id = "1376777071279214662"
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 
-bots = []
+bots = [] # This will now hold only the additional bots
 main_bot = None
 main_bot_2 = None
 auto_grab_enabled = False
@@ -77,10 +80,10 @@ def create_bot(token, is_main=False, is_main_2=False):
                         def read_karibbit():
                             time.sleep(0.5)
                             messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg in messages:
-                                author_id = msg.get("author", {}).get("id")
-                                if author_id == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
-                                    desc = msg["embeds"][0].get("description", "")
+                            for msg_kb in messages:
+                                author_id = msg_kb.get("author", {}).get("id")
+                                if author_id == karibbit_id and "embeds" in msg_kb and len(msg_kb["embeds"]) > 0:
+                                    desc = msg_kb["embeds"][0].get("description", "")
                                     print(f"\n[Bot 1] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 1] ===== Kết thúc tin nhắn =====\n")
 
                                     lines = desc.split('\n')
@@ -118,8 +121,7 @@ def create_bot(token, is_main=False, is_main_2=False):
                                                     print(f"[Bot 1] Lỗi khi grab hoặc nhắn kt b: {e}")
 
                                             threading.Timer(delay, grab).start()
-
-                                    break
+                                    break # Exit after finding the Karibbit message
 
                         threading.Thread(target=read_karibbit).start()
 
@@ -143,10 +145,10 @@ def create_bot(token, is_main=False, is_main_2=False):
                         def read_karibbit_2():
                             time.sleep(0.5)
                             messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg in messages:
-                                author_id = msg.get("author", {}).get("id")
-                                if author_id == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
-                                    desc = msg["embeds"][0].get("description", "")
+                            for msg_kb in messages:
+                                author_id = msg_kb.get("author", {}).get("id")
+                                if author_id == karibbit_id and "embeds" in msg_kb and len(msg_kb["embeds"]) > 0:
+                                    desc = msg_kb["embeds"][0].get("description", "")
                                     print(f"\n[Bot 2] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 2] ===== Kết thúc tin nhắn =====\n")
 
                                     lines = desc.split('\n')
@@ -185,8 +187,7 @@ def create_bot(token, is_main=False, is_main_2=False):
                                                     print(f"[Bot 2] Lỗi khi grab hoặc nhắn kt b: {e}")
 
                                             threading.Timer(delay, grab_2).start()
-
-                                    break
+                                    break # Exit after finding the Karibbit message
 
                         threading.Thread(target=read_karibbit_2).start()
 
@@ -196,12 +197,12 @@ def create_bot(token, is_main=False, is_main_2=False):
 main_bot = create_bot(main_token, is_main=True)
 main_bot_2 = create_bot(main_token_2, is_main_2=True) if main_token_2 else None
 
-for token in tokens:
-    if token.strip():
-        bots.append(create_bot(token.strip(), is_main=False))
+for token_val in tokens:
+    if token_val.strip():
+        bots.append(create_bot(token_val.strip(), is_main=False))
 
 # Auto Work Functions
-def run_work_bot(token, acc_index):
+def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
 
     headers = {
@@ -209,20 +210,21 @@ def run_work_bot(token, acc_index):
         "Content-Type": "application/json"
     }
 
-    step = {"value": 0}
+    # Using a list to make 'step' mutable within nested functions
+    step = [0]
 
     def send_karuta_command():
-        print(f"[Work Acc {acc_index}] Gửi lệnh 'kc o:ef'...")
+        print(f"[{acc_name}] Gửi lệnh 'kc o:ef'...")
         bot.sendMessage(work_channel_id, "kc o:ef")
 
     def send_kn_command():
-        print(f"[Work Acc {acc_index}] Gửi lệnh 'kn'...")
+        print(f"[{acc_name}] Gửi lệnh 'kn'...")
         bot.sendMessage(work_channel_id, "kn")
 
     def send_kw_command():
-        print(f"[Work Acc {acc_index}] Gửi lệnh 'kw'...")
+        print(f"[{acc_name}] Gửi lệnh 'kw'...")
         bot.sendMessage(work_channel_id, "kw")
-        step["value"] = 2
+        step[0] = 2
 
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
@@ -240,38 +242,35 @@ def run_work_bot(token, acc_index):
             }
             r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
             if r.status_code == 204:
-                print(f"[Work Acc {acc_index}] Click tick thành công!")
+                print(f"[{acc_name}] Click tick thành công!")
             else:
-                print(f"[Work Acc {acc_index}] Click thất bại! Mã lỗi: {r.status_code}, Nội dung: {r.text}")
+                print(f"[{acc_name}] Click thất bại! Mã lỗi: {r.status_code}, Nội dung: {r.text}")
         except Exception as e:
-            print(f"[Work Acc {acc_index}] Lỗi click tick: {str(e)}")
+            print(f"[{acc_name}] Lỗi click tick: {str(e)}")
 
     @bot.gateway.command
     def on_message(resp):
         if resp.event.message:
             m = resp.parsed.auto()
-            if str(m.get('channel_id')) != work_channel_id:
+            if str(m.get('channel_id')) != work_channel_id or m.get('author', {}).get('id') == bot.gateway.session.user['id']:
                 return
 
             author_id = str(m.get('author', {}).get('id', ''))
             guild_id = m.get('guild_id')
 
-            if step["value"] == 0 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
+            if step[0] == 0 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
                 desc = m['embeds'][0].get('description', '')
                 card_codes = re.findall(r'\bv[a-zA-Z0-9]{6}\b', desc)
                 if card_codes and len(card_codes) >= 10:
                     first_5 = card_codes[:5]
                     last_5 = card_codes[-5:]
 
-                    print(f"[Work Acc {acc_index}] Mã đầu: {', '.join(first_5)}")
-                    print(f"[Work Acc {acc_index}] Mã cuối: {', '.join(last_5)}")
+                    print(f"[{acc_name}] Mã đầu: {', '.join(first_5)}")
+                    print(f"[{acc_name}] Mã cuối: {', '.join(last_5)}")
 
                     for i, code in enumerate(last_5):
                         suffix = chr(97 + i)
-                        if i == 0:
-                            time.sleep(2)
-                        else:
-                            time.sleep(1.5)
+                        time.sleep(2 if i == 0 else 1.5)
                         bot.sendMessage(work_channel_id, f"kjw {code} {suffix}")
 
                     for i, code in enumerate(first_5):
@@ -281,22 +280,22 @@ def run_work_bot(token, acc_index):
 
                     time.sleep(1)
                     send_kn_command()
-                    step["value"] = 1
+                    step[0] = 1
 
-            elif step["value"] == 1 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
+            elif step[0] == 1 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
                 desc = m['embeds'][0].get('description', '')
                 lines = desc.split('\n')
                 if len(lines) >= 2:
                     match = re.search(r'\d+\.\s*`([^`]+)`', lines[1])
                     if match:
                         resource = match.group(1)
-                        print(f"[Work Acc {acc_index}] Tài nguyên chọn: {resource}")
+                        print(f"[{acc_name}] Tài nguyên chọn: {resource}")
                         time.sleep(2)
                         bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
                         time.sleep(1)
                         send_kw_command()
 
-            elif step["value"] == 2 and author_id == karuta_id and 'components' in m:
+            elif step[0] == 2 and author_id == karuta_id and 'components' in m:
                 message_id = m['id']
                 application_id = m.get('application_id', karuta_id)
                 last_custom_id = None
@@ -305,34 +304,39 @@ def run_work_bot(token, acc_index):
                         for btn in comp['components']:
                             if btn['type'] == 2:
                                 last_custom_id = btn['custom_id']
-                                print(f"[Work Acc {acc_index}] Phát hiện button, custom_id: {last_custom_id}")
+                                print(f"[{acc_name}] Phát hiện button, custom_id: {last_custom_id}")
 
                 if last_custom_id:
                     click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
-                    step["value"] = 3
-                    bot.gateway.close()
+                    step[0] = 3
+                    bot.gateway.close() # Close gateway once work is done
 
-    print(f"[Work Acc {acc_index}] Bắt đầu hoạt động...")
+    print(f"[{acc_name}] Bắt đầu hoạt động...")
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     time.sleep(3)
     send_karuta_command()
 
-    timeout = time.time() + 90
-    while step["value"] != 3 and time.time() < timeout:
+    timeout_start = time.time()
+    while step[0] != 3 and (time.time() - timeout_start) < 90:
         time.sleep(1)
 
+    if step[0] != 3:
+        print(f"[{acc_name}] Tác vụ work không hoàn thành trong thời gian cho phép hoặc gặp lỗi.")
+    
     bot.gateway.close()
-    print(f"[Work Acc {acc_index}] Đã hoàn thành, chuẩn bị tới acc tiếp theo.")
+    print(f"[{acc_name}] Đã hoàn thành, chuẩn bị tới acc tiếp theo.")
 
 def auto_work_loop():
     global auto_work_enabled
     while True:
         if auto_work_enabled:
-            for i, token in enumerate(tokens):
+            # Main Bot 1 and Main Bot 2 are not included in auto work
+            for i, token in enumerate(tokens): # This 'tokens' variable now strictly refers to ADDITIONAL_TOKENS
                 if token.strip():
-                    print(f"[Auto Work] Đang chạy acc {i+1}...")
-                    run_work_bot(token.strip(), i+1)
-                    print(f"[Auto Work] Acc {i+1} xong, chờ {work_delay_between_acc} giây...")
+                    acc_name = acc_names[i + 2] if (i + 2) < len(acc_names) else f"Acc phụ {i+1}" # Adjust index for ACC_NAMES
+                    print(f"[Auto Work] Đang chạy acc {acc_name}...")
+                    run_work_bot(token.strip(), acc_name)
+                    print(f"[Auto Work] Acc {acc_name} xong, chờ {work_delay_between_acc} giây...")
                     time.sleep(work_delay_between_acc)
             
             print(f"[Auto Work] Hoàn thành tất cả acc, chờ {work_delay_after_all} giây để lặp lại...")
@@ -353,21 +357,21 @@ HTML = """
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         /* Global Styles */
-        * {{
+        * {
             box-sizing: border-box;
-        }}
+        }
 
-        body {{
+        body {
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #ffffff;
             margin: 0;
             padding: 20px 0;
-        }}
+        }
 
         /* Header Styles */
-        .header-section {{
+        .header-section {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border-radius: 20px;
@@ -375,9 +379,9 @@ HTML = """
             margin-bottom: 2rem;
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }}
+        }
 
-        .header-section h1 {{
+        .header-section h1 {
             font-size: 2.5rem;
             font-weight: 700;
             background: linear-gradient(45deg, #00d4ff, #ff9500);
@@ -386,16 +390,16 @@ HTML = """
             background-clip: text;
             margin-bottom: 0.5rem;
             text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-        }}
+        }
 
-        .header-section p {{
+        .header-section p {
             font-size: 1.1rem;
             color: #b0b0b0;
             margin-bottom: 0;
-        }}
+        }
 
         /* Control Card Styles */
-        .control-card {{
+        .control-card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             border-radius: 20px;
@@ -404,34 +408,34 @@ HTML = """
             transition: all 0.3s ease;
             overflow: hidden;
             margin-bottom: 2rem;
-        }}
+        }
 
-        .control-card:hover {{
+        .control-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
             border-color: rgba(0, 212, 255, 0.3);
-        }}
+        }
 
-        .control-card .card-header {{
+        .control-card .card-header {
             background: linear-gradient(45deg, rgba(0, 212, 255, 0.2), rgba(255, 149, 0, 0.2));
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             padding: 1.5rem;
             border-radius: 20px 20px 0 0;
-        }}
+        }
 
-        .control-card .card-header h5 {{
+        .control-card .card-header h5 {
             color: #ffffff;
             font-weight: 600;
             margin: 0;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        }}
+        }
 
-        .control-card .card-body {{
+        .control-card .card-body {
             padding: 1.5rem;
-        }}
+        }
 
         /* Form Styles */
-        .form-control {{
+        .form-control {
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 12px;
@@ -439,20 +443,20 @@ HTML = """
             padding: 12px 16px;
             font-size: 1rem;
             transition: all 0.3s ease;
-        }}
+        }
 
-        .form-control:focus {{
+        .form-control:focus {
             background: rgba(255, 255, 255, 0.15);
             border-color: #00d4ff;
             box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.25);
             color: #ffffff;
-        }}
+        }
 
-        .form-control::placeholder {{
+        .form-control::placeholder {
             color: #b0b0b0;
-        }}
+        }
 
-        .form-select {{
+        .form-select {
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 12px;
@@ -460,35 +464,35 @@ HTML = """
             padding: 12px 16px;
             font-size: 1rem;
             transition: all 0.3s ease;
-        }}
+        }
 
-        .form-select:focus {{
+        .form-select:focus {
             background: rgba(255, 255, 255, 0.15);
             border-color: #00d4ff;
             box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.25);
             color: #ffffff;
-        }}
+        }
 
-        .form-select option {{
+        .form-select option {
             background: #1a1a2e;
             color: #ffffff;
-        }}
+        }
 
-        .form-label {{
+        .form-label {
             color: #ffffff;
             font-weight: 500;
             margin-bottom: 0.5rem;
-        }}
+        }
 
-        .input-group-text {{
+        .input-group-text {
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: #ffffff;
             border-radius: 12px 0 0 12px;
-        }}
+        }
 
         /* Button Styles */
-        .btn {{
+        .btn {
             border-radius: 12px;
             padding: 12px 24px;
             font-weight: 500;
@@ -499,9 +503,9 @@ HTML = """
             border: none;
             position: relative;
             overflow: hidden;
-        }}
+        }
 
-        .btn::before {{
+        .btn::before {
             content: '';
             position: absolute;
             top: 0;
@@ -510,56 +514,56 @@ HTML = """
             height: 100%;
             background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
             transition: left 0.5s ease;
-        }}
+        }
 
-        .btn:hover::before {{
+        .btn:hover::before {
             left: 100%;
-        }}
+        }
 
-        .btn-primary {{
+        .btn-primary {
             background: linear-gradient(45deg, #00d4ff, #0099cc);
             color: #ffffff;
             box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
-        }}
+        }
 
-        .btn-primary:hover {{
+        .btn-primary:hover {
             background: linear-gradient(45deg, #0099cc, #00d4ff);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0, 212, 255, 0.6);
-        }}
+        }
 
-        .btn-success {{
+        .btn-success {
             background: linear-gradient(45deg, #28a745, #20c997);
             color: #ffffff;
             box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
-        }}
+        }
 
-        .btn-success:hover {{
+        .btn-success:hover {
             background: linear-gradient(45deg, #20c997, #28a745);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
-        }}
+        }
 
-        .btn-danger {{
+        .btn-danger {
             background: linear-gradient(45deg, #dc3545, #e83e8c);
             color: #ffffff;
             box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
-        }}
+        }
 
-        .btn-danger:hover {{
+        .btn-danger:hover {
             background: linear-gradient(45deg, #e83e8c, #dc3545);
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(220, 53, 69, 0.6);
-        }}
+        }
 
         /* Status Indicators */
-        .status-indicator {{
+        .status-indicator {
             display: flex;
             align-items: center;
             margin-bottom: 1rem;
-        }}
+        }
 
-        .status-badge {{
+        .status-badge {
             display: inline-flex;
             align-items: center;
             padding: 8px 16px;
@@ -569,96 +573,96 @@ HTML = """
             text-transform: uppercase;
             letter-spacing: 0.5px;
             transition: all 0.3s ease;
-        }}
+        }
 
-        .status-active {{
+        .status-active {
             background: linear-gradient(45deg, #28a745, #20c997);
             color: #ffffff;
             box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
-        }}
+        }
 
-        .status-inactive {{
+        .status-inactive {
             background: linear-gradient(45deg, #dc3545, #e83e8c);
             color: #ffffff;
             box-shadow: 0 0 20px rgba(220, 53, 69, 0.3);
-        }}
+        }
 
         /* Alert Styles */
-        .alert {{
+        .alert {
             background: rgba(40, 167, 69, 0.2);
             border: 1px solid rgba(40, 167, 69, 0.3);
             border-radius: 12px;
             color: #ffffff;
             backdrop-filter: blur(10px);
             margin-bottom: 1rem;
-        }}
+        }
 
-        .alert-success {{
+        .alert-success {
             background: rgba(40, 167, 69, 0.2);
             border-color: rgba(40, 167, 69, 0.3);
-        }}
+        }
 
         /* Animation */
-        @keyframes fadeInUp {{
-            from {{
+        @keyframes fadeInUp {
+            from {
                 opacity: 0;
                 transform: translateY(30px);
-            }}
-            to {{
+            }
+            to {
                 opacity: 1;
                 transform: translateY(0);
-            }}
-        }}
+            }
+        }
 
-        .control-card {{
+        .control-card {
             animation: fadeInUp 0.6s ease-out;
-        }}
+        }
 
-        .quick-commands {{
+        .quick-commands {
             margin-top: 1.5rem;
             padding-top: 1.5rem;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }}
+        }
 
-        .quick-commands h6 {{
+        .quick-commands h6 {
             color: #ffffff;
             font-weight: 600;
             margin-bottom: 1rem;
-        }}
+        }
 
-        .heart-threshold {{
+        .heart-threshold {
             margin-top: 1.5rem;
             padding-top: 1.5rem;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }}
+        }
 
-        .heart-threshold h6 {{
+        .heart-threshold h6 {
             color: #ffffff;
             font-weight: 600;
             margin-bottom: 1rem;
-        }}
+        }
 
         /* Responsive Design */
-        @media (max-width: 768px) {{
-            .header-section {{
+        @media (max-width: 768px) {
+            .header-section {
                 padding: 1.5rem;
                 margin-bottom: 1.5rem;
-            }}
+            }
             
-            .header-section h1 {{
+            .header-section h1 {
                 font-size: 2rem;
-            }}
+            }
             
             .control-card .card-header,
-            .control-card .card-body {{
+            .control-card .card-body {
                 padding: 1rem;
-            }}
+            }
             
-            .btn {{
+            .btn {
                 padding: 10px 20px;
                 font-size: 0.9rem;
-            }}
-        }}
+            }
+        }
     </style>
 </head>
 <body>
@@ -678,7 +682,6 @@ HTML = """
         {alert_section}
 
         <div class="row g-4">
-            <!-- Manual Message Section -->
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
@@ -726,7 +729,6 @@ HTML = """
                 </div>
             </div>
 
-            <!-- Auto Work Section -->
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
@@ -757,14 +759,13 @@ HTML = """
                         <div class="mt-2">
                             <small class="text-muted">
                                 <i class="fas fa-info-circle me-1"></i>
-                                Tự động làm việc cho tất cả account
+                                Tự động làm việc cho tất cả account phụ
                             </small>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Auto Grab Section - Row with both accounts -->
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
@@ -871,7 +872,6 @@ HTML = """
                 </div>
             </div>
 
-            <!-- Code Sending Section -->
             <div class="col-12">
                 <div class="control-card">
                     <div class="card-header">
@@ -923,14 +923,13 @@ HTML = """
                 </div>
             </div>
 
-            <!-- Spam Control Section -->
             <div class="col-12">
                 <div class="control-card">
                     <div class="card-header">
                         <h5 class="mb-0">
                             <i class="fas fa-repeat me-2"></i>
                             Spam Control
-                        </h5>
+                        </h4>
                     </div>
                     <div class="card-body">
                         <div class="status-indicator mb-3">
@@ -1002,83 +1001,118 @@ def index():
         auto_work_toggle = request.form.get("auto_work_toggle")
 
         if msg:
-            for idx, bot in enumerate(bots):
+            all_active_bots = []
+            if main_bot:
+                all_active_bots.append(main_bot)
+            if main_bot_2:
+                all_active_bots.append(main_bot_2)
+            all_active_bots.extend(bots) # Add all additional bots
+
+            for idx, bot_instance in enumerate(all_active_bots):
                 try:
-                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
+                    threading.Timer(2 * idx, bot_instance.sendMessage, args=(other_channel_id, msg)).start()
                 except Exception as e:
-                    print(f"Lỗi gửi tin nhắn: {e}")
+                    print(f"Lỗi gửi tin nhắn thủ công: {e}")
             msg_status = "Đã gửi thủ công thành công!"
 
         if quickmsg:
-            for idx, bot in enumerate(bots):
+            all_active_bots = []
+            if main_bot:
+                all_active_bots.append(main_bot)
+            if main_bot_2:
+                all_active_bots.append(main_bot_2)
+            all_active_bots.extend(bots) # Add all additional bots
+            
+            for idx, bot_instance in enumerate(all_active_bots):
                 try:
-                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, quickmsg)).start()
+                    threading.Timer(2 * idx, bot_instance.sendMessage, args=(other_channel_id, quickmsg)).start()
                 except Exception as e:
-                    print(f"Lỗi gửi tin nhắn: {e}")
+                    print(f"Lỗi gửi lệnh nhanh: {e}")
             msg_status = f"Đã gửi lệnh {quickmsg} thành công!"
 
         if toggle:
-            auto_grab_enabled = toggle == "on"
+            auto_grab_enabled = (toggle == "on")
             msg_status = f"Tự grab Acc chính 1 {'đã bật' if auto_grab_enabled else 'đã tắt'}"
 
         if toggle_2:
-            auto_grab_enabled_2 = toggle_2 == "on"
+            auto_grab_enabled_2 = (toggle_2 == "on")
             msg_status = f"Tự grab Acc chính 2 {'đã bật' if auto_grab_enabled_2 else 'đã tắt'}"
 
-        if heart_threshold_form:
+        if heart_threshold_form is not None:
             try:
-                heart_threshold = int(heart_threshold_form)
-                msg_status = f"Đã cập nhật mức tim Acc chính 1: {heart_threshold}"
-            except:
+                new_threshold = int(heart_threshold_form)
+                if new_threshold >= 0:
+                    heart_threshold = new_threshold
+                    msg_status = f"Đã cập nhật mức tim Acc chính 1: {heart_threshold}"
+                else:
+                    msg_status = "Mức tim Acc chính 1 không hợp lệ! Phải là số không âm."
+            except ValueError:
                 msg_status = "Mức tim Acc chính 1 không hợp lệ!"
 
-        if heart_threshold_2_form:
+        if heart_threshold_2_form is not None:
             try:
-                heart_threshold_2 = int(heart_threshold_2_form)
-                msg_status = f"Đã cập nhật mức tim Acc chính 2: {heart_threshold_2}"
-            except:
+                new_threshold_2 = int(heart_threshold_2_form)
+                if new_threshold_2 >= 0:
+                    heart_threshold_2 = new_threshold_2
+                    msg_status = f"Đã cập nhật mức tim Acc chính 2: {heart_threshold_2}"
+                else:
+                    msg_status = "Mức tim Acc chính 2 không hợp lệ! Phải là số không âm."
+            except ValueError:
                 msg_status = "Mức tim Acc chính 2 không hợp lệ!"
 
         if send_codes:
-            acc_index = request.form.get("acc_index")
-            delay = request.form.get("delay")
-            prefix = request.form.get("prefix")
-            codes = request.form.get("codes")
+            acc_index_str = request.form.get("acc_index")
+            delay_str = request.form.get("delay")
+            prefix = request.form.get("prefix", "").strip()
+            codes = request.form.get("codes", "").strip()
 
-            if acc_index and delay and codes:
+            if acc_index_str and delay_str and codes:
                 try:
-                    acc_idx = int(acc_index)
-                    delay_val = float(delay)
-                    codes_list = codes.split(",")
+                    acc_idx = int(acc_index_str)
+                    delay_val = float(delay_str)
+                    codes_list = [code.strip() for code in codes.split(",") if code.strip()]
                     
-                    if acc_idx < len(bots):
+                    target_bot = None
+                    if acc_idx == 0 and main_bot:
+                        target_bot = main_bot
+                    elif acc_idx == 1 and main_bot_2:
+                        target_bot = main_bot_2
+                    elif acc_idx >= 2 and (acc_idx - 2) < len(bots): # Adjust index for 'bots' list
+                        target_bot = bots[acc_idx - 2]
+                    
+                    if target_bot:
                         for i, code in enumerate(codes_list):
-                            code = code.strip()
-                            if code:
-                                final_msg = f"{prefix} {code}" if prefix else code
-                                try:
-                                    threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
-                                except Exception as e:
-                                    print(f"Lỗi gửi mã: {e}")
+                            final_msg = f"{prefix} {code}" if prefix else code
+                            threading.Timer(delay_val * i, target_bot.sendMessage, args=(other_channel_id, final_msg)).start()
+                        msg_status = f"Đã bắt đầu gửi mã cho acc {acc_names[acc_idx]}!"
+                    else:
+                        msg_status = "Không tìm thấy bot cho tài khoản đã chọn hoặc tài khoản đó không được khởi tạo!"
+                except ValueError:
+                    msg_status = "Lỗi: Thời gian delay hoặc định dạng mã không hợp lệ."
                 except Exception as e:
-                    print(f"Lỗi xử lý codes: {e}")
-
-            msg_status = "Đã bắt đầu gửi mã!"
+                    print(f"Lỗi khi gửi danh sách mã: {e}")
+                    msg_status = f"Đã xảy ra lỗi khi gửi mã: {str(e)}"
+            else:
+                msg_status = "Vui lòng điền đầy đủ thông tin để gửi mã."
 
         if spamtoggle:
-            spam_enabled = spamtoggle == "on"
+            spam_enabled = (spamtoggle == "on")
             spam_message = spammsg.strip()
             msg_status = f"Spam {'đã bật' if spam_enabled else 'đã tắt'}"
 
-        if spam_delay_form:
+        if spam_delay_form is not None:
             try:
-                spam_delay = int(spam_delay_form)
-                msg_status = f"Đã cập nhật thời gian spam: {spam_delay} giây"
-            except:
+                new_spam_delay = int(spam_delay_form)
+                if new_spam_delay >= 1:
+                    spam_delay = new_spam_delay
+                    msg_status = f"Đã cập nhật thời gian spam: {spam_delay} giây"
+                else:
+                    msg_status = "Thời gian spam không hợp lệ! Phải là số dương."
+            except ValueError:
                 msg_status = "Thời gian spam không hợp lệ!"
 
         if auto_work_toggle:
-            auto_work_enabled = auto_work_toggle == "on"
+            auto_work_enabled = (auto_work_toggle == "on")
             msg_status = f"Auto Work {'đã bật' if auto_work_enabled else 'đã tắt'}"
 
     if msg_status:
@@ -1098,7 +1132,21 @@ def index():
     auto_work_status = "status-active" if auto_work_enabled else "status-inactive"
     auto_work_text = "Đang bật" if auto_work_enabled else "Đang tắt"
 
-    acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names))
+    # Generate options for account selection
+    current_acc_options = []
+    if main_bot:
+        current_acc_options.append('<option value="0">Blacklist (Acc Chính 1)</option>')
+    if main_bot_2:
+        current_acc_options.append('<option value="1">Khanh bang (Acc Chính 2)</option>')
+    
+    # Start from index 2 of acc_names for additional bots as 0 and 1 are main bots
+    for i, _ in enumerate(tokens): # 'tokens' is the list of additional bot tokens
+        # acc_names[i+2] corresponds to the name for the i-th token in 'tokens' list
+        # (considering Blacklist and Khanh bang are at index 0 and 1)
+        acc_name_for_dropdown = acc_names[i + 2] if (i + 2) < len(acc_names) else f"Acc phụ {i+1}"
+        current_acc_options.append(f'<option value="{i + 2}">{acc_name_for_dropdown}</option>')
+    
+    acc_options_html = "".join(current_acc_options)
 
     return render_template_string(HTML.format(
         alert_section=alert_section,
@@ -1114,34 +1162,45 @@ def index():
         heart_threshold_2=heart_threshold_2,
         spam_message=spam_message,
         spam_delay=spam_delay,
-        acc_options=acc_options
+        acc_options=acc_options_html
     ))
 
 def spam_loop():
     global spam_enabled, spam_message, spam_delay
     while True:
         if spam_enabled and spam_message:
-            for idx, bot in enumerate(bots):
+            all_spam_bots = []
+            if main_bot:
+                all_spam_bots.append(main_bot)
+            if main_bot_2:
+                all_spam_bots.append(main_bot_2)
+            all_spam_bots.extend(bots) # Add all additional bots
+
+            for idx, bot_instance in enumerate(all_spam_bots):
                 try:
-                    bot.sendMessage(spam_channel_id, spam_message)
-                    print(f"[{acc_names[idx]}] đã gửi: {spam_message}")
+                    bot_instance.sendMessage(spam_channel_id, spam_message)
+                    log_name = acc_names[idx] if idx < len(acc_names) else f"Bot {idx + 1}"
+                    print(f"[{log_name}] đã gửi: {spam_message}")
                     time.sleep(2)
                 except Exception as e:
-                    print(f"Lỗi gửi spam: {e}")
+                    print(f"Lỗi gửi spam từ bot {idx}: {e}")
         time.sleep(spam_delay)
 
 def keep_alive():
     while True:
         try:
+            # Current logic doesn't send messages, only checks for main_bot existence.
+            # If you want to actually "keep alive" by sending messages,
+            # you'd need a dedicated channel and uncomment a send action here.
             if main_bot:
-                # Gửi tin nhắn để giữ bot hoạt động
-                pass
+                pass 
             time.sleep(random.randint(60, 120))
-        except:
-            pass
+        except Exception as e:
+            print(f"Lỗi trong keep_alive: {e}")
 
 if __name__ == "__main__":
     threading.Thread(target=spam_loop, daemon=True).start()
     threading.Thread(target=keep_alive, daemon=True).start()
     threading.Thread(target=auto_work_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=5000, debug=True)
+```
