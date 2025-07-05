@@ -29,8 +29,8 @@ heart_threshold = 50
 heart_threshold_2 = 50
 last_drop_msg_id = ""
 acc_names = [
-    "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
-    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent", "sly_dd"
+    "sly_dd","HellNBack",Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
+    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent",
 ]
 
 spam_enabled = False
