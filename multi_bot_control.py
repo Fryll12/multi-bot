@@ -25,7 +25,6 @@ work_channel_id = "1389250541590413363"
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 
-
 # --- BIẾN TRẠNG THÁI ---
 bots = []
 main_bot = None
@@ -42,7 +41,6 @@ acc_names = [
     "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent", 
     "sly_dd" # Tên này tương ứng với main_bot (Acc Chính 1)
 ]
-
 
 spam_enabled = False
 spam_message = ""
@@ -66,7 +64,6 @@ def run_bot_with_reconnect(bot, bot_name):
         except Exception as e:
             print(f"[{bot_name}] LỖI GATEWAY NGHIÊM TRỌNG: {e}. Đang thử kết nối lại sau 5 giây...")
         time.sleep(5)
-
 
 # =================================================================
 # === HÀM TẠO BOT (ĐÃ CẬP NHẬT ĐỂ DÙNG RECONNECT) ===
@@ -98,53 +95,41 @@ def create_bot(token, bot_name, is_main=False, is_main_2=False):
                 author = msg.get("author", {}).get("id")
                 content = msg.get("content", "")
                 channel = msg.get("channel_id")
-                mentions = msg.get("mentions", [])
-
-                if author == karuta_id and channel == main_channel_id:
-                    if "is dropping" not in content and not mentions and auto_grab_enabled:
-                        print(f"\n[{bot_name}] Phát hiện tự drop! Đọc tin nhắn Karibbit...")
-                        last_drop_msg_id = msg["id"]
-
-                        def read_karibbit():
-                            time.sleep(0.5)
-                            try:
-                                messages = bot.getMessages(main_channel_id, num=5).json()
-                                for msg_item in messages:
-                                    author_id = msg_item.get("author", {}).get("id")
-                                    if author_id == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                        desc = msg_item["embeds"][0].get("description", "")
-                                        print(f"[{bot_name}] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[{bot_name}] ===== Kết thúc tin nhắn =====")
-                                        lines = desc.split('\n')
-                                        heart_numbers = []
-                                        for i, line in enumerate(lines[:3]):
-                                            matches = re.findall(r'`([^`]*)`', line)
-                                            if len(matches) >= 2 and matches[1].isdigit():
-                                                heart_numbers.append(int(matches[1]))
-                                            else:
-                                                heart_numbers.append(0)
-                                        
-                                        if sum(heart_numbers) == 0:
-                                            print(f"[{bot_name}] Không có số tim nào, bỏ qua.\n")
+                if author == karuta_id and channel == main_channel_id and "is dropping" not in content and not msg.get("mentions", []) and auto_grab_enabled:
+                    print(f"\n[{bot_name}] Phát hiện tự drop! Đọc tin nhắn Karibbit...")
+                    last_drop_msg_id = msg["id"]
+                    def read_karibbit():
+                        time.sleep(0.5)
+                        try:
+                            messages = bot.getMessages(main_channel_id, num=5).json()
+                            for msg_item in messages:
+                                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and msg_item["embeds"]:
+                                    desc = msg_item["embeds"][0].get("description", "")
+                                    print(f"[{bot_name}] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[{bot_name}] ===== Kết thúc tin nhắn =====")
+                                    lines = desc.split('\n')
+                                    heart_numbers = [int(m[1]) for line in lines[:3] if (m := re.findall(r'`([^`]*)`', line)) and len(m) >= 2 and m[1].isdigit()]
+                                    if not heart_numbers or sum(heart_numbers) == 0:
+                                        print(f"[{bot_name}] Không có số tim nào, bỏ qua.\n")
+                                    else:
+                                        max_num = max(heart_numbers)
+                                        if max_num < heart_threshold:
+                                            print(f"[{bot_name}] Số tim lớn nhất {max_num} < {heart_threshold}, không grab!\n")
                                         else:
-                                            max_num = max(heart_numbers)
-                                            if max_num < heart_threshold:
-                                                print(f"[{bot_name}] Số tim lớn nhất {max_num} < {heart_threshold}, không grab!\n")
-                                            else:
-                                                max_index = heart_numbers.index(max_num)
-                                                emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
-                                                delay = {"1️⃣": 0.5, "2️⃣": 1.5, "3️⃣": 2.2}[emoji]
-                                                print(f"[{bot_name}] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
-                                                def grab():
-                                                    try:
-                                                        bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                                        bot.sendMessage(ktb_channel_id, "kt b")
-                                                    except Exception as e:
-                                                        print(f"[{bot_name}] Lỗi khi grab: {e}")
-                                                threading.Timer(delay, grab).start()
-                                        return 
-                            except Exception as e:
-                                print(f"[{bot_name}] Lỗi khi đọc tin nhắn Karibbit: {e}")
-                        threading.Thread(target=read_karibbit).start()
+                                            max_index = heart_numbers.index(max_num)
+                                            emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
+                                            delay = {"1️⃣": 0.5, "2️⃣": 1.5, "3️⃣": 2.2}[emoji]
+                                            print(f"[{bot_name}] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
+                                            def grab():
+                                                try:
+                                                    bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                                    bot.sendMessage(ktb_channel_id, "kt b")
+                                                except Exception as e:
+                                                    print(f"[{bot_name}] Lỗi khi grab: {e}")
+                                            threading.Timer(delay, grab).start()
+                                    return
+                        except Exception as e:
+                            print(f"[{bot_name}] Lỗi khi đọc tin nhắn Karibbit: {e}")
+                    threading.Thread(target=read_karibbit).start()
 
     # --- Logic on_message cho Acc Chính 2 ---
     if is_main_2:
@@ -156,64 +141,51 @@ def create_bot(token, bot_name, is_main=False, is_main_2=False):
                 author = msg.get("author", {}).get("id")
                 content = msg.get("content", "")
                 channel = msg.get("channel_id")
-                mentions = msg.get("mentions", [])
-
-                if author == karuta_id and channel == main_channel_id:
-                    if "is dropping" not in content and not mentions and auto_grab_enabled_2:
-                        print(f"\n[{bot_name}] Phát hiện tự drop! Đọc tin nhắn Karibbit...")
-                        last_drop_msg_id = msg["id"]
-
-                        def read_karibbit_2():
-                            time.sleep(0.5)
-                            try:
-                                messages = bot.getMessages(main_channel_id, num=5).json()
-                                for msg_item in messages:
-                                    author_id = msg_item.get("author", {}).get("id")
-                                    if author_id == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                        desc = msg_item["embeds"][0].get("description", "")
-                                        print(f"[{bot_name}] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[{bot_name}] ===== Kết thúc tin nhắn =====")
-                                        lines = desc.split('\n')
-                                        heart_numbers = []
-                                        for i, line in enumerate(lines[:3]):
-                                            matches = re.findall(r'`([^`]*)`', line)
-                                            if len(matches) >= 2 and matches[1].isdigit():
-                                                heart_numbers.append(int(matches[1]))
-                                            else:
-                                                heart_numbers.append(0)
-
-                                        if sum(heart_numbers) == 0:
-                                            print(f"[{bot_name}] Không có số tim nào, bỏ qua.\n")
+                if author == karuta_id and channel == main_channel_id and "is dropping" not in content and not msg.get("mentions", []) and auto_grab_enabled_2:
+                    print(f"\n[{bot_name}] Phát hiện tự drop! Đọc tin nhắn Karibbit...")
+                    last_drop_msg_id = msg["id"]
+                    def read_karibbit_2():
+                        time.sleep(0.5)
+                        try:
+                            messages = bot.getMessages(main_channel_id, num=5).json()
+                            for msg_item in messages:
+                                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and msg_item["embeds"]:
+                                    desc = msg_item["embeds"][0].get("description", "")
+                                    print(f"[{bot_name}] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[{bot_name}] ===== Kết thúc tin nhắn =====")
+                                    lines = desc.split('\n')
+                                    heart_numbers = [int(m[1]) for line in lines[:3] if (m := re.findall(r'`([^`]*)`', line)) and len(m) >= 2 and m[1].isdigit()]
+                                    if not heart_numbers or sum(heart_numbers) == 0:
+                                        print(f"[{bot_name}] Không có số tim nào, bỏ qua.\n")
+                                    else:
+                                        max_num = max(heart_numbers)
+                                        if max_num < heart_threshold_2:
+                                            print(f"[{bot_name}] Số tim lớn nhất {max_num} < {heart_threshold_2}, không grab!\n")
                                         else:
-                                            max_num = max(heart_numbers)
-                                            if max_num < heart_threshold_2:
-                                                print(f"[{bot_name}] Số tim lớn nhất {max_num} < {heart_threshold_2}, không grab!\n")
-                                            else:
-                                                max_index = heart_numbers.index(max_num)
-                                                emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
-                                                delay = {"1️⃣": 0.8, "2️⃣": 1.8, "3️⃣": 2.5}[emoji]
-                                                print(f"[{bot_name}] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
-                                                def grab_2():
-                                                    try:
-                                                        bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                                        bot.sendMessage(ktb_channel_id, "kt b")
-                                                    except Exception as e:
-                                                        print(f"[{bot_name}] Lỗi khi grab: {e}")
-                                                threading.Timer(delay, grab_2).start()
-                                        return
-                            except Exception as e:
-                                print(f"[{bot_name}] Lỗi khi đọc tin nhắn Karibbit: {e}")
-                        threading.Thread(target=read_karibbit_2).start()
+                                            max_index = heart_numbers.index(max_num)
+                                            emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
+                                            delay = {"1️⃣": 0.8, "2️⃣": 1.8, "3️⃣": 2.5}[emoji]
+                                            print(f"[{bot_name}] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
+                                            def grab_2():
+                                                try:
+                                                    bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                                    bot.sendMessage(ktb_channel_id, "kt b")
+                                                except Exception as e:
+                                                    print(f"[{bot_name}] Lỗi khi grab: {e}")
+                                            threading.Timer(delay, grab_2).start()
+                                    return
+                        except Exception as e:
+                            print(f"[{bot_name}] Lỗi khi đọc tin nhắn Karibbit: {e}")
+                    threading.Thread(target=read_karibbit_2).start()
 
     threading.Thread(target=run_bot_with_reconnect, args=(bot, bot_name), daemon=True).start()
     return bot
 
 # =================================================================
-# === CÁC HÀM CHỨC NĂNG (ĐÃ CẬP NHẬT) ===
+# === CÁC HÀM CHỨC NĂNG ===
 # =================================================================
 def reboot_bot(target_id):
     """Khởi động lại một bot dựa trên ID định danh của nó (vd: 'main_1', 'sub_2')."""
     global main_bot, main_bot_2, bots
-
     with bots_lock:
         print(f"[Reboot] Nhận được yêu cầu reboot cho target: {target_id}")
         if target_id == 'main_1' and main_bot:
@@ -222,14 +194,12 @@ def reboot_bot(target_id):
             except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 1: {e}")
             main_bot = create_bot(main_token, "Acc Chính 1 (Rebooted)", is_main=True)
             print("[Reboot] Acc Chính 1 đã được khởi động lại.")
-
         elif target_id == 'main_2' and main_bot_2:
             print("[Reboot] Đang xử lý Acc Chính 2...")
             try: main_bot_2.gateway.close()
             except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 2: {e}")
             main_bot_2 = create_bot(main_token_2, "Acc Chính 2 (Rebooted)", is_main_2=True)
             print("[Reboot] Acc Chính 2 đã được khởi động lại.")
-
         elif target_id.startswith('sub_'):
             try:
                 index = int(target_id.split('_')[1])
@@ -248,20 +218,32 @@ def reboot_bot(target_id):
         else:
             print(f"[Reboot] Target không xác định: {target_id}")
 
+# --- Auto Work Functions (ĐÃ THAY THẾ BẰNG CODE CHUẨN BẠN GỬI) ---
 def run_work_bot(token, acc_index):
     bot = discum.Client(token=token, log={"console": False, "file": False})
-    headers = { "Authorization": token, "Content-Type": "application/json" }
+    headers = {"Authorization": token, "Content-Type": "application/json"}
     step = {"value": 0}
 
-    def send_command(command):
-        print(f"[Work Acc {acc_index}] Gửi lệnh '{command}'...")
-        bot.sendMessage(work_channel_id, command)
+    def send_karuta_command():
+        print(f"[Work Acc {acc_index}] Gửi lệnh 'kc o:ef'...")
+        bot.sendMessage(work_channel_id, "kc o:ef")
+
+    def send_kn_command():
+        print(f"[Work Acc {acc_index}] Gửi lệnh 'kn'...")
+        bot.sendMessage(work_channel_id, "kn")
+
+    def send_kw_command():
+        print(f"[Work Acc {acc_index}] Gửi lệnh 'kw'...")
+        bot.sendMessage(work_channel_id, "kw")
+        step["value"] = 2
 
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
             payload = {"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": "a", "data": {"component_type": 2, "custom_id": custom_id}}
             r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
-            if r.status_code != 204:
+            if r.status_code == 204:
+                print(f"[Work Acc {acc_index}] Click tick thành công!")
+            else:
                 print(f"[Work Acc {acc_index}] Click thất bại! Mã lỗi: {r.status_code}, Nội dung: {r.text}")
         except Exception as e:
             print(f"[Work Acc {acc_index}] Lỗi click tick: {str(e)}")
@@ -276,14 +258,21 @@ def run_work_bot(token, acc_index):
 
             if step["value"] == 0 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
                 desc = m['embeds'][0].get('description', '')
-                card_codes = re.findall(r'\b\w{6}\b', desc)
+                card_codes = re.findall(r'\bv[a-zA-Z0-9]{6}\b', desc)
                 if card_codes and len(card_codes) >= 10:
-                    first_5, last_5 = card_codes[:5], card_codes[-5:]
-                    print(f"[Work Acc {acc_index}] Mã đầu: {', '.join(first_5)}, Mã cuối: {', '.join(last_5)}")
-                    for i, code in enumerate(last_5 + first_5):
-                        time.sleep(1.5 + (0.5 if i == 0 else 0))
-                        bot.sendMessage(work_channel_id, f"kjw {code} {chr(97 + i)}")
-                    time.sleep(1); send_command("kn"); step["value"] = 1
+                    first_5 = card_codes[:5]
+                    last_5 = card_codes[-5:]
+                    print(f"[Work Acc {acc_index}] Mã đầu: {', '.join(first_5)}")
+                    print(f"[Work Acc {acc_index}] Mã cuối: {', '.join(last_5)}")
+                    for i, code in enumerate(last_5):
+                        suffix = chr(97 + i)
+                        time.sleep(2 if i == 0 else 1.5)
+                        bot.sendMessage(work_channel_id, f"kjw {code} {suffix}")
+                    for i, code in enumerate(first_5):
+                        suffix = chr(97 + i + 5) # Tiếp tục suffix
+                        time.sleep(1.5)
+                        bot.sendMessage(work_channel_id, f"kjw {code} {suffix}")
+                    time.sleep(1); send_kn_command(); step["value"] = 1
             elif step["value"] == 1 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
                 desc = m['embeds'][0].get('description', '')
                 lines = desc.split('\n')
@@ -292,25 +281,29 @@ def run_work_bot(token, acc_index):
                     print(f"[Work Acc {acc_index}] Tài nguyên chọn: {resource}")
                     time.sleep(2)
                     bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
-                    time.sleep(1); send_command("kw"); step["value"] = 2
+                    time.sleep(1); send_kw_command(); step["value"] = 2
             elif step["value"] == 2 and author_id == karuta_id and 'components' in m:
                 message_id = m['id']
                 application_id = m.get('application_id', karuta_id)
-                if 'components' in m and m['components']:
+                last_custom_id = None
+                if m.get('components'):
                     for comp in m['components']:
                         if comp.get('components'):
                             for btn in comp['components']:
-                                if btn.get('custom_id'):
-                                    click_tick(work_channel_id, message_id, btn['custom_id'], application_id, guild_id)
-                                    step["value"] = 3; bot.gateway.close(); return
+                                if btn.get('type') == 2:
+                                    last_custom_id = btn['custom_id']
+                if last_custom_id:
+                    print(f"[Work Acc {acc_index}] Phát hiện button, custom_id: {last_custom_id}")
+                    click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
+                    step["value"] = 3; bot.gateway.close()
 
     print(f"[Work Acc {acc_index}] Bắt đầu hoạt động...")
     threading.Thread(target=bot.gateway.run, daemon=True).start()
-    time.sleep(3); send_command("kc o:ef")
+    time.sleep(3); send_karuta_command()
     timeout = time.time() + 90
     while step["value"] != 3 and time.time() < timeout: time.sleep(1)
     bot.gateway.close()
-    print(f"[Work Acc {acc_index}] Đã hoàn thành hoặc hết thời gian.")
+    print(f"[Work Acc {acc_index}] Đã hoàn thành, chuẩn bị tới acc tiếp theo.")
 
 def auto_work_loop():
     global auto_work_enabled
@@ -490,11 +483,9 @@ def index():
     reboot_options = ""
     if main_bot: reboot_options += '<option value="main_1">Acc Chính 1</option>'
     if main_bot_2: reboot_options += '<option value="main_2">Acc Chính 2</option>'
-    # Sửa lỗi logic reboot, chỉ hiển thị các acc phụ có tồn tại
     for i in range(len(bots)):
         reboot_options += f'<option value="sub_{i}">Acc Phụ {i} ({acc_names[i]})</option>'
 
-    # SỬA LỖI KEYERROR: Truyền biến một cách tường minh
     return render_template_string(HTML.format(
         alert_section=alert_section,
         auto_grab_status=auto_grab_status,
@@ -557,5 +548,4 @@ if __name__ == "__main__":
     threading.Thread(target=auto_work_loop, daemon=True).start()
     print("-> Luồng Auto Work đã sẵn sàng.")
     
-    # Chạy web server trên luồng chính
     keep_alive()
