@@ -35,7 +35,7 @@ heart_threshold_2 = 50
 last_drop_msg_id = ""
 acc_names = [
      "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
-    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent", "sly_dd",
+    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent",
 ]
 
 spam_enabled = False
@@ -1135,21 +1135,7 @@ def index():
                     delay_val = float(delay)
                     codes_list = codes.split(",")
                     
-                    # Kiểm tra xem có phải account "sly_dd" (index 18) không
-                    if acc_idx == 18:  # sly_dd sử dụng main_bot
-                        if main_bot:
-                            with bots_lock:
-                                for i, code in enumerate(codes_list):
-                                    code = code.strip()
-                                    if code:
-                                        final_msg = f"{prefix} {code}" if prefix else code
-                                        try:
-                                            threading.Timer(delay_val * i, main_bot.sendMessage, args=(other_channel_id, final_msg)).start()
-                                        except Exception as e:
-                                            print(f"Lỗi gửi mã (sly_dd): {e}")
-                        else:
-                            print("Main bot không khả dụng cho sly_dd")
-                    elif acc_idx < len(bots):  # Các account khác sử dụng sub bots
+                    if acc_idx < len(bots):
                          with bots_lock:
                             for i, code in enumerate(codes_list):
                                 code = code.strip()
@@ -1253,8 +1239,25 @@ def keep_alive():
         except:
             pass
             
-# Logic khởi tạo bot được chuyển sang main.py
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    print("Đang khởi tạo các bot...")
+    with bots_lock:
+        if main_token:
+            main_bot = create_bot(main_token, is_main=True)
+        if main_token_2:
+            main_bot_2 = create_bot(main_token_2, is_main_2=True)
+
+        for token in tokens:
+            if token.strip():
+                bots.append(create_bot(token.strip(), is_main=False))
+    print("Tất cả các bot đã được khởi tạo.")
+
+    print("Đang khởi tạo các luồng nền...")
+    threading.Thread(target=spam_loop, daemon=True).start()
+    threading.Thread(target=keep_alive, daemon=True).start()
+    threading.Thread(target=auto_work_loop, daemon=True).start()
+    print("Các luồng nền đã sẵn sàng.")
+
+    port = int(os.environ.get("PORT", 8080))
+    print(f"Khởi động Web Server tại cổng {port}...")
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
