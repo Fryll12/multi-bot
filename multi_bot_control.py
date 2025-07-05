@@ -77,10 +77,10 @@ def create_bot(token, is_main=False, is_main_2=False):
                         def read_karibbit():
                             time.sleep(0.5)
                             messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg in messages:
-                                author_id = msg.get("author", {}).get("id")
-                                if author_id == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
-                                    desc = msg["embeds"][0].get("description", "")
+                            for msg_kb in messages:
+                                author_id = msg_kb.get("author", {}).get("id")
+                                if author_id == karibbit_id and "embeds" in msg_kb and len(msg_kb["embeds"]) > 0:
+                                    desc = msg_kb["embeds"][0].get("description", "")
                                     print(f"\n[Bot 1] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 1] ===== Kết thúc tin nhắn =====\n")
 
                                     lines = desc.split('\n')
@@ -118,7 +118,6 @@ def create_bot(token, is_main=False, is_main_2=False):
                                                     print(f"[Bot 1] Lỗi khi grab hoặc nhắn kt b: {e}")
 
                                             threading.Timer(delay, grab).start()
-
                                     break
 
                         threading.Thread(target=read_karibbit).start()
@@ -143,10 +142,10 @@ def create_bot(token, is_main=False, is_main_2=False):
                         def read_karibbit_2():
                             time.sleep(0.5)
                             messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg in messages:
-                                author_id = msg.get("author", {}).get("id")
-                                if author_id == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
-                                    desc = msg["embeds"][0].get("description", "")
+                            for msg_kb in messages:
+                                author_id = msg_kb.get("author", {}).get("id")
+                                if author_id == karibbit_id and "embeds" in msg_kb and len(msg_kb["embeds"]) > 0:
+                                    desc = msg_kb["embeds"][0].get("description", "")
                                     print(f"\n[Bot 2] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 2] ===== Kết thúc tin nhắn =====\n")
 
                                     lines = desc.split('\n')
@@ -185,23 +184,28 @@ def create_bot(token, is_main=False, is_main_2=False):
                                                     print(f"[Bot 2] Lỗi khi grab hoặc nhắn kt b: {e}")
 
                                             threading.Timer(delay, grab_2).start()
-
                                     break
 
                         threading.Thread(target=read_karibbit_2).start()
 
-def run_main_bot_2():
-    while True:
-        try:
-            bot.gateway.run(auto_reconnect=True)
-        except Exception as e:
-            print(f"[Acc chính 2] Bot lỗi, thử kết nối lại: {e}")
-        time.sleep(5)
-threading.Thread(target=run_main_bot_2, daemon=True).start()
-    return bot
+    # Define a helper function for bot connection lifecycle
+    def run_bot_connection_lifecycle(bot_instance, bot_name_for_log):
+        while True:
+            try:
+                bot_instance.gateway.run(auto_reconnect=True)
+            except Exception as e:
+                print(f"[{bot_name_for_log}] Bot bị ngắt kết nối hoặc gặp lỗi nghiêm trọng, đang thử kết nối lại sau 5 giây: {e}")
+            time.sleep(5)
 
+    # Start the connection lifecycle in a separate daemon thread
+    bot_log_name = "Bot chính 1" if is_main else ("Bot chính 2" if is_main_2 else "Bot phụ")
+    threading.Thread(target=run_bot_connection_lifecycle, args=(bot, bot_log_name), daemon=True).start()
+    return bot # This return statement was originally incorrectly indented
+
+# --- Bot Initialization ---
 main_bot = create_bot(main_token, is_main=True)
-main_bot_2 = create_bot(main_token_2, is_main_2=True) if main_token_2 else None
+if main_token_2:
+    main_bot_2 = create_bot(main_token_2, is_main_2=True)
 
 for token in tokens:
     if token.strip():
@@ -257,7 +261,7 @@ def run_work_bot(token, acc_index):
     def on_message(resp):
         if resp.event.message:
             m = resp.parsed.auto()
-            if str(m.get('channel_id')) != work_channel_id:
+            if str(m.get('channel_id')) != work_channel_id or m.get('author', {}).get('id') == bot.gateway.session.user['id']:
                 return
 
             author_id = str(m.get('author', {}).get('id', ''))
@@ -320,14 +324,14 @@ def run_work_bot(token, acc_index):
                     bot.gateway.close()
 
     print(f"[Work Acc {acc_index}] Bắt đầu hoạt động...")
-def run_main_bot_2():
-    while True:
-        try:
-            bot.gateway.run(auto_reconnect=True)
-        except Exception as e:
-            print(f"[Acc chính 2] Bot lỗi, thử kết nối lại: {e}")
-        time.sleep(5)
-threading.Thread(target=run_main_bot_2, daemon=True).start()
+    # This bot will use run_bot_connection_lifecycle if it's one of the persistent bots
+    # created by create_bot. If it's a new, temporary bot created just for work,
+    # its gateway needs to be explicitly run and managed here.
+    # To avoid creating multiple discum clients for the same token and to ensure the work bot
+    # also attempts to reconnect, we should reuse the persistent bot instance from `create_bot`.
+    # However, to maintain existing structure of `run_work_bot`, I will keep this logic as-is,
+    # and acknowledge it means a separate, temporary discum instance is created here.
+    threading.Thread(target=bot.gateway.run, daemon=True).start()
     time.sleep(3)
     send_karuta_command()
 
@@ -344,9 +348,12 @@ def auto_work_loop():
         if auto_work_enabled:
             for i, token in enumerate(tokens):
                 if token.strip():
-                    print(f"[Auto Work] Đang chạy acc {i+1}...")
-                    run_work_bot(token.strip(), i+1)
-                    print(f"[Auto Work] Acc {i+1} xong, chờ {work_delay_between_acc} giây...")
+                    # The acc_names indexing for work bots should match the dropdown in Flask
+                    # For `tokens` list (additional bots), it corresponds to acc_names from index 2 onwards.
+                    acc_name = acc_names[i + 2] if (i + 2) < len(acc_names) else f"Acc phụ {i+1}"
+                    print(f"[Auto Work] Đang chạy acc {acc_name}...")
+                    run_work_bot(token.strip(), acc_name) # Pass acc_name for logging
+                    print(f"[Auto Work] Acc {acc_name} xong, chờ {work_delay_between_acc} giây...")
                     time.sleep(work_delay_between_acc)
             
             print(f"[Auto Work] Hoàn thành tất cả acc, chờ {work_delay_after_all} giây để lặp lại...")
@@ -692,7 +699,6 @@ HTML = """
         {alert_section}
 
         <div class="row g-4">
-            <!-- Manual Message Section -->
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
@@ -740,7 +746,6 @@ HTML = """
                 </div>
             </div>
 
-            <!-- Auto Work Section -->
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
@@ -778,7 +783,6 @@ HTML = """
                 </div>
             </div>
 
-            <!-- Auto Grab Section - Row with both accounts -->
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
@@ -885,7 +889,6 @@ HTML = """
                 </div>
             </div>
 
-            <!-- Code Sending Section -->
             <div class="col-12">
                 <div class="control-card">
                     <div class="card-header">
@@ -937,7 +940,6 @@ HTML = """
                 </div>
             </div>
 
-            <!-- Spam Control Section -->
             <div class="col-12">
                 <div class="control-card">
                     <div class="card-header">
@@ -1016,19 +1018,33 @@ def index():
         auto_work_toggle = request.form.get("auto_work_toggle")
 
         if msg:
-            for idx, bot in enumerate(bots):
+            all_active_bots = []
+            if main_bot:
+                all_active_bots.append(main_bot)
+            if main_bot_2:
+                all_active_bots.append(main_bot_2)
+            all_active_bots.extend(bots) # Add all additional bots
+
+            for idx, bot_instance in enumerate(all_active_bots):
                 try:
-                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
+                    threading.Timer(2 * idx, bot_instance.sendMessage, args=(other_channel_id, msg)).start()
                 except Exception as e:
-                    print(f"Lỗi gửi tin nhắn: {e}")
+                    print(f"Lỗi gửi tin nhắn thủ công: {e}")
             msg_status = "Đã gửi thủ công thành công!"
 
         if quickmsg:
-            for idx, bot in enumerate(bots):
+            all_active_bots = []
+            if main_bot:
+                all_active_bots.append(main_bot)
+            if main_bot_2:
+                all_active_bots.append(main_bot_2)
+            all_active_bots.extend(bots) # Add all additional bots
+            
+            for idx, bot_instance in enumerate(all_active_bots):
                 try:
-                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, quickmsg)).start()
+                    threading.Timer(2 * idx, bot_instance.sendMessage, args=(other_channel_id, quickmsg)).start()
                 except Exception as e:
-                    print(f"Lỗi gửi tin nhắn: {e}")
+                    print(f"Lỗi gửi lệnh nhanh: {e}")
             msg_status = f"Đã gửi lệnh {quickmsg} thành công!"
 
         if toggle:
@@ -1039,60 +1055,81 @@ def index():
             auto_grab_enabled_2 = toggle_2 == "on"
             msg_status = f"Tự grab Acc chính 2 {'đã bật' if auto_grab_enabled_2 else 'đã tắt'}"
 
-        if heart_threshold_form:
+        if heart_threshold_form is not None:
             try:
-                heart_threshold = int(heart_threshold_form)
-                msg_status = f"Đã cập nhật mức tim Acc chính 1: {heart_threshold}"
-            except:
+                new_threshold = int(heart_threshold_form)
+                if new_threshold >= 0:
+                    heart_threshold = new_threshold
+                    msg_status = f"Đã cập nhật mức tim Acc chính 1: {heart_threshold}"
+                else:
+                    msg_status = "Mức tim Acc chính 1 không hợp lệ! Phải là số không âm."
+            except ValueError:
                 msg_status = "Mức tim Acc chính 1 không hợp lệ!"
 
-        if heart_threshold_2_form:
+        if heart_threshold_2_form is not None:
             try:
-                heart_threshold_2 = int(heart_threshold_2_form)
-                msg_status = f"Đã cập nhật mức tim Acc chính 2: {heart_threshold_2}"
-            except:
+                new_threshold_2 = int(heart_threshold_2_form)
+                if new_threshold_2 >= 0:
+                    heart_threshold_2 = new_threshold_2
+                    msg_status = f"Đã cập nhật mức tim Acc chính 2: {heart_threshold_2}"
+                else:
+                    msg_status = "Mức tim Acc chính 2 không hợp lệ! Phải là số không âm."
+            except ValueError:
                 msg_status = "Mức tim Acc chính 2 không hợp lệ!"
 
         if send_codes:
-            acc_index = request.form.get("acc_index")
-            delay = request.form.get("delay")
-            prefix = request.form.get("prefix")
-            codes = request.form.get("codes")
+            acc_index_str = request.form.get("acc_index")
+            delay_str = request.form.get("delay")
+            prefix = request.form.get("prefix", "").strip()
+            codes = request.form.get("codes", "").strip()
 
-            if acc_index and delay and codes:
+            if acc_index_str and delay_str and codes:
                 try:
-                    acc_idx = int(acc_index)
-                    delay_val = float(delay)
-                    codes_list = codes.split(",")
+                    acc_idx = int(acc_index_str)
+                    delay_val = float(delay_str)
+                    codes_list = [code.strip() for code in codes.split(",") if code.strip()]
                     
-                    if acc_idx < len(bots):
+                    target_bot = None
+                    if acc_idx == 0 and main_bot:
+                        target_bot = main_bot
+                    elif acc_idx == 1 and main_bot_2:
+                        target_bot = main_bot_2
+                    elif acc_idx >= 2 and (acc_idx - 2) < len(bots): # Adjusted for `bots` list
+                        target_bot = bots[acc_idx - 2]
+                    
+                    if target_bot:
                         for i, code in enumerate(codes_list):
-                            code = code.strip()
-                            if code:
-                                final_msg = f"{prefix} {code}" if prefix else code
-                                try:
-                                    threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
-                                except Exception as e:
-                                    print(f"Lỗi gửi mã: {e}")
+                            final_msg = f"{prefix} {code}" if prefix else code
+                            threading.Timer(delay_val * i, target_bot.sendMessage, args=(other_channel_id, final_msg)).start()
+                        msg_status = f"Đã bắt đầu gửi mã cho acc {acc_names[acc_idx]}!"
+                    else:
+                        msg_status = "Không tìm thấy bot cho tài khoản đã chọn hoặc tài khoản đó không được khởi tạo!"
+                except ValueError:
+                    msg_status = "Lỗi: Thời gian delay hoặc định dạng mã không hợp lệ."
                 except Exception as e:
-                    print(f"Lỗi xử lý codes: {e}")
-
-            msg_status = "Đã bắt đầu gửi mã!"
+                    print(f"Lỗi khi gửi danh sách mã: {e}")
+                    msg_status = f"Đã xảy ra lỗi khi gửi mã: {str(e)}"
+            else:
+                msg_status = "Vui lòng điền đầy đủ thông tin để gửi mã."
 
         if spamtoggle:
-            spam_enabled = spamtoggle == "on"
+            spam_enabled = (spamtoggle == "on")
             spam_message = spammsg.strip()
             msg_status = f"Spam {'đã bật' if spam_enabled else 'đã tắt'}"
 
-        if spam_delay_form:
+        if spam_delay_form is not None:
             try:
-                spam_delay = int(spam_delay_form)
-                msg_status = f"Đã cập nhật thời gian spam: {spam_delay} giây"
-            except:
+                new_spam_delay = int(spam_delay_form)
+                if new_spam_delay >= 1:
+                    spam_delay = new_spam_delay
+                    msg_status = f"Đã cập nhật thời gian spam: {spam_delay} giây"
+                else:
+                    msg_status = "Thời gian spam không hợp lệ! Phải là số dương."
+            except ValueError:
                 msg_status = "Thời gian spam không hợp lệ!"
 
         if auto_work_toggle:
-            auto_work_enabled = auto_work_toggle == "on"
+            auto_work_enabled = (auto_work_toggle == "on")
             msg_status = f"Auto Work {'đã bật' if auto_work_enabled else 'đã tắt'}"
 
     if msg_status:
@@ -1112,7 +1149,17 @@ def index():
     auto_work_status = "status-active" if auto_work_enabled else "status-inactive"
     auto_work_text = "Đang bật" if auto_work_enabled else "Đang tắt"
 
-    acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names[:-1]))
+    current_acc_options = []
+    if main_bot:
+        current_acc_options.append('<option value="0">Blacklist (Acc Chính 1)</option>')
+    if main_bot_2:
+        current_acc_options.append('<option value="1">Khanh bang (Acc Chính 2)</option>')
+    
+    for i, _ in enumerate(tokens):
+        acc_name_for_dropdown = acc_names[i + 2] if (i + 2) < len(acc_names) else f"Acc phụ {i+1}"
+        current_acc_options.append(f'<option value="{i + 2}">{acc_name_for_dropdown}</option>')
+    
+    acc_options_html = "".join(current_acc_options)
 
     return render_template_string(HTML.format(
         alert_section=alert_section,
@@ -1128,31 +1175,38 @@ def index():
         heart_threshold_2=heart_threshold_2,
         spam_message=spam_message,
         spam_delay=spam_delay,
-        acc_options=acc_options
+        acc_options=acc_options_html
     ))
 
 def spam_loop():
     global spam_enabled, spam_message, spam_delay
     while True:
         if spam_enabled and spam_message:
-            for idx, bot in enumerate(bots):
+            all_spam_bots = []
+            if main_bot:
+                all_spam_bots.append(main_bot)
+            if main_bot_2:
+                all_spam_bots.append(main_bot_2)
+            all_spam_bots.extend(bots)
+
+            for idx, bot_instance in enumerate(all_spam_bots):
                 try:
-                    bot.sendMessage(spam_channel_id, spam_message)
-                    print(f"[{acc_names[idx]}] đã gửi: {spam_message}")
+                    bot_instance.sendMessage(spam_channel_id, spam_message)
+                    log_name = acc_names[idx] if idx < len(acc_names) else f"Bot {idx + 1}"
+                    print(f"[{log_name}] đã gửi: {spam_message}")
                     time.sleep(2)
                 except Exception as e:
-                    print(f"Lỗi gửi spam: {e}")
+                    print(f"Lỗi gửi spam từ bot {idx}: {e}")
         time.sleep(spam_delay)
 
 def keep_alive():
     while True:
         try:
             if main_bot:
-                # Gửi tin nhắn để giữ bot hoạt động
                 pass
             time.sleep(random.randint(60, 120))
-        except:
-            pass
+        except Exception as e:
+            print(f"Lỗi trong keep_alive: {e}")
 
 if __name__ == "__main__":
     threading.Thread(target=spam_loop, daemon=True).start()
