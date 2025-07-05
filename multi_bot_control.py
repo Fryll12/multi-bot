@@ -35,7 +35,7 @@ heart_threshold_2 = 50
 last_drop_msg_id = ""
 acc_names = [
      "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
-    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent",
+    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent", "sly_dd",
 ]
 
 spam_enabled = False
@@ -1241,11 +1241,26 @@ def keep_alive():
             
 if __name__ == "__main__":
     print("Đang khởi tạo các bot...")
+    
+    # Thêm auto-reconnect loop function
+    def run_main_bot_loop(bot, bot_name="main"):
+        while True:
+            try:
+                bot.gateway.run(auto_reconnect=True)
+            except Exception as e:
+                print(f"[{bot_name}] → Mất kết nối, thử lại sau 5s: {e}")
+                time.sleep(5)
+    
     with bots_lock:
         if main_token:
             main_bot = create_bot(main_token, is_main=True)
+            # Thêm auto-reconnect cho main bot 1
+            threading.Thread(target=run_main_bot_loop, args=(main_bot, "main_1"), daemon=True).start()
+        
         if main_token_2:
             main_bot_2 = create_bot(main_token_2, is_main_2=True)
+            # Thêm auto-reconnect cho main bot 2
+            threading.Thread(target=run_main_bot_loop, args=(main_bot_2, "main_2"), daemon=True).start()
 
         for token in tokens:
             if token.strip():
@@ -1258,6 +1273,6 @@ if __name__ == "__main__":
     threading.Thread(target=auto_work_loop, daemon=True).start()
     print("Các luồng nền đã sẵn sàng.")
 
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 5000))
     print(f"Khởi động Web Server tại cổng {port}...")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
