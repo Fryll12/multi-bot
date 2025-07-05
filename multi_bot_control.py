@@ -1252,5 +1252,7 @@ def keep_alive():
             time.sleep(random.randint(60, 120))
         except:
             pass
-            
+            if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
 # Logic khởi tạo bot được chuyển sang main.py
