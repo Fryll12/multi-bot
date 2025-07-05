@@ -498,6 +498,7 @@ def index():
     """Main dashboard page"""
     # Dynamically generate the options for the select dropdown
     acc_options_html = ''.join(f'<option value="{i}">{acc_names[i] if i < len(acc_names) else f"Acc {i}"}</option>' for i in range(len(tokens)))
+    # THE FIX IS HERE: Replace a specific placeholder, not an empty string.
     return render_template_string(HTML_TEMPLATE.replace('', acc_options_html))
 
 @app.route('/api/status')
@@ -1050,3 +1051,4 @@ if __name__ == '__main__':
     logging.info("Karuta Deep Control Center is ready! Access at http://localhost:5000")
     # For production, consider using a more robust WSGI server like gunicorn or waitress
     app.run(host="0.0.0.0", port=5000, debug=False)
+}
