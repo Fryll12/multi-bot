@@ -190,16 +190,14 @@ def create_bot(token, is_main=False, is_main_2=False):
 
                         threading.Thread(target=read_karibbit_2).start()
 
-    
-def run_main_bot():
+def run_main_bot_2():
     while True:
         try:
             bot.gateway.run(auto_reconnect=True)
         except Exception as e:
-            print(f"[Acc chính] Bot lỗi, thử kết nối lại: {e}")
+            print(f"[Acc chính 2] Bot lỗi, thử kết nối lại: {e}")
         time.sleep(5)
-threading.Thread(target=run_main_bot, daemon=True).start()
-
+threading.Thread(target=run_main_bot_2, daemon=True).start()
     return bot
 
 main_bot = create_bot(main_token, is_main=True)
@@ -322,7 +320,6 @@ def run_work_bot(token, acc_index):
                     bot.gateway.close()
 
     print(f"[Work Acc {acc_index}] Bắt đầu hoạt động...")
-    
 def run_main_bot_2():
     while True:
         try:
@@ -331,7 +328,6 @@ def run_main_bot_2():
             print(f"[Acc chính 2] Bot lỗi, thử kết nối lại: {e}")
         time.sleep(5)
 threading.Thread(target=run_main_bot_2, daemon=True).start()
-
     time.sleep(3)
     send_karuta_command()
 
