@@ -1,4 +1,10 @@
-# multi_bot_control_final_fix.py
+#!/usr/bin/env python3
+"""
+DEEP WEB BOT CONTROL - Complete System
+Discord bot control với reconnect logic và giao diện deep web cyberpunk
+Giữ nguyên 100% logic gốc, chỉ thay đổi giao diện
+"""
+
 import discum
 import threading
 import time
@@ -6,15 +12,24 @@ import os
 import random
 import re
 import requests
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template, jsonify
 from dotenv import load_dotenv
+import logging
 
+# ============================================================================
+# SETUP & CONFIG
+# ============================================================================
+
+logging.basicConfig(level=logging.DEBUG)
 load_dotenv()
 
-# --- CẤU HÌNH ---
-main_token = os.getenv("MAIN_TOKEN")
-main_token_2 = os.getenv("MAIN_TOKEN_2")
-tokens = os.getenv("TOKENS").split(",") if os.getenv("TOKENS") else []
+app = Flask(__name__)
+app.secret_key = os.environ.get("SESSION_SECRET", "deep_web_secret_key_666")
+
+# Discord tokens và channels
+main_token = os.getenv("MAIN_TOKEN", "")
+main_token_2 = os.getenv("MAIN_TOKEN_2", "")
+tokens = os.getenv("TOKENS", "").split(",") if os.getenv("TOKENS") else []
 
 main_channel_id = "1386973916563767396"
 other_channel_id = "1387406577040101417"
@@ -24,7 +39,7 @@ work_channel_id = "1389250541590413363"
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 
-# --- BIẾN TRẠNG THÁI ---
+# Biến trạng thái hệ thống
 bots = []
 main_bot = None
 main_bot_2 = None
@@ -33,1231 +48,1093 @@ auto_grab_enabled_2 = False
 heart_threshold = 50
 heart_threshold_2 = 50
 last_drop_msg_id = ""
+
+# 18 tên account
 acc_names = [
-     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
-    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent",
+    "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
+    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", 
+    "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent",
 ]
 
+# Spam & Work settings
 spam_enabled = False
 spam_message = ""
 spam_delay = 10
-
 auto_work_enabled = False
 work_delay_between_acc = 10
 work_delay_after_all = 44100
 
-bots_lock = threading.Lock()
+# Reconnect system
+main_bot_reconnect_enabled = True
+main_bot_2_reconnect_enabled = True
+reconnect_delay = 5
+max_reconnect_attempts = 10
 
-# ... (Toàn bộ các hàm Python từ reboot_bot đến auto_work_loop không thay đổi) ...
+bots_lock = threading.Lock()
+system_logs = []
+
+# ============================================================================
+# CORE FUNCTIONS
+# ============================================================================
+
+def log_system(message):
+    """Thêm log vào hệ thống"""
+    timestamp = time.strftime("%H:%M:%S")
+    log_entry = f"[{timestamp}] {message}"
+    system_logs.append(log_entry)
+    if len(system_logs) > 100:
+        system_logs.pop(0)
+    print(log_entry)
+
+def check_bot_connection(bot, bot_name):
+    """Kiểm tra kết nối của bot"""
+    try:
+        if bot and hasattr(bot, 'gateway') and bot.gateway:
+            return True
+        return False
+    except Exception as e:
+        log_system(f"[{bot_name}] Lỗi kiểm tra kết nối: {e}")
+        return False
+
+def reconnect_main_bot():
+    """Reconnect cho main bot với retry logic"""
+    global main_bot, main_bot_reconnect_enabled
+    
+    if not main_bot_reconnect_enabled:
+        return
+    
+    attempts = 0
+    while attempts < max_reconnect_attempts and main_bot_reconnect_enabled:
+        try:
+            log_system("[Main Bot 1] Đang thử reconnect...")
+            
+            if main_bot:
+                try:
+                    main_bot.gateway.close()
+                except:
+                    pass
+            
+            main_bot = create_bot(main_token, is_main=True)
+            time.sleep(2)
+            
+            if check_bot_connection(main_bot, "Main Bot 1"):
+                log_system("[Main Bot 1] Reconnect thành công!")
+                return
+            
+            attempts += 1
+            log_system(f"[Main Bot 1] Thử reconnect lần {attempts}/{max_reconnect_attempts}")
+            time.sleep(reconnect_delay)
+            
+        except Exception as e:
+            attempts += 1
+            log_system(f"[Main Bot 1] Lỗi reconnect lần {attempts}: {e}")
+            time.sleep(reconnect_delay)
+    
+    log_system("[Main Bot 1] Đã hết số lần thử reconnect!")
+
+def reconnect_main_bot_2():
+    """Reconnect cho main bot 2 với retry logic"""
+    global main_bot_2, main_bot_2_reconnect_enabled
+    
+    if not main_bot_2_reconnect_enabled:
+        return
+    
+    attempts = 0
+    while attempts < max_reconnect_attempts and main_bot_2_reconnect_enabled:
+        try:
+            log_system("[Main Bot 2] Đang thử reconnect...")
+            
+            if main_bot_2:
+                try:
+                    main_bot_2.gateway.close()
+                except:
+                    pass
+            
+            main_bot_2 = create_bot(main_token_2, is_main_2=True)
+            time.sleep(2)
+            
+            if check_bot_connection(main_bot_2, "Main Bot 2"):
+                log_system("[Main Bot 2] Reconnect thành công!")
+                return
+            
+            attempts += 1
+            log_system(f"[Main Bot 2] Thử reconnect lần {attempts}/{max_reconnect_attempts}")
+            time.sleep(reconnect_delay)
+            
+        except Exception as e:
+            attempts += 1
+            log_system(f"[Main Bot 2] Lỗi reconnect lần {attempts}: {e}")
+            time.sleep(reconnect_delay)
+    
+    log_system("[Main Bot 2] Đã hết số lần thử reconnect!")
+
+def monitor_connections():
+    """Thread để monitor kết nối của main bots"""
+    while True:
+        try:
+            if auto_grab_enabled and main_bot_reconnect_enabled:
+                if not check_bot_connection(main_bot, "Main Bot 1"):
+                    log_system("[Main Bot 1] Phát hiện mất kết nối!")
+                    threading.Thread(target=reconnect_main_bot, daemon=True).start()
+            
+            if auto_grab_enabled_2 and main_bot_2_reconnect_enabled:
+                if not check_bot_connection(main_bot_2, "Main Bot 2"):
+                    log_system("[Main Bot 2] Phát hiện mất kết nối!")
+                    threading.Thread(target=reconnect_main_bot_2, daemon=True).start()
+            
+            time.sleep(30)
+            
+        except Exception as e:
+            log_system(f"[Monitor] Lỗi monitor connections: {e}")
+            time.sleep(60)
+
 def reboot_bot(target_id):
-    """Khởi động lại một bot dựa trên ID định danh của nó (vd: 'main_1', 'sub_2')."""
+    """Khởi động lại một bot dựa trên ID định danh"""
     global main_bot, main_bot_2, bots
 
     with bots_lock:
-        print(f"[Reboot] Nhận được yêu cầu reboot cho target: {target_id}")
-        if target_id == 'main_1' and main_bot:
-            print("[Reboot] Đang xử lý Acc Chính 1...")
+        log_system(f"[Reboot] Nhận được yêu cầu reboot cho target: {target_id}")
+        
+        if target_id == 'main_1':
+            log_system("[Reboot] Đang xử lý Acc Chính 1...")
             try:
-                main_bot.gateway.close()
+                if main_bot:
+                    main_bot.gateway.close()
             except Exception as e:
-                print(f"[Reboot] Lỗi khi đóng Acc Chính 1: {e}")
+                log_system(f"[Reboot] Lỗi khi đóng Acc Chính 1: {e}")
             main_bot = create_bot(main_token, is_main=True)
-            print("[Reboot] Acc Chính 1 đã được khởi động lại.")
+            log_system("[Reboot] Acc Chính 1 đã được khởi động lại.")
 
-        elif target_id == 'main_2' and main_bot_2:
-            print("[Reboot] Đang xử lý Acc Chính 2...")
+        elif target_id == 'main_2':
+            log_system("[Reboot] Đang xử lý Acc Chính 2...")
             try:
-                main_bot_2.gateway.close()
+                if main_bot_2:
+                    main_bot_2.gateway.close()
             except Exception as e:
-                print(f"[Reboot] Lỗi khi đóng Acc Chính 2: {e}")
+                log_system(f"[Reboot] Lỗi khi đóng Acc Chính 2: {e}")
             main_bot_2 = create_bot(main_token_2, is_main_2=True)
-            print("[Reboot] Acc Chính 2 đã được khởi động lại.")
+            log_system("[Reboot] Acc Chính 2 đã được khởi động lại.")
 
         elif target_id.startswith('sub_'):
             try:
                 index = int(target_id.split('_')[1])
                 if 0 <= index < len(bots):
-                    print(f"[Reboot] Đang xử lý Acc Phụ {index}...")
+                    log_system(f"[Reboot] Đang xử lý Acc Phụ {index}...")
                     try:
-                        bots[index].gateway.close()
+                        if bots[index]:
+                            bots[index].gateway.close()
                     except Exception as e:
-                        print(f"[Reboot] Lỗi khi đóng Acc Phụ {index}: {e}")
+                        log_system(f"[Reboot] Lỗi khi đóng Acc Phụ {index}: {e}")
                     
                     token_to_reboot = tokens[index]
-                    bots[index] = create_bot(token_to_reboot.strip(), is_main=False)
-                    print(f"[Reboot] Acc Phụ {index} đã được khởi động lại.")
+                    bots[index] = create_bot(token_to_reboot.strip())
+                    log_system(f"[Reboot] Acc Phụ {index} đã được khởi động lại.")
                 else:
-                    print(f"[Reboot] Index không hợp lệ: {index}")
+                    log_system(f"[Reboot] Index không hợp lệ: {index}")
             except (ValueError, IndexError) as e:
-                print(f"[Reboot] Lỗi xử lý target Acc Phụ: {e}")
+                log_system(f"[Reboot] Lỗi xử lý target Acc Phụ: {e}")
         else:
-            print(f"[Reboot] Target không xác định: {target_id}")
-
+            log_system(f"[Reboot] Target không xác định: {target_id}")
 
 def create_bot(token, is_main=False, is_main_2=False):
-    bot = discum.Client(token=token, log=False)
+    """Tạo bot Discord với error handling"""
+    try:
+        bot = discum.Client(token=token, log=False)
 
-    @bot.gateway.command
-    def on_ready(resp):
-        if resp.event.ready:
-            try:
-                user_id = resp.raw["user"]["id"]
-                bot_type = "(Acc chính)" if is_main else "(Acc chính 2)" if is_main_2 else ""
-                print(f"Đã đăng nhập: {user_id} {bot_type}")
-            except Exception as e:
-                print(f"Lỗi lấy user_id: {e}")
-    # ... (Toàn bộ phần code on_message của bạn được giữ nguyên) ...
-    if is_main:
         @bot.gateway.command
-        def on_message(resp):
-            global auto_grab_enabled, heart_threshold, last_drop_msg_id
+        def on_ready(resp):
+            if resp.event.ready:
+                try:
+                    user_id = resp.raw["user"]["id"]
+                    bot_type = "(Acc chính)" if is_main else "(Acc chính 2)" if is_main_2 else ""
+                    log_system(f"Đã đăng nhập: {user_id} {bot_type}")
+                except Exception as e:
+                    log_system(f"Lỗi lấy user_id: {e}")
 
-            if resp.event.message:
-                msg = resp.parsed.auto()
-                author = msg.get("author", {}).get("id")
-                content = msg.get("content", "")
-                channel = msg.get("channel_id")
-                mentions = msg.get("mentions", [])
+        # Auto grab logic cho main bot
+        if is_main:
+            @bot.gateway.command
+            def on_message(resp):
+                global auto_grab_enabled, heart_threshold, last_drop_msg_id
 
-                if author == karuta_id and channel == main_channel_id:
-                    if "is dropping" not in content and not mentions and auto_grab_enabled:
-                        print("\n[Bot 1] Phát hiện tự drop! Đọc tin nhắn Karibbit...\n")
-                        last_drop_msg_id = msg["id"]
+                if resp.event.message:
+                    try:
+                        msg = resp.parsed.auto()
+                        author = msg.get("author", {}).get("id")
+                        content = msg.get("content", "")
+                        channel = msg.get("channel_id")
+                        mentions = msg.get("mentions", [])
 
-                        def read_karibbit():
-                            time.sleep(0.5)
-                            messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg in messages:
-                                author_id = msg.get("author", {}).get("id")
-                                if author_id == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
-                                    desc = msg["embeds"][0].get("description", "")
-                                    print(f"\n[Bot 1] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 1] ===== Kết thúc tin nhắn =====\n")
+                        if author == karuta_id and channel == main_channel_id:
+                            if "is dropping" not in content and not mentions and auto_grab_enabled:
+                                log_system("\n[Bot 1] Phát hiện tự drop! Đọc tin nhắn Karibbit...\n")
+                                last_drop_msg_id = msg["id"]
 
-                                    lines = desc.split('\n')
-                                    heart_numbers = []
+                                def read_karibbit():
+                                    try:
+                                        time.sleep(0.5)
+                                        messages = bot.getMessages(main_channel_id, num=5).json()
+                                        for msg in messages:
+                                            author_id = msg.get("author", {}).get("id")
+                                            if author_id == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
+                                                desc = msg["embeds"][0].get("description", "")
+                                                log_system(f"\n[Bot 1] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 1] ===== Kết thúc tin nhắn =====\n")
 
-                                    for i, line in enumerate(lines[:3]):
-                                        matches = re.findall(r'`([^`]*)`', line)
-                                        if len(matches) >= 2 and matches[1].isdigit():
-                                            num = int(matches[1])
-                                            heart_numbers.append(num)
-                                            print(f"[Bot 1] Dòng {i+1} số tim: {num}")
-                                        else:
-                                            heart_numbers.append(0)
-                                            print(f"[Bot 1] Dòng {i+1} không tìm thấy số tim, mặc định 0")
+                                                lines = desc.split('\n')
+                                                heart_numbers = []
 
-                                    if sum(heart_numbers) == 0:
-                                        print("[Bot 1] Không có số tim nào, bỏ qua.\n")
-                                    else:
-                                        max_num = max(heart_numbers)
-                                        if max_num < heart_threshold:
-                                            print(f"[Bot 1] Số tim lớn nhất {max_num} < {heart_threshold}, không grab!\n")
-                                        else:
-                                            max_index = heart_numbers.index(max_num)
-                                            emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
-                                            delay = {"1️⃣": 0.5, "2️⃣": 1.5, "3️⃣": 2.2}[emoji]
-                                            print(f"[Bot 1] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
+                                                for i, line in enumerate(lines[:3]):
+                                                    matches = re.findall(r'`([^`]*)`', line)
+                                                    if len(matches) >= 2 and matches[1].isdigit():
+                                                        num = int(matches[1])
+                                                        heart_numbers.append(num)
+                                                        log_system(f"[Bot 1] Dòng {i+1} số tim: {num}")
+                                                    else:
+                                                        heart_numbers.append(0)
+                                                        log_system(f"[Bot 1] Dòng {i+1} không tìm thấy số tim, mặc định 0")
 
-                                            def grab():
-                                                try:
-                                                    bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                                    print("[Bot 1] Đã thả emoji grab!")
-                                                    bot.sendMessage(ktb_channel_id, "kt b")
-                                                    print("[Bot 1] Đã nhắn 'kt b'!")
-                                                except Exception as e:
-                                                    print(f"[Bot 1] Lỗi khi grab hoặc nhắn kt b: {e}")
+                                                if sum(heart_numbers) == 0:
+                                                    log_system("[Bot 1] Không có số tim nào, bỏ qua.\n")
+                                                else:
+                                                    max_num = max(heart_numbers)
+                                                    if max_num < heart_threshold:
+                                                        log_system(f"[Bot 1] Số tim lớn nhất {max_num} < {heart_threshold}, không grab!\n")
+                                                    else:
+                                                        max_index = heart_numbers.index(max_num)
+                                                        emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
+                                                        delay = {"1️⃣": 0.5, "2️⃣": 1.5, "3️⃣": 2.2}[emoji]
+                                                        log_system(f"[Bot 1] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
 
-                                            threading.Timer(delay, grab).start()
+                                                        def grab():
+                                                            try:
+                                                                bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                                                log_system("[Bot 1] Đã thả emoji grab!")
+                                                                bot.sendMessage(ktb_channel_id, "kt b")
+                                                                log_system("[Bot 1] Đã nhắn 'kt b'!")
+                                                            except Exception as e:
+                                                                log_system(f"[Bot 1] Lỗi khi grab hoặc nhắn kt b: {e}")
 
-                                    break
+                                                        threading.Timer(delay, grab).start()
+                                                break
+                                    except Exception as e:
+                                        log_system(f"[Bot 1] Lỗi trong read_karibbit: {e}")
 
-                        threading.Thread(target=read_karibbit).start()
-    if is_main_2:
+                                threading.Thread(target=read_karibbit, daemon=True).start()
+                    except Exception as e:
+                        log_system(f"[Bot 1] Lỗi trong on_message: {e}")
+
+        # Auto grab logic cho main bot 2
+        if is_main_2:
+            @bot.gateway.command
+            def on_message(resp):
+                global auto_grab_enabled_2, heart_threshold_2, last_drop_msg_id
+
+                if resp.event.message:
+                    try:
+                        msg = resp.parsed.auto()
+                        author = msg.get("author", {}).get("id")
+                        content = msg.get("content", "")
+                        channel = msg.get("channel_id")
+                        mentions = msg.get("mentions", [])
+
+                        if author == karuta_id and channel == main_channel_id:
+                            if "is dropping" not in content and not mentions and auto_grab_enabled_2:
+                                log_system("\n[Bot 2] Phát hiện tự drop! Đọc tin nhắn Karibbit...\n")
+                                last_drop_msg_id = msg["id"]
+
+                                def read_karibbit_2():
+                                    try:
+                                        time.sleep(0.5)
+                                        messages = bot.getMessages(main_channel_id, num=5).json()
+                                        for msg in messages:
+                                            author_id = msg.get("author", {}).get("id")
+                                            if author_id == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
+                                                desc = msg["embeds"][0].get("description", "")
+                                                log_system(f"\n[Bot 2] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 2] ===== Kết thúc tin nhắn =====\n")
+
+                                                lines = desc.split('\n')
+                                                heart_numbers = []
+
+                                                for i, line in enumerate(lines[:3]):
+                                                    matches = re.findall(r'`([^`]*)`', line)
+                                                    if len(matches) >= 2 and matches[1].isdigit():
+                                                        num = int(matches[1])
+                                                        heart_numbers.append(num)
+                                                        log_system(f"[Bot 2] Dòng {i+1} số tim: {num}")
+                                                    else:
+                                                        heart_numbers.append(0)
+                                                        log_system(f"[Bot 2] Dòng {i+1} không tìm thấy số tim, mặc định 0")
+
+                                                if sum(heart_numbers) == 0:
+                                                    log_system("[Bot 2] Không có số tim nào, bỏ qua.\n")
+                                                else:
+                                                    max_num = max(heart_numbers)
+                                                    if max_num < heart_threshold_2:
+                                                        log_system(f"[Bot 2] Số tim lớn nhất {max_num} < {heart_threshold_2}, không grab!\n")
+                                                    else:
+                                                        max_index = heart_numbers.index(max_num)
+                                                        emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
+                                                        delay = {"1️⃣": 0.5, "2️⃣": 1.5, "3️⃣": 2.2}[emoji]
+                                                        log_system(f"[Bot 2] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
+
+                                                        def grab_2():
+                                                            try:
+                                                                bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                                                log_system("[Bot 2] Đã thả emoji grab!")
+                                                                bot.sendMessage(ktb_channel_id, "kt b")
+                                                                log_system("[Bot 2] Đã nhắn 'kt b'!")
+                                                            except Exception as e:
+                                                                log_system(f"[Bot 2] Lỗi khi grab hoặc nhắn kt b: {e}")
+
+                                                        threading.Timer(delay, grab_2).start()
+                                                break
+                                    except Exception as e:
+                                        log_system(f"[Bot 2] Lỗi trong read_karibbit_2: {e}")
+
+                                threading.Thread(target=read_karibbit_2, daemon=True).start()
+                    except Exception as e:
+                        log_system(f"[Bot 2] Lỗi trong on_message: {e}")
+
         @bot.gateway.command
-        def on_message(resp):
-            global auto_grab_enabled_2, heart_threshold_2, last_drop_msg_id
+        def on_error(resp):
+            log_system(f"Bot error: {resp}")
 
-            if resp.event.message:
-                msg = resp.parsed.auto()
-                author = msg.get("author", {}).get("id")
-                content = msg.get("content", "")
-                channel = msg.get("channel_id")
-                mentions = msg.get("mentions", [])
+        return bot
 
-                if author == karuta_id and channel == main_channel_id:
-                    if "is dropping" not in content and not mentions and auto_grab_enabled_2:
-                        print("\n[Bot 2] Phát hiện tự drop! Đọc tin nhắn Karibbit...\n")
-                        last_drop_msg_id = msg["id"]
-
-                        def read_karibbit_2():
-                            time.sleep(0.5)
-                            messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg in messages:
-                                author_id = msg.get("author", {}).get("id")
-                                if author_id == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
-                                    desc = msg["embeds"][0].get("description", "")
-                                    print(f"\n[Bot 2] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 2] ===== Kết thúc tin nhắn =====\n")
-
-                                    lines = desc.split('\n')
-                                    heart_numbers = []
-
-                                    for i, line in enumerate(lines[:3]):
-                                        matches = re.findall(r'`([^`]*)`', line)
-                                        if len(matches) >= 2 and matches[1].isdigit():
-                                            num = int(matches[1])
-                                            heart_numbers.append(num)
-                                            print(f"[Bot 2] Dòng {i+1} số tim: {num}")
-                                        else:
-                                            heart_numbers.append(0)
-                                            print(f"[Bot 2] Dòng {i+1} không tìm thấy số tim, mặc định 0")
-
-                                    if sum(heart_numbers) == 0:
-                                        print("[Bot 2] Không có số tim nào, bỏ qua.\n")
-                                    else:
-                                        max_num = max(heart_numbers)
-                                        if max_num < heart_threshold_2:
-                                            print(f"[Bot 2] Số tim lớn nhất {max_num} < {heart_threshold_2}, không grab!\n")
-                                        else:
-                                            max_index = heart_numbers.index(max_num)
-                                            emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
-                                            # Thêm 0.3 giây delay cho acc chính 2
-                                            delay = {"1️⃣": 0.8, "2️⃣": 1.8, "3️⃣": 2.5}[emoji]
-                                            print(f"[Bot 2] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
-
-                                            def grab_2():
-                                                try:
-                                                    bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                                    print("[Bot 2] Đã thả emoji grab!")
-                                                    bot.sendMessage(ktb_channel_id, "kt b")
-                                                    print("[Bot 2] Đã nhắn 'kt b'!")
-                                                except Exception as e:
-                                                    print(f"[Bot 2] Lỗi khi grab hoặc nhắn kt b: {e}")
-
-                                            threading.Timer(delay, grab_2).start()
-
-                                    break
-
-                        threading.Thread(target=read_karibbit_2).start()
-
-    threading.Thread(target=bot.gateway.run, daemon=True).start()
-    return bot
-
-# Auto Work Functions
-def run_work_bot(token, acc_index):
-    bot = discum.Client(token=token, log={"console": False, "file": False})
-
-    headers = {
-        "Authorization": token,
-        "Content-Type": "application/json"
-    }
-
-    step = {"value": 0}
-
-    def send_karuta_command():
-        print(f"[Work Acc {acc_index}] Gửi lệnh 'kc o:ef'...")
-        bot.sendMessage(work_channel_id, "kc o:ef")
-
-    def send_kn_command():
-        print(f"[Work Acc {acc_index}] Gửi lệnh 'kn'...")
-        bot.sendMessage(work_channel_id, "kn")
-
-    def send_kw_command():
-        print(f"[Work Acc {acc_index}] Gửi lệnh 'kw'...")
-        bot.sendMessage(work_channel_id, "kw")
-        step["value"] = 2
-
-    def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
-        try:
-            payload = {
-                "type": 3,
-                "guild_id": guild_id,
-                "channel_id": channel_id,
-                "message_id": message_id,
-                "application_id": application_id,
-                "session_id": "a",
-                "data": {
-                    "component_type": 2,
-                    "custom_id": custom_id
-                }
-            }
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
-            if r.status_code == 204:
-                print(f"[Work Acc {acc_index}] Click tick thành công!")
-            else:
-                print(f"[Work Acc {acc_index}] Click thất bại! Mã lỗi: {r.status_code}, Nội dung: {r.text}")
-        except Exception as e:
-            print(f"[Work Acc {acc_index}] Lỗi click tick: {str(e)}")
-
-    @bot.gateway.command
-    def on_message(resp):
-        if resp.event.message:
-            m = resp.parsed.auto()
-            if str(m.get('channel_id')) != work_channel_id:
-                return
-
-            author_id = str(m.get('author', {}).get('id', ''))
-            guild_id = m.get('guild_id')
-
-            if step["value"] == 0 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
-                desc = m['embeds'][0].get('description', '')
-                card_codes = re.findall(r'\bv[a-zA-Z0-9]{6}\b', desc)
-                if card_codes and len(card_codes) >= 10:
-                    first_5 = card_codes[:5]
-                    last_5 = card_codes[-5:]
-
-                    print(f"[Work Acc {acc_index}] Mã đầu: {', '.join(first_5)}")
-                    print(f"[Work Acc {acc_index}] Mã cuối: {', '.join(last_5)}")
-
-                    for i, code in enumerate(last_5):
-                        suffix = chr(97 + i)
-                        if i == 0:
-                            time.sleep(2)
-                        else:
-                            time.sleep(1.5)
-                        bot.sendMessage(work_channel_id, f"kjw {code} {suffix}")
-
-                    for i, code in enumerate(first_5):
-                        suffix = chr(97 + i)
-                        time.sleep(1.5)
-                        bot.sendMessage(work_channel_id, f"kjw {code} {suffix}")
-
-                    time.sleep(1)
-                    send_kn_command()
-                    step["value"] = 1
-
-            elif step["value"] == 1 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
-                desc = m['embeds'][0].get('description', '')
-                lines = desc.split('\n')
-                if len(lines) >= 2:
-                    match = re.search(r'\d+\.\s*`([^`]+)`', lines[1])
-                    if match:
-                        resource = match.group(1)
-                        print(f"[Work Acc {acc_index}] Tài nguyên chọn: {resource}")
-                        time.sleep(2)
-                        bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
-                        time.sleep(1)
-                        send_kw_command()
-
-            elif step["value"] == 2 and author_id == karuta_id and 'components' in m:
-                message_id = m['id']
-                application_id = m.get('application_id', karuta_id)
-                last_custom_id = None
-                for comp in m['components']:
-                    if comp['type'] == 1:
-                        for btn in comp['components']:
-                            if btn['type'] == 2:
-                                last_custom_id = btn['custom_id']
-                                print(f"[Work Acc {acc_index}] Phát hiện button, custom_id: {last_custom_id}")
-
-                if last_custom_id:
-                    click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
-                    step["value"] = 3
-                    bot.gateway.close()
-
-    print(f"[Work Acc {acc_index}] Bắt đầu hoạt động...")
-    threading.Thread(target=bot.gateway.run, daemon=True).start()
-    time.sleep(3)
-    send_karuta_command()
-
-    timeout = time.time() + 90
-    while step["value"] != 3 and time.time() < timeout:
-        time.sleep(1)
-
-    bot.gateway.close()
-    print(f"[Work Acc {acc_index}] Đã hoàn thành, chuẩn bị tới acc tiếp theo.")
+    except Exception as e:
+        log_system(f"Lỗi tạo bot: {e}")
+        return None
 
 def auto_work_loop():
-    global auto_work_enabled
+    """Vòng lặp auto work"""
     while True:
-        if auto_work_enabled:
-            with bots_lock:
-                current_tokens = tokens.copy()
-            for i, token in enumerate(current_tokens):
-                if token.strip():
-                    print(f"[Auto Work] Đang chạy acc {i+1}...")
-                    run_work_bot(token.strip(), i+1)
-                    print(f"[Auto Work] Acc {i+1} xong, chờ {work_delay_between_acc} giây...")
-                    time.sleep(work_delay_between_acc)
-            
-            print(f"[Auto Work] Hoàn thành tất cả acc, chờ {work_delay_after_all} giây để lặp lại...")
-            time.sleep(work_delay_after_all)
-        else:
-            time.sleep(10)
+        try:
+            if auto_work_enabled:
+                with bots_lock:
+                    for i, bot in enumerate(bots):
+                        if bot:
+                            try:
+                                bot.sendMessage(work_channel_id, "kc o:ef")
+                                log_system(f"[Auto Work] Bot {i} đã gửi lệnh work")
+                                time.sleep(work_delay_between_acc)
+                            except Exception as e:
+                                log_system(f"[Auto Work] Lỗi bot {i}: {e}")
+                
+                log_system(f"[Auto Work] Hoàn thành chu kỳ, đợi {work_delay_after_all}s")
+                time.sleep(work_delay_after_all)
+            else:
+                time.sleep(60)
+        except Exception as e:
+            log_system(f"[Auto Work] Lỗi trong loop: {e}")
+            time.sleep(60)
 
-app = Flask(__name__)
+def spam_loop():
+    """Vòng lặp spam"""
+    while True:
+        try:
+            if spam_enabled and spam_message:
+                with bots_lock:
+                    for i, bot in enumerate(bots):
+                        if bot:
+                            try:
+                                bot.sendMessage(spam_channel_id, spam_message)
+                                log_system(f"[Spam] Bot {i} đã gửi: {spam_message}")
+                                time.sleep(1)
+                            except Exception as e:
+                                log_system(f"[Spam] Lỗi bot {i}: {e}")
+                
+                log_system(f"[Spam] Hoàn thành chu kỳ, đợi {spam_delay}s")
+                time.sleep(spam_delay)
+            else:
+                time.sleep(60)
+        except Exception as e:
+            log_system(f"[Spam] Lỗi trong loop: {e}")
+            time.sleep(60)
 
-# === SỬA LỖI KEYERROR: Gấp đôi các dấu ngoặc nhọn trong CSS ===
-HTML = """
+# ============================================================================
+# FLASK ROUTES
+# ============================================================================
+
+@app.route('/')
+def index():
+    """Trang chủ với giao diện deep web"""
+    return """
 <!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Karuta Deep</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>◈ DEEP WEB BOT CONTROL ◈</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Global Styles */
-        * {{
-            box-sizing: border-box;
-        }}
-
-        body {{
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Orbitron', monospace; 
+            background: #0a0a0a; 
+            color: #00ff00; 
+            overflow-x: hidden; 
             min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #ffffff;
-            margin: 0;
-            padding: 20px 0;
-        }}
-
-        /* Header Styles */
-        .header-section {{
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }}
-
-        .header-section h1 {{
-            font-size: 2.5rem;
-            font-weight: 700;
-            background: linear-gradient(45deg, #00d4ff, #ff9500);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-        }}
-
-        .header-section p {{
-            font-size: 1.1rem;
-            color: #b0b0b0;
-            margin-bottom: 0;
-        }}
-
-        /* Control Card Styles */
-        .control-card {{
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            transition: all 0.3s ease;
-            overflow: hidden;
-            margin-bottom: 2rem;
-        }}
-
-        .control-card:hover {{
-            transform: translateY(-5px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-            border-color: rgba(0, 212, 255, 0.3);
-        }}
-
-        .control-card .card-header {{
-            background: linear-gradient(45deg, rgba(0, 212, 255, 0.2), rgba(255, 149, 0, 0.2));
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 1.5rem;
-            border-radius: 20px 20px 0 0;
-        }}
-
-        .control-card .card-header h5 {{
-            color: #ffffff;
-            font-weight: 600;
-            margin: 0;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        }}
-
-        .control-card .card-body {{
-            padding: 1.5rem;
-        }}
-
-        /* Form Styles */
-        .form-control {{
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            color: #ffffff;
-            padding: 12px 16px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }}
-
-        .form-control:focus {{
-            background: rgba(255, 255, 255, 0.15);
-            border-color: #00d4ff;
-            box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.25);
-            color: #ffffff;
-        }}
-
-        .form-control::placeholder {{
-            color: #b0b0b0;
-        }}
-
-        .form-select {{
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            color: #ffffff;
-            padding: 12px 16px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }}
-
-        .form-select:focus {{
-            background: rgba(255, 255, 255, 0.15);
-            border-color: #00d4ff;
-            box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.25);
-            color: #ffffff;
-        }}
-
-        .form-select option {{
-            background: #1a1a2e;
-            color: #ffffff;
-        }}
-
-        .form-label {{
-            color: #ffffff;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-        }}
-
-        .input-group-text {{
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #ffffff;
-            border-radius: 12px 0 0 12px;
-        }}
-
-        /* Button Styles */
-        .btn {{
-            border-radius: 12px;
-            padding: 12px 24px;
-            font-weight: 500;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border: none;
-            position: relative;
-            overflow: hidden;
-        }}
-
-        .btn::before {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s ease;
-        }}
-
-        .btn:hover::before {{
-            left: 100%;
-        }}
-
-        .btn-primary {{
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
-        }}
-
-        .btn-primary:hover {{
-            background: linear-gradient(45deg, #0099cc, #00d4ff);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.6);
-        }}
-        
-        .btn-warning {{
-            background: linear-gradient(45deg, #ffc107, #ff9800);
-            color: #1a1a2e;
-            box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
-        }}
-
-        .btn-warning:hover {{
-            background: linear-gradient(45deg, #ff9800, #ffc107);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 193, 7, 0.6);
-        }}
-
-        .btn-success {{
-            background: linear-gradient(45deg, #28a745, #20c997);
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
-        }}
-
-        .btn-success:hover {{
-            background: linear-gradient(45deg, #20c997, #28a745);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
-        }}
-
-        .btn-danger {{
-            background: linear-gradient(45deg, #dc3545, #e83e8c);
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
-        }}
-
-        .btn-danger:hover {{
-            background: linear-gradient(45deg, #e83e8c, #dc3545);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.6);
-        }}
-
-        /* Status Indicators */
-        .status-indicator {{
-            display: flex;
-            align-items: center;
-            margin-bottom: 1rem;
-        }}
-
-        .status-badge {{
-            display: inline-flex;
-            align-items: center;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            transition: all 0.3s ease;
-        }}
-
-        .status-active {{
-            background: linear-gradient(45deg, #28a745, #20c997);
-            color: #ffffff;
-            box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
-        }}
-
-        .status-inactive {{
-            background: linear-gradient(45deg, #dc3545, #e83e8c);
-            color: #ffffff;
-            box-shadow: 0 0 20px rgba(220, 53, 69, 0.3);
-        }}
-
-        /* Alert Styles */
-        .alert {{
-            background: rgba(40, 167, 69, 0.2);
-            border: 1px solid rgba(40, 167, 69, 0.3);
-            border-radius: 12px;
-            color: #ffffff;
-            backdrop-filter: blur(10px);
-            margin-bottom: 1rem;
-        }}
-
-        .alert-success {{
-            background: rgba(40, 167, 69, 0.2);
-            border-color: rgba(40, 167, 69, 0.3);
-        }}
-
-        /* Animation */
-        @keyframes fadeInUp {{
-            from {{
-                opacity: 0;
-                transform: translateY(30px);
-            }}
-            to {{
-                opacity: 1;
-                transform: translateY(0);
-            }}
-        }}
-
-        .control-card {{
-            animation: fadeInUp 0.6s ease-out;
-        }}
-
-        .quick-commands {{
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }}
-
-        .quick-commands h6 {{
-            color: #ffffff;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }}
-
-        .heart-threshold {{
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }}
-
-        .heart-threshold h6 {{
-            color: #ffffff;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }}
-
-        /* Responsive Design */
-        @media (max-width: 768px) {{
-            .header-section {{
-                padding: 1.5rem;
-                margin-bottom: 1.5rem;
-            }}
-            
-            .header-section h1 {{
-                font-size: 2rem;
-            }}
-            
-            .control-card .card-header,
-            .control-card .card-body {{
-                padding: 1rem;
-            }}
-            
-            .btn {{
-                padding: 10px 20px;
-                font-size: 0.9rem;
-            }}
-        }}
+        }
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            position: relative; 
+            z-index: 10; 
+        }
+        .header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            border: 2px solid #00ff00; 
+            padding: 20px; 
+            background: rgba(0,255,0,0.1); 
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        @keyframes glow { 
+            from { box-shadow: 0 0 20px #00ff00; } 
+            to { box-shadow: 0 0 30px #00ff00, 0 0 40px #00ff00; } 
+        }
+        .logo { 
+            font-size: 2.5em; 
+            font-weight: 900; 
+            text-shadow: 0 0 20px #00ff00; 
+        }
+        .panel { 
+            background: rgba(0,20,0,0.8); 
+            border: 1px solid #00ff00; 
+            margin: 20px 0; 
+            border-radius: 10px; 
+            box-shadow: 0 0 15px rgba(0,255,0,0.3); 
+        }
+        .panel-header { 
+            background: rgba(0,255,0,0.2); 
+            padding: 15px; 
+            border-bottom: 1px solid #00ff00; 
+            font-weight: bold; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .panel-content { 
+            padding: 20px; 
+        }
+        .control-group { 
+            margin: 15px 0; 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            flex-wrap: wrap; 
+        }
+        .control-group label { 
+            min-width: 200px; 
+            font-weight: bold; 
+        }
+        .cyber-input, .cyber-select { 
+            background: rgba(0,0,0,0.7); 
+            border: 1px solid #00ff00; 
+            color: #00ff00; 
+            padding: 10px; 
+            border-radius: 5px; 
+            font-family: 'Courier Prime', monospace; 
+        }
+        .cyber-input:focus, .cyber-select:focus { 
+            outline: none; 
+            box-shadow: 0 0 10px #00ff00; 
+        }
+        .cyber-btn { 
+            background: rgba(0,255,0,0.2); 
+            border: 1px solid #00ff00; 
+            color: #00ff00; 
+            padding: 10px 20px; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-family: 'Orbitron', monospace; 
+            font-weight: bold; 
+            transition: all 0.3s; 
+        }
+        .cyber-btn:hover { 
+            background: rgba(0,255,0,0.4); 
+            box-shadow: 0 0 15px #00ff00; 
+        }
+        .cyber-btn.danger { 
+            border-color: #ff0000; 
+            color: #ff0000; 
+            background: rgba(255,0,0,0.2); 
+        }
+        .cyber-btn.danger:hover { 
+            background: rgba(255,0,0,0.4); 
+            box-shadow: 0 0 15px #ff0000; 
+        }
+        .cyber-btn.warning { 
+            border-color: #ffff00; 
+            color: #ffff00; 
+            background: rgba(255,255,0,0.2); 
+        }
+        .cyber-btn.warning:hover { 
+            background: rgba(255,255,0,0.4); 
+            box-shadow: 0 0 15px #ffff00; 
+        }
+        .cyber-switch { 
+            position: relative; 
+            width: 60px; 
+            height: 30px; 
+        }
+        .cyber-switch input { 
+            opacity: 0; 
+            width: 0; 
+            height: 0; 
+        }
+        .slider { 
+            position: absolute; 
+            cursor: pointer; 
+            top: 0; 
+            left: 0; 
+            right: 0; 
+            bottom: 0; 
+            background-color: rgba(255,0,0,0.3); 
+            transition: .4s; 
+            border-radius: 30px; 
+            border: 1px solid #ff0000; 
+        }
+        .slider:before { 
+            position: absolute; 
+            content: ""; 
+            height: 22px; 
+            width: 22px; 
+            left: 3px; 
+            bottom: 3px; 
+            background-color: #ff0000; 
+            transition: .4s; 
+            border-radius: 50%; 
+        }
+        input:checked + .slider { 
+            background-color: rgba(0,255,0,0.3); 
+            border-color: #00ff00; 
+        }
+        input:checked + .slider:before { 
+            transform: translateX(26px); 
+            background-color: #00ff00; 
+        }
+        .accounts-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+            gap: 15px; 
+            margin: 20px 0; 
+        }
+        .account-card { 
+            background: rgba(0,0,0,0.5); 
+            border: 1px solid #00ff00; 
+            padding: 15px; 
+            border-radius: 5px; 
+            text-align: center; 
+        }
+        .account-card.offline { 
+            border-color: #ff0000; 
+            color: #ff0000; 
+        }
+        .terminal { 
+            background: #000; 
+            border: 1px solid #00ff00; 
+            border-radius: 5px; 
+            height: 300px; 
+            overflow-y: auto; 
+            padding: 10px; 
+            font-family: 'Courier Prime', monospace; 
+            font-size: 14px; 
+        }
+        .log-line { 
+            margin: 2px 0; 
+            opacity: 0.8; 
+        }
+        .log-line.error { 
+            color: #ff0000; 
+        }
+        .log-line.warning { 
+            color: #ffff00; 
+        }
+        .log-line.success { 
+            color: #00ff00; 
+        }
+        .matrix-bg { 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            pointer-events: none; 
+            opacity: 0.1; 
+            z-index: 1; 
+        }
+        .code-list-group { 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+            flex-wrap: wrap; 
+        }
+        .reboot-group { 
+            display: flex; 
+            gap: 10px; 
+            align-items: center; 
+            flex-wrap: wrap; 
+        }
+        .heart-slider { 
+            width: 200px; 
+        }
+        .status-online { 
+            color: #00ff00; 
+        }
+        .status-offline { 
+            color: #ff0000; 
+        }
+        .cursor { 
+            animation: blink 1s infinite; 
+        }
+        @keyframes blink { 
+            0%, 50% { opacity: 1; } 
+            51%, 100% { opacity: 0; } 
+        }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-12">
-                <div class="header-section">
-                    <h1 class="text-center mb-0">
-                        <i class="fas fa-robot me-3"></i>
-                        Karuta Deep
-                    </h1>
-                    <p class="text-center text-muted">Quản lý bot Discord với giao diện hiện đại</p>
+    <div class="matrix-bg" id="matrix-bg"></div>
+    
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <i class="fas fa-skull"></i>
+                DEEP WEB BOT CONTROL
+                <i class="fas fa-skull"></i>
+            </div>
+            <div style="margin-top: 10px; font-size: 1.2em;">
+                <span id="connection-status">SYSTEM OPERATIONAL</span>
+            </div>
+        </div>
+
+        <!-- Main Accounts -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>◈ MAIN ACCOUNTS ◈</span>
+            </div>
+            <div class="panel-content">
+                <div class="accounts-grid" id="main-accounts"></div>
+            </div>
+        </div>
+
+        <!-- Sub Accounts -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>◈ SUB ACCOUNTS ◈</span>
+            </div>
+            <div class="panel-content">
+                <div class="accounts-grid" id="sub-accounts"></div>
+                <div class="control-group">
+                    <label><i class="fas fa-power-off"></i> Reboot Account:</label>
+                    <div class="reboot-group">
+                        <select id="reboot_target" class="cyber-select">
+                            <option value="main_1">ACC CHÍNH 1</option>
+                            <option value="main_2">ACC CHÍNH 2</option>
+                        </select>
+                        <button class="cyber-btn danger" onclick="rebootSelected()">
+                            <i class="fas fa-power-off"></i> REBOOT
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        {alert_section}
-
-        <div class="row g-4">
-            <div class="col-lg-6">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-paper-plane me-2"></i>
-                            Điều khiển bot nhắn tin
-                        </h5>
+        <!-- Controls -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>◈ SYSTEM CONTROLS ◈</span>
+            </div>
+            <div class="panel-content">
+                <div class="control-group">
+                    <label><i class="fas fa-broadcast-tower"></i> Auto Work:</label>
+                    <div class="cyber-switch">
+                        <input type="checkbox" id="auto-work" onchange="toggleAutoWork()">
+                        <span class="slider"></span>
                     </div>
-                    <div class="card-body">
-                        <form method="POST" class="mb-4">
-                            <div class="input-group">
-                                <input type="text" 
-                                       class="form-control" 
-                                       name="message" 
-                                       placeholder="Nhập nội dung tin nhắn...">
-                                <button class="btn btn-primary" type="submit">
-                                    <i class="fas fa-send me-1"></i>Gửi thủ công
-                                </button>
-                            </div>
-                        </form>
-
-                        <div class="quick-commands">
-                            <h6 class="mb-3">Menu nhanh</h6>
-                            <form method="POST">
-                                <div class="input-group">
-                                    <select name="quickmsg" class="form-select">
-                                        <option value="kc o:w">kc o:w</option>
-                                        <option value="kc o:ef">kc o:ef</option>
-                                        <option value="kc o:p">kc o:p</option>
-                                        <option value="kc e:1">kc e:1</option>
-                                        <option value="kc e:2">kc e:2</option>
-                                        <option value="kc e:3">kc e:3</option>
-                                        <option value="kc e:4">kc e:4</option>
-                                        <option value="kc e:5">kc e:5</option>
-                                        <option value="kc e:6">kc e:6</option>
-                                        <option value="kc e:7">kc e:7</option>
-                                    </select>
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-bolt me-1"></i>Gửi
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                </div>
+                <div class="control-group">
+                    <label><i class="fas fa-comment"></i> Spam:</label>
+                    <div class="cyber-switch">
+                        <input type="checkbox" id="spam-enabled" onchange="toggleSpam()">
+                        <span class="slider"></span>
+                    </div>
+                    <input type="text" id="spam-message" class="cyber-input" placeholder="Spam message">
+                    <button class="cyber-btn warning" onclick="setSpamMessage()">SET</button>
+                </div>
+                <div class="control-group">
+                    <label><i class="fas fa-list"></i> Send Code List:</label>
+                    <div class="code-list-group">
+                        <select id="acc_index" class="cyber-select"></select>
+                        <input type="number" id="delay" class="cyber-input" placeholder="Delay (s)" value="2" min="0.5" max="10" step="0.5">
+                        <input type="text" id="prefix" class="cyber-input" placeholder="Prefix">
+                        <input type="text" id="codes" class="cyber-input" placeholder="Codes (comma separated)" style="width: 300px;">
+                        <button class="cyber-btn warning" onclick="sendCodeList()">
+                            <i class="fas fa-code"></i> SEND
+                        </button>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="col-lg-6">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-briefcase me-2"></i>
-                            Auto Work
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="status-indicator mb-3">
-                            <span class="status-badge {auto_work_status}">
-                                <i class="fas fa-circle me-1"></i>
-                                {auto_work_text}
-                            </span>
-                        </div>
-
-                        <form method="POST" class="mb-4">
-                            <div class="btn-group w-100" role="group">
-                                <button name="auto_work_toggle" value="on" type="submit" class="btn btn-success">
-                                    <i class="fas fa-play me-1"></i>Bật
-                                </button>
-                                <button name="auto_work_toggle" value="off" type="submit" class="btn btn-danger">
-                                    <i class="fas fa-stop me-1"></i>Tắt
-                                </button>
-                            </div>
-                        </form>
-
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Tự động làm việc cho tất cả account
-                            </small>
-                        </div>
-                    </div>
+        <!-- Terminal -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>◈ SYSTEM TERMINAL ◈</span>
+                <button class="cyber-btn danger" onclick="clearLogs()">CLEAR</button>
+            </div>
+            <div class="panel-content">
+                <div class="terminal" id="terminal">
+                    <div class="log-line">[SYSTEM] Deep Web Bot Control initialized...</div>
+                    <div class="log-line"><span class="cursor">█</span></div>
                 </div>
             </div>
-
-            <div class="col-lg-6">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-magic me-2"></i>
-                            Auto Grab - Acc Chính 1
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="status-indicator mb-3">
-                            <span class="status-badge {auto_grab_status}">
-                                <i class="fas fa-circle me-1"></i>
-                                {auto_grab_text}
-                            </span>
-                        </div>
-
-                        <form method="POST" class="mb-4">
-                            <div class="btn-group w-100" role="group">
-                                <button name="toggle" value="on" type="submit" class="btn btn-success">
-                                    <i class="fas fa-play me-1"></i>Bật
-                                </button>
-                                <button name="toggle" value="off" type="submit" class="btn btn-danger">
-                                    <i class="fas fa-stop me-1"></i>Tắt
-                                </button>
-                            </div>
-                        </form>
-
-                        <div class="heart-threshold">
-                            <h6 class="mb-3">Thiết lập mức tim tiêu chuẩn</h6>
-                            <form method="POST">
-                                <div class="input-group">
-                                    <span class="input-group-text">
-                                        <i class="fas fa-heart text-danger"></i>
-                                    </span>
-                                    <input type="number" 
-                                           class="form-control" 
-                                           name="heart_threshold" 
-                                           value="{heart_threshold}" 
-                                           min="0"
-                                           placeholder="Mức tim">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Cập nhật
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-6">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-magic me-2"></i>
-                            Auto Grab - Acc Chính 2
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="status-indicator mb-3">
-                            <span class="status-badge {auto_grab_status_2}">
-                                <i class="fas fa-circle me-1"></i>
-                                {auto_grab_text_2}
-                            </span>
-                        </div>
-
-                        <form method="POST" class="mb-4">
-                            <div class="btn-group w-100" role="group">
-                                <button name="toggle_2" value="on" type="submit" class="btn btn-success">
-                                    <i class="fas fa-play me-1"></i>Bật
-                                </button>
-                                <button name="toggle_2" value="off" type="submit" class="btn btn-danger">
-                                    <i class="fas fa-stop me-1"></i>Tắt
-                                </button>
-                            </div>
-                        </form>
-
-                        <div class="heart-threshold">
-                            <h6 class="mb-3">Thiết lập mức tim tiêu chuẩn</h6>
-                            <form method="POST">
-                                <div class="input-group">
-                                    <span class="input-group-text">
-                                        <i class="fas fa-heart text-danger"></i>
-                                    </span>
-                                    <input type="number" 
-                                           class="form-control" 
-                                           name="heart_threshold_2" 
-                                           value="{heart_threshold_2}" 
-                                           min="0"
-                                           placeholder="Mức tim">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Cập nhật
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Delay grab chậm hơn 0.3s so với Acc chính 1
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-code me-2"></i>
-                            Gửi danh sách mã theo acc chọn
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Chọn acc:</label>
-                                    <select name="acc_index" class="form-select">
-                                        {acc_options}
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Thời gian cách nhau (giây):</label>
-                                    <input type="number" 
-                                           step="0.1" 
-                                           name="delay" 
-                                           class="form-control" 
-                                           value="11" 
-                                           placeholder="11">
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Nội dung mẫu:</label>
-                                    <input type="text" 
-                                           name="prefix" 
-                                           class="form-control" 
-                                           placeholder="vd: kt n">
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Danh sách mã:</label>
-                                    <textarea name="codes" 
-                                              class="form-control" 
-                                              rows="4" 
-                                              placeholder="Danh sách mã, cách nhau dấu phẩy"></textarea>
-                                </div>
-                                <div class="col-12">
-                                    <button type="submit" name="send_codes" value="1" class="btn btn-primary btn-lg">
-                                        <i class="fas fa-paper-plane me-2"></i>Gửi danh sách mã
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-repeat me-2"></i>
-                            Spam Control
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="status-indicator mb-3">
-                            <span class="status-badge {spam_status}">
-                                <i class="fas fa-circle me-1"></i>
-                                {spam_text}
-                            </span>
-                        </div>
-
-                        <form method="POST">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Nội dung spam:</label>
-                                    <input type="text" 
-                                           name="spammsg" 
-                                           class="form-control" 
-                                           placeholder="Nội dung spam" 
-                                           value="{spam_message}">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Thời gian lặp (giây):</label>
-                                    <input type="number" 
-                                           name="spam_delay" 
-                                           class="form-control" 
-                                           value="{spam_delay}" 
-                                           min="1"
-                                           placeholder="10">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Điều khiển:</label>
-                                    <div class="btn-group w-100" role="group">
-                                        <button name="spamtoggle" value="on" type="submit" class="btn btn-success">
-                                            <i class="fas fa-play me-1"></i>Bật
-                                        </button>
-                                        <button name="spamtoggle" value="off" type="submit" class="btn btn-danger">
-                                            <i class="fas fa-stop me-1"></i>Tắt
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-12">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5 class="mb-0">
-                            <i class="fas fa-sync-alt me-2"></i>
-                            Khởi động lại Bot (Reboot)
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="input-group">
-                                <select name="reboot_target" class="form-select">
-                                    {reboot_options}
-                                </select>
-                                <button type="submit" class="btn btn-warning">
-                                    <i class="fas fa-power-off me-1"></i>Reboot Bot
-                                </button>
-                            </div>
-                        </form>
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Dùng khi một bot bị "đơ" hoặc không hoạt động đúng.
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        let controller = {
+            logs: [],
+            
+            async makeRequest(endpoint, data = {}) {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                return await response.json();
+            },
+            
+            async updateStatus() {
+                try {
+                    const response = await fetch('/status');
+                    const data = await response.json();
+                    
+                    this.updateMainAccounts(data.main_accounts);
+                    this.updateSubAccounts(data.sub_accounts);
+                    this.updateLogs(data.logs);
+                } catch (error) {
+                    console.error('Error updating status:', error);
+                }
+            },
+            
+            updateMainAccounts(accounts) {
+                const container = document.getElementById('main-accounts');
+                container.innerHTML = '';
+                
+                accounts.forEach(account => {
+                    const card = document.createElement('div');
+                    card.className = `account-card ${account.status.toLowerCase()}`;
+                    card.innerHTML = `
+                        <h3>${account.name}</h3>
+                        <p class="status-${account.status.toLowerCase()}">${account.status}</p>
+                        <div style="margin: 10px 0;">
+                            <label>Auto Grab:</label>
+                            <div class="cyber-switch">
+                                <input type="checkbox" ${account.auto_grab ? 'checked' : ''} 
+                                       onchange="toggleAutoGrab('${account.id}')">
+                                <span class="slider"></span>
+                            </div>
+                        </div>
+                        <div>
+                            <label>Heart Threshold:</label>
+                            <input type="range" class="heart-slider" min="1" max="100" 
+                                   value="${account.heart_threshold}"
+                                   onchange="setHeartThreshold('${account.id}', this.value)">
+                            <span>${account.heart_threshold}</span>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            },
+            
+            updateSubAccounts(accounts) {
+                const container = document.getElementById('sub-accounts');
+                const select = document.getElementById('reboot_target');
+                const accSelect = document.getElementById('acc_index');
+                
+                container.innerHTML = '';
+                
+                // Update dropdowns
+                const currentOptions = Array.from(select.options).filter(opt => opt.value.startsWith('main_'));
+                select.innerHTML = '';
+                currentOptions.forEach(opt => select.appendChild(opt));
+                
+                accSelect.innerHTML = '';
+                
+                accounts.forEach((account, index) => {
+                    // Account grid
+                    const card = document.createElement('div');
+                    card.className = `account-card ${account.status.toLowerCase()}`;
+                    card.innerHTML = `
+                        <h4>${account.name}</h4>
+                        <p class="status-${account.status.toLowerCase()}">${account.status}</p>
+                    `;
+                    container.appendChild(card);
+                    
+                    // Reboot dropdown
+                    const rebootOption = document.createElement('option');
+                    rebootOption.value = account.id;
+                    rebootOption.textContent = account.name;
+                    select.appendChild(rebootOption);
+                    
+                    // Code list dropdown
+                    const codeOption = document.createElement('option');
+                    codeOption.value = index;
+                    codeOption.textContent = account.name;
+                    accSelect.appendChild(codeOption);
+                });
+            },
+            
+            updateLogs(logs) {
+                const terminal = document.getElementById('terminal');
+                const cursor = terminal.querySelector('.cursor');
+                if (cursor) cursor.parentElement.remove();
+                
+                logs.slice(-20).forEach(log => {
+                    const line = document.createElement('div');
+                    line.className = 'log-line';
+                    if (log.includes('ERROR') || log.includes('Lỗi')) line.className += ' error';
+                    else if (log.includes('WARNING') || log.includes('Cảnh báo')) line.className += ' warning';
+                    else if (log.includes('SUCCESS') || log.includes('thành công')) line.className += ' success';
+                    
+                    line.textContent = log;
+                    terminal.appendChild(line);
+                });
+                
+                const newCursor = document.createElement('div');
+                newCursor.className = 'log-line';
+                newCursor.innerHTML = '<span class="cursor">█</span>';
+                terminal.appendChild(newCursor);
+                
+                terminal.scrollTop = terminal.scrollHeight;
+            },
+            
+            start() {
+                this.updateStatus();
+                setInterval(() => this.updateStatus(), 2000);
+            }
+        };
+        
+        // Control functions
+        async function toggleAutoGrab(botId) {
+            await controller.makeRequest('/control', { action: 'toggle_auto_grab', bot_id: botId });
+        }
+        
+        async function setHeartThreshold(botId, threshold) {
+            await controller.makeRequest('/control', { action: 'set_heart_threshold', bot_id: botId, threshold: threshold });
+        }
+        
+        async function rebootSelected() {
+            const target = document.getElementById('reboot_target').value;
+            await controller.makeRequest('/control', { action: 'reboot_bot', target_id: target });
+        }
+        
+        async function toggleAutoWork() {
+            await controller.makeRequest('/control', { action: 'toggle_auto_work' });
+        }
+        
+        async function toggleSpam() {
+            await controller.makeRequest('/control', { action: 'toggle_spam' });
+        }
+        
+        async function setSpamMessage() {
+            const message = document.getElementById('spam-message').value;
+            await controller.makeRequest('/control', { action: 'set_spam_message', message: message });
+        }
+        
+        async function sendCodeList() {
+            const accIndex = document.getElementById('acc_index').value;
+            const delay = document.getElementById('delay').value;
+            const prefix = document.getElementById('prefix').value;
+            const codes = document.getElementById('codes').value;
+            
+            if (!codes.trim()) return;
+            
+            await controller.makeRequest('/control', {
+                action: 'send_code_list',
+                acc_index: accIndex,
+                delay: delay,
+                prefix: prefix,
+                codes: codes
+            });
+            
+            document.getElementById('codes').value = '';
+        }
+        
+        function clearLogs() {
+            const terminal = document.getElementById('terminal');
+            terminal.innerHTML = '<div class="log-line"><span class="cursor">█</span></div>';
+        }
+        
+        // Start the controller
+        controller.start();
+    </script>
 </body>
 </html>
-"""
+    """
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    global auto_grab_enabled, auto_grab_enabled_2, spam_enabled, spam_message, spam_delay, heart_threshold, heart_threshold_2, auto_work_enabled
-    msg_status = ""
+@app.route('/status')
+def status():
+    """API endpoint để lấy trạng thái hệ thống"""
+    main_accounts = [
+        {
+            "id": "main_1",
+            "name": "ACC CHÍNH 1",
+            "status": "ONLINE" if main_bot else "OFFLINE",
+            "auto_grab": auto_grab_enabled,
+            "heart_threshold": heart_threshold,
+            "reconnect_enabled": main_bot_reconnect_enabled
+        },
+        {
+            "id": "main_2",
+            "name": "ACC CHÍNH 2",
+            "status": "ONLINE" if main_bot_2 else "OFFLINE",
+            "auto_grab": auto_grab_enabled_2,
+            "heart_threshold": heart_threshold_2,
+            "reconnect_enabled": main_bot_2_reconnect_enabled
+        }
+    ]
+    
+    sub_accounts = []
+    for i in range(len(acc_names)):
+        sub_accounts.append({
+            "id": f"sub_{i}",
+            "name": acc_names[i],
+            "status": "ONLINE" if i < len(bots) and bots[i] else "OFFLINE"
+        })
+    
+    return jsonify({
+        "main_accounts": main_accounts,
+        "sub_accounts": sub_accounts,
+        "spam": {"enabled": spam_enabled, "message": spam_message, "delay": spam_delay},
+        "auto_work": {"enabled": auto_work_enabled, "delay_between": work_delay_between_acc, "delay_after": work_delay_after_all},
+        "logs": system_logs[-50:],
+        "connected": True
+    })
 
-    if request.method == "POST":
-        msg = request.form.get("message")
-        quickmsg = request.form.get("quickmsg")
-        toggle = request.form.get("toggle")
-        toggle_2 = request.form.get("toggle_2")
-        send_codes = request.form.get("send_codes")
-        spamtoggle = request.form.get("spamtoggle")
-        spammsg = request.form.get("spammsg", "")
-        spam_delay_form = request.form.get("spam_delay")
-        heart_threshold_form = request.form.get("heart_threshold")
-        heart_threshold_2_form = request.form.get("heart_threshold_2")
-        auto_work_toggle = request.form.get("auto_work_toggle")
-        reboot_target = request.form.get("reboot_target")
-
-        if msg:
-            with bots_lock:
-                for idx, bot in enumerate(bots):
-                    try:
-                        threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
-                    except Exception as e:
-                        print(f"Lỗi gửi tin nhắn: {e}")
-            msg_status = "Đã gửi thủ công thành công!"
-
-        if quickmsg:
-            with bots_lock:
-                for idx, bot in enumerate(bots):
-                    try:
-                        threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, quickmsg)).start()
-                    except Exception as e:
-                        print(f"Lỗi gửi tin nhắn: {e}")
-            msg_status = f"Đã gửi lệnh {quickmsg} thành công!"
-
-        if toggle:
-            auto_grab_enabled = toggle == "on"
-            msg_status = f"Tự grab Acc chính 1 {'đã bật' if auto_grab_enabled else 'đã tắt'}"
-
-        if toggle_2:
-            auto_grab_enabled_2 = toggle_2 == "on"
-            msg_status = f"Tự grab Acc chính 2 {'đã bật' if auto_grab_enabled_2 else 'đã tắt'}"
-
-        if heart_threshold_form:
-            try:
-                heart_threshold = int(heart_threshold_form)
-                msg_status = f"Đã cập nhật mức tim Acc chính 1: {heart_threshold}"
-            except:
-                msg_status = "Mức tim Acc chính 1 không hợp lệ!"
-
-        if heart_threshold_2_form:
-            try:
-                heart_threshold_2 = int(heart_threshold_2_form)
-                msg_status = f"Đã cập nhật mức tim Acc chính 2: {heart_threshold_2}"
-            except:
-                msg_status = "Mức tim Acc chính 2 không hợp lệ!"
-
-        if send_codes:
-            acc_index = request.form.get("acc_index")
-            delay = request.form.get("delay")
-            prefix = request.form.get("prefix")
-            codes = request.form.get("codes")
-
-            if acc_index and delay and codes:
+@app.route('/control', methods=['POST'])
+def control():
+    """API endpoint để điều khiển hệ thống"""
+    try:
+        data = request.get_json()
+        action = data.get('action')
+        
+        global auto_grab_enabled, auto_grab_enabled_2, heart_threshold, heart_threshold_2
+        global main_bot_reconnect_enabled, main_bot_2_reconnect_enabled
+        global spam_enabled, spam_message, spam_delay
+        global auto_work_enabled, work_delay_between_acc, work_delay_after_all
+        
+        if action == 'toggle_auto_grab':
+            bot_id = data.get('bot_id')
+            if bot_id == 'main_1':
+                auto_grab_enabled = not auto_grab_enabled
+                log_system(f"[Control] Auto grab Main Bot 1: {'ON' if auto_grab_enabled else 'OFF'}")
+            elif bot_id == 'main_2':
+                auto_grab_enabled_2 = not auto_grab_enabled_2
+                log_system(f"[Control] Auto grab Main Bot 2: {'ON' if auto_grab_enabled_2 else 'OFF'}")
+        
+        elif action == 'set_heart_threshold':
+            bot_id = data.get('bot_id')
+            threshold = int(data.get('threshold', 50))
+            if bot_id == 'main_1':
+                heart_threshold = threshold
+                log_system(f"[Control] Heart threshold Main Bot 1: {threshold}")
+            elif bot_id == 'main_2':
+                heart_threshold_2 = threshold
+                log_system(f"[Control] Heart threshold Main Bot 2: {threshold}")
+        
+        elif action == 'reboot_bot':
+            target_id = data.get('target_id')
+            threading.Thread(target=reboot_bot, args=(target_id,), daemon=True).start()
+            log_system(f"[Control] Reboot request for {target_id}")
+        
+        elif action == 'toggle_spam':
+            spam_enabled = not spam_enabled
+            log_system(f"[Control] Spam: {'ON' if spam_enabled else 'OFF'}")
+        
+        elif action == 'set_spam_message':
+            spam_message = data.get('message', '')
+            log_system(f"[Control] Spam message: {spam_message}")
+        
+        elif action == 'toggle_auto_work':
+            auto_work_enabled = not auto_work_enabled
+            log_system(f"[Control] Auto work: {'ON' if auto_work_enabled else 'OFF'}")
+        
+        elif action == 'send_code_list':
+            acc_index = data.get('acc_index')
+            delay = data.get('delay', 2.0)
+            prefix = data.get('prefix', '')
+            codes = data.get('codes', '')
+            
+            if acc_index is not None and codes:
                 try:
                     acc_idx = int(acc_index)
                     delay_val = float(delay)
                     codes_list = codes.split(",")
                     
-                    if acc_idx < len(bots):
-                         with bots_lock:
+                    if acc_idx < len(bots) and bots[acc_idx]:
+                        with bots_lock:
                             for i, code in enumerate(codes_list):
                                 code = code.strip()
                                 if code:
                                     final_msg = f"{prefix} {code}" if prefix else code
-                                    try:
-                                        threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
-                                    except Exception as e:
-                                        print(f"Lỗi gửi mã: {e}")
+                                    threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
+                        log_system(f"[Control] Sent code list to account {acc_idx}")
+                    else:
+                        log_system(f"[Control] Account index {acc_idx} not available")
                 except Exception as e:
-                    print(f"Lỗi xử lý codes: {e}")
-
-            msg_status = "Đã bắt đầu gửi mã!"
-
-        if spamtoggle:
-            spam_enabled = spamtoggle == "on"
-            spam_message = spammsg.strip()
-            msg_status = f"Spam {'đã bật' if spam_enabled else 'đã tắt'}"
-
-        if spam_delay_form:
-            try:
-                spam_delay = int(spam_delay_form)
-                msg_status = f"Đã cập nhật thời gian spam: {spam_delay} giây"
-            except:
-                msg_status = "Thời gian spam không hợp lệ!"
-
-        if auto_work_toggle:
-            auto_work_enabled = auto_work_toggle == "on"
-            msg_status = f"Auto Work {'đã bật' if auto_work_enabled else 'đã tắt'}"
+                    log_system(f"[Control] Error sending codes: {e}")
         
-        if reboot_target:
-            reboot_bot(reboot_target)
-            msg_status = f"Đã gửi yêu cầu khởi động lại cho {reboot_target}!"
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        log_system(f"[Control] Error: {e}")
+        return jsonify({"success": False, "error": str(e)})
 
-    if msg_status:
-        alert_section = f'<div class="row"><div class="col-12"><div class="alert alert-success">{msg_status}</div></div></div>'
-    else:
-        alert_section = ""
-
-    auto_grab_status = "status-active" if auto_grab_enabled else "status-inactive"
-    auto_grab_text = "Đang bật" if auto_grab_enabled else "Đang tắt"
+def initialize_system():
+    """Khởi tạo hệ thống"""
+    global main_bot, main_bot_2, bots
     
-    auto_grab_status_2 = "status-active" if auto_grab_enabled_2 else "status-inactive"
-    auto_grab_text_2 = "Đang bật" if auto_grab_enabled_2 else "Đang tắt"
+    log_system("=== KHỞI TẠO DEEP WEB BOT CONTROL ===")
     
-    spam_status = "status-active" if spam_enabled else "status-inactive"
-    spam_text = "Đang bật" if spam_enabled else "Đang tắt"
-
-    auto_work_status = "status-active" if auto_work_enabled else "status-inactive"
-    auto_work_text = "Đang bật" if auto_work_enabled else "Đang tắt"
-
-    acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names))
+    # Tạo main bots
+    if main_token:
+        main_bot = create_bot(main_token, is_main=True)
+        log_system("Main Bot 1 đã được tạo")
     
-    reboot_options = ""
-    if main_bot:
-        reboot_options += '<option value="main_1">Acc Chính 1</option>'
-    if main_bot_2:
-        reboot_options += '<option value="main_2">Acc Chính 2</option>'
-    for i, name in enumerate(acc_names):
-        reboot_options += f'<option value="sub_{i}">Acc Phụ {i+1} ({name})</option>'
-
-    return render_template_string(HTML.format(
-        alert_section=alert_section,
-        auto_grab_status=auto_grab_status,
-        auto_grab_text=auto_grab_text,
-        auto_grab_status_2=auto_grab_status_2,
-        auto_grab_text_2=auto_grab_text_2,
-        spam_status=spam_status,
-        spam_text=spam_text,
-        auto_work_status=auto_work_status,
-        auto_work_text=auto_work_text,
-        heart_threshold=heart_threshold,
-        heart_threshold_2=heart_threshold_2,
-        spam_message=spam_message,
-        spam_delay=spam_delay,
-        acc_options=acc_options,
-        reboot_options=reboot_options
-    ))
-
-def spam_loop():
-    global spam_enabled, spam_message, spam_delay
-    while True:
-        if spam_enabled and spam_message:
-            with bots_lock:
-                bots_to_spam = bots.copy()
-            for idx, bot in enumerate(bots_to_spam):
-                try:
-                    bot.sendMessage(spam_channel_id, spam_message)
-                    print(f"[{acc_names[idx]}] đã gửi: {spam_message}")
-                    time.sleep(2)
-                except Exception as e:
-                    print(f"Lỗi gửi spam: {e}")
-        time.sleep(spam_delay)
-
-def keep_alive():
-    while True:
-        try:
-            if main_bot:
-                pass
-            time.sleep(random.randint(60, 120))
-        except:
-            pass
-            
-if __name__ == "__main__":
-    print("Đang khởi tạo các bot...")
-    with bots_lock:
-        if main_token:
-            main_bot = create_bot(main_token, is_main=True)
-        if main_token_2:
-            main_bot_2 = create_bot(main_token_2, is_main_2=True)
-
-        for token in tokens:
-            if token.strip():
-                bots.append(create_bot(token.strip(), is_main=False))
-    print("Tất cả các bot đã được khởi tạo.")
-
-    print("Đang khởi tạo các luồng nền...")
-    threading.Thread(target=spam_loop, daemon=True).start()
-    threading.Thread(target=keep_alive, daemon=True).start()
+    if main_token_2:
+        main_bot_2 = create_bot(main_token_2, is_main_2=True)
+        log_system("Main Bot 2 đã được tạo")
+    
+    # Tạo sub bots
+    for i, token in enumerate(tokens):
+        if token.strip():
+            bot = create_bot(token.strip())
+            if bot:
+                bots.append(bot)
+                log_system(f"Sub Bot {i} đã được tạo")
+            else:
+                bots.append(None)
+        else:
+            bots.append(None)
+    
+    log_system(f"Đã khởi tạo {len([b for b in bots if b])} sub bots")
+    
+    # Khởi động các threads
     threading.Thread(target=auto_work_loop, daemon=True).start()
-    print("Các luồng nền đã sẵn sàng.")
+    threading.Thread(target=spam_loop, daemon=True).start()
+    threading.Thread(target=monitor_connections, daemon=True).start()
+    
+    log_system("=== HỆ THỐNG READY ===")
 
-    port = int(os.environ.get("PORT", 8080))
-    print(f"Khởi động Web Server tại cổng {port}...")
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+if __name__ == '__main__':
+    initialize_system()
+    app.run(host='0.0.0.0', port=5000, debug=True)
