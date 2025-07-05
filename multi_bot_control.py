@@ -40,14 +40,14 @@ spam_delay = 30
 
 # Cài đặt Auto Work (ĐÃ THÊM LẠI)
 auto_work_enabled = False
-work_channel_id = "1390851619016671246" # ID kênh mặc định, có thể thay đổi trên UI
+work_channel_id = "1389250541590413363" # ID kênh mặc định, có thể thay đổi trên UI
 work_delay_between_acc = 10
 work_delay_after_all = 44100
 
 # Danh sách tên các acc, acc cuối cùng tương ứng với main_token
 acc_names = [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
-    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", 
+    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent", 
     "sly_dd" # Tên này tương ứng với main_bot
 ]
 
