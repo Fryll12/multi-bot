@@ -517,9 +517,9 @@ HTML_TEMPLATE = """
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
     <style>
-         #override-panel {
+         #override-panel {{
              grid-column: 1 / -1;
-         }      
+         }}      
         :root {{
             --neon-green: #00ff41; --neon-cyan: #00ffff; --neon-red: #ff0040; --neon-purple: #8000ff;
             --primary-bg: #0a0a0a; --secondary-bg: #111111; --accent-bg: #1a1a1a;
