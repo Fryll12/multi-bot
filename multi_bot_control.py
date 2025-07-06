@@ -588,14 +588,14 @@ HTML_TEMPLATE = """
         <div class="control-grid">
             <div class="control-panel">
                 <div class="panel-header"><i class="fas fa-terminal"></i><span>MANUAL OPERATIONS</span></div>
-                <div class="panel-content">
-                    <form method="POST" class="spam-form">
+                <div class="panel-content" style="display: flex; align-items: flex-start; gap: 20px;">
+                    <form method="POST" class="spam-form" style="flex: 1;">
                         <div class="control-row">
                             <div class="input-group" style="flex: 1;"><span class="input-label">MESSAGE</span><input type="text" name="message" placeholder="Enter manual message..." class="input-cyber"></div>
                             <button type="submit" class="btn-cyber btn-primary" style="align-self: flex-end;"><i class="fas fa-paper-plane"></i> SEND</button>
                         </div>
                     </form>
-                    <div class="quick-commands">
+                    <div class="quick-commands" style="flex: 1;">
                         <div class="control-row">
                             <form method="POST" style="display: inline;"><input type="hidden" name="quickmsg" value="kc o:w"><button type="submit" class="btn-cyber btn-quick">kc o:w</button></form>
                             <form method="POST" style="display: inline;"><input type="hidden" name="quickmsg" value="kc o:ef"><button type="submit" class="btn-cyber btn-quick">kc o:ef</button></form>
