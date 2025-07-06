@@ -32,9 +32,9 @@ auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3 = False, False, Fals
 heart_threshold, heart_threshold_2, heart_threshold_3 = 50, 50, 50
 last_drop_msg_id = ""
 acc_names = [
-    "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
+    "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Silent",
     "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", 
-    "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent"]
+    "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "HellNBack"]
 spam_enabled, spam_message, spam_delay, spam_channel_id = False, "", 10, "1388802151723302912"
 auto_work_enabled, work_channel_id, work_delay_between_acc, work_delay_after_all = False, "1389250541590413363", 10, 44100
 
