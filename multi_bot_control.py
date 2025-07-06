@@ -380,7 +380,7 @@ def auto_work_loop():
 
 app = Flask(__name__)
 
-# ---- GIAO DIỆN TỐI KIỂU TAILWIND, ĐẦY ĐỦ DIV ----
+# ---- FULL HTML ĐÃ ĐƯỢC CẬP NHẬT ----
 HTML = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -544,9 +544,8 @@ HTML = """
                 </div>
             </div>
         </div>
-        {alert_section}
+        {{ alert_section|safe }}
         <div class="row g-4">
-            <!-- ==== Dưới đây là tất cả các box điều khiển giữ nguyên như code cũ ==== -->
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
@@ -596,9 +595,9 @@ HTML = """
                     </div>
                     <div class="card-body">
                         <div class="status-indicator mb-3">
-                            <span class="status-badge {auto_work_status}">
+                            <span class="status-badge {{ auto_work_status }}">
                                 <i class="fas fa-circle me-1"></i>
-                                {auto_work_text}
+                                {{ auto_work_text }}
                             </span>
                         </div>
                         <form method="POST" class="mb-4">
@@ -627,9 +626,9 @@ HTML = """
                     </div>
                     <div class="card-body">
                         <div class="status-indicator mb-3">
-                            <span class="status-badge {auto_grab_status}">
+                            <span class="status-badge {{ auto_grab_status }}">
                                 <i class="fas fa-circle me-1"></i>
-                                {auto_grab_text}
+                                {{ auto_grab_text }}
                             </span>
                         </div>
                         <form method="POST" class="mb-4">
@@ -652,7 +651,7 @@ HTML = """
                                     <input type="number" 
                                            class="form-control" 
                                            name="heart_threshold" 
-                                           value="{heart_threshold}" 
+                                           value="{{ heart_threshold }}" 
                                            min="0"
                                            placeholder="Mức tim">
                                     <button type="submit" class="btn btn-primary">
@@ -671,9 +670,9 @@ HTML = """
                     </div>
                     <div class="card-body">
                         <div class="status-indicator mb-3">
-                            <span class="status-badge {auto_grab_status_2}">
+                            <span class="status-badge {{ auto_grab_status_2 }}">
                                 <i class="fas fa-circle me-1"></i>
-                                {auto_grab_text_2}
+                                {{ auto_grab_text_2 }}
                             </span>
                         </div>
                         <form method="POST" class="mb-4">
@@ -696,7 +695,7 @@ HTML = """
                                     <input type="number" 
                                            class="form-control" 
                                            name="heart_threshold_2" 
-                                           value="{heart_threshold_2}" 
+                                           value="{{ heart_threshold_2 }}" 
                                            min="0"
                                            placeholder="Mức tim">
                                     <button type="submit" class="btn btn-primary">
@@ -725,7 +724,7 @@ HTML = """
                                 <div class="col-md-6">
                                     <label class="form-label">Chọn acc:</label>
                                     <select name="acc_index" class="form-select">
-                                        {acc_options}
+                                        {{ acc_options|safe }}
                                     </select>
                                 </div>
                                 <div class="col-md-6">
@@ -768,9 +767,9 @@ HTML = """
                     </div>
                     <div class="card-body">
                         <div class="status-indicator mb-3">
-                            <span class="status-badge {spam_status}">
+                            <span class="status-badge {{ spam_status }}">
                                 <i class="fas fa-circle me-1"></i>
-                                {spam_text}
+                                {{ spam_text }}
                             </span>
                         </div>
                         <form method="POST">
@@ -781,14 +780,14 @@ HTML = """
                                            name="spammsg" 
                                            class="form-control" 
                                            placeholder="Nội dung spam" 
-                                           value="{spam_message}">
+                                           value="{{ spam_message }}">
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label">Thời gian lặp (giây):</label>
                                     <input type="number" 
                                            name="spam_delay" 
                                            class="form-control" 
-                                           value="{spam_delay}" 
+                                           value="{{ spam_delay }}" 
                                            min="1"
                                            placeholder="10">
                                 </div>
@@ -817,7 +816,7 @@ HTML = """
                         <form method="POST">
                             <div class="input-group">
                                 <select name="reboot_target" class="form-select">
-                                    {reboot_options}
+                                    {{ reboot_options|safe }}
                                 </select>
                                 <button type="submit" class="btn btn-warning">
                                     <i class="fas fa-power-off me-1"></i>Reboot Bot
@@ -973,7 +972,7 @@ def index():
     for i, name in enumerate(acc_names):
         reboot_options += f'<option value="sub_{i}">Acc Phụ {i+1} ({name})</option>'
 
-    return render_template_string(HTML.format(
+    return render_template_string(HTML,
         alert_section=alert_section,
         auto_grab_status=auto_grab_status,
         auto_grab_text=auto_grab_text,
@@ -989,7 +988,7 @@ def index():
         spam_delay=spam_delay,
         acc_options=acc_options,
         reboot_options=reboot_options
-    ))
+    )
 
 def spam_loop():
     global spam_enabled, spam_message, spam_delay
