@@ -517,6 +517,9 @@ HTML_TEMPLATE = """
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
     <style>
+         #override-panel {
+             grid-column: 1 / -1;
+         }      
         :root {{
             --neon-green: #00ff41; --neon-cyan: #00ffff; --neon-red: #ff0040; --neon-purple: #8000ff;
             --primary-bg: #0a0a0a; --secondary-bg: #111111; --accent-bg: #1a1a1a;
@@ -588,14 +591,14 @@ HTML_TEMPLATE = """
         <div class="control-grid">
             <div class="control-panel">
                 <div class="panel-header"><i class="fas fa-terminal"></i><span>MANUAL OPERATIONS</span></div>
-                <div class="panel-content" style="display: flex; align-items: flex-start; gap: 20px;">
-                    <form method="POST" class="spam-form" style="flex: 1;">
+                <div class="panel-content"
+                    <form method="POST" class="spam-form">
                         <div class="control-row">
                             <div class="input-group" style="flex: 1;"><span class="input-label">MESSAGE</span><input type="text" name="message" placeholder="Enter manual message..." class="input-cyber"></div>
                             <button type="submit" class="btn-cyber btn-primary" style="align-self: flex-end;"><i class="fas fa-paper-plane"></i> SEND</button>
                         </div>
                     </form>
-                    <div class="quick-commands" style="flex: 1;">
+                    <div class="quick-commands"
                         <div class="control-row">
                             <form method="POST" style="display: inline;"><input type="hidden" name="quickmsg" value="kc o:w"><button type="submit" class="btn-cyber btn-quick">kc o:w</button></form>
                             <form method="POST" style="display: inline;"><input type="hidden" name="quickmsg" value="kc o:ef"><button type="submit" class="btn-cyber btn-quick">kc o:ef</button></form>
@@ -680,10 +683,10 @@ HTML_TEMPLATE = """
                     </form>
                 </div>
             </div>
-             <div class="control-panel">
+             <div class="control-panel" id="override-panel">
                 <div class="panel-header"><i class="fas fa-power-off"></i><span>MANUAL OVERRIDE</span></div>
                 <div class="panel-content">
-                    <div class="reboot-grid"
+                    <div class="reboot-grid">
                         <div class="reboot-section"><h4>EMERGENCY CONTROLS</h4>
                             <form method="POST" style="display: inline-block;"><button type="submit" name="reboot_target" value="all" class="btn-cyber btn-danger"><i class="fas fa-bomb"></i> REBOOT ALL SYSTEMS</button></form>
                         </div>
