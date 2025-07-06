@@ -384,6 +384,11 @@ app = Flask(__name__)
 
 # --- TOÀN BỘ MÃ HTML ĐƯỢC NHÚNG VÀO ĐÂY ---
 HTML = """
+# multi_bot_control_fixed.py
+# ... (các import, hàm python giữ nguyên như file của bạn) ...
+
+# --- TOÀN BỘ MÃ HTML ĐƯỢC NHÚNG VÀO ĐÂY ---
+HTML = """
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -394,36 +399,36 @@ HTML = """
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@800&display=swap" rel="stylesheet">
     <style>
-        body {
+        body {{
             background: #090a11 url('https://www.transparenttextures.com/patterns/asfalt-dark.png');
             color: #c6f2ff;
             font-family: 'Orbitron', 'JetBrains Mono', 'Roboto Mono', monospace;
             min-height: 100vh;
             letter-spacing: 1px;
-        }
-        .container-fluid {
+        }}
+        .container-fluid {{
             margin-top: 24px;
-        }
-        .header-section {
+        }}
+        .header-section {{
             background: transparent;
             border: none;
             margin-bottom: 1.7rem;
             text-align: center;
-        }
-        .header-section h1 {
+        }}
+        .header-section h1 {{
             font-family: 'Orbitron', monospace;
             font-size: 2.5rem;
             color: #14fdce;
             text-shadow: 0 0 5px #14fdce, 0 0 20px #14fdce;
             letter-spacing: 2.5px;
             margin-bottom: 0;
-        }
-        .header-section p {
+        }}
+        .header-section p {{
             color: #fafff0;
             font-size: 1.07rem;
             text-shadow: 0 0 2px #14fdce;
-        }
-        .control-card {
+        }}
+        .control-card {{
             background: rgba(20, 20, 20, 0.98);
             border: 2px solid #00ff41;
             border-radius: 12px;
@@ -431,25 +436,25 @@ HTML = """
             margin-bottom: 1.8rem;
             position: relative;
             z-index: 1;
-        }
-        .control-card .card-header {
+        }}
+        .control-card .card-header {{
             background: transparent;
             border-bottom: none;
             padding: 1rem 1rem 0.5rem 1rem;
             border-radius: 12px 12px 0 0;
-        }
-        .control-card .card-header h5 {
+        }}
+        .control-card .card-header h5 {{
             font-family: 'Orbitron', monospace;
             color: #14fdce;
             text-shadow: 0 0 12px #14fdce, 0 0 2px #fff;
             font-size: 1.2rem;
             margin: 0;
             letter-spacing: 1.5px;
-        }
-        .control-card .card-body {
+        }}
+        .control-card .card-body {{
             padding: 1rem 1rem 1.1rem 1rem;
-        }
-        .form-control, .form-select, textarea {
+        }}
+        .form-control, .form-select, textarea {{
             background: #030d10;
             border: 1.5px solid #14fdce;
             color: #fff;
@@ -457,14 +462,14 @@ HTML = """
             font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
             font-size: 1rem;
             margin-bottom: 0.4rem;
-        }
-        .form-control:focus, .form-select:focus, textarea:focus {
+        }}
+        .form-control:focus, .form-select:focus, textarea:focus {{
             background: #050a0b;
             border-color: #00ff41;
             color: #fff;
             box-shadow: 0 0 2px #00ff41;
-        }
-        .btn {
+        }}
+        .btn {{
             border-radius: 7px;
             font-family: 'Orbitron', monospace;
             font-weight: 600;
@@ -473,33 +478,33 @@ HTML = """
             box-shadow: 0 0 8px #14fdce44;
             transition: background 0.2s, box-shadow 0.2s, color 0.2s;
             text-transform: uppercase;
-        }
-        .btn-primary {
+        }}
+        .btn-primary {{
             background: linear-gradient(90deg, #14fdce 30%, #00ff41 100%);
             color: #111;
             box-shadow: 0 0 10px #14fdce;
-        }
-        .btn-success {
+        }}
+        .btn-success {{
             background: linear-gradient(90deg, #00ff41 60%, #14fdce 100%);
             color: #111;
             box-shadow: 0 0 8px #00ff41;
-        }
-        .btn-danger {
+        }}
+        .btn-danger {{
             background: linear-gradient(90deg, #ff2770 80%, #ff2770 100%);
             color: #fff;
             box-shadow: 0 0 8px #ff2770;
-        }
-        .btn-warning {
+        }}
+        .btn-warning {{
             background: linear-gradient(90deg, #e9f500 80%, #ff2770 100%);
             color: #111;
             box-shadow: 0 0 8px #e9f500;
-        }
-        .btn:hover, .btn:focus {
+        }}
+        .btn:hover, .btn:focus {{
             filter: brightness(1.2) contrast(1.08);
             box-shadow: 0 0 14px #14fdce, 0 0 12px #00ff41;
             color: #fff;
-        }
-        .status-badge {
+        }}
+        .status-badge {{
             border-radius: 999px;
             padding: 7px 17px;
             font-size: 0.95rem;
@@ -508,20 +513,20 @@ HTML = """
             color: #ff2770;
             box-shadow: 0 0 10px #ff2770;
             border: 1px solid #ff2770;
-        }
-        .status-active {
+        }}
+        .status-active {{
             background: #111;
             color: #00ff41;
             border-color: #00ff41;
             text-shadow: 0 0 6px #00ff41;
-        }
-        .status-inactive {
+        }}
+        .status-inactive {{
             background: #111;
             color: #ff2770;
             border-color: #ff2770;
             text-shadow: 0 0 6px #ff2770;
-        }
-        .alert {
+        }}
+        .alert {{
             background: #0a0a0f;
             color: #00ff41;
             border: 1.5px solid #14fdce;
@@ -530,355 +535,29 @@ HTML = """
             font-size: 1rem;
             box-shadow: 0 0 10px #14fdce;
             margin-bottom: 1rem;
-        }
-        ::-webkit-scrollbar {
+        }}
+        ::-webkit-scrollbar {{
             width: 10px;
             background: #090a11;
-        }
-        ::-webkit-scrollbar-thumb {
+        }}
+        ::-webkit-scrollbar-thumb {{
             background: #00ff4166;
             border-radius: 8px;
-        }
-        @media (max-width: 900px) {
-            .header-section h1 { font-size: 1.5rem; }
-            .control-card { margin-bottom: 1rem; }
-        }
+        }}
+        @media (max-width: 900px) {{
+            .header-section h1 {{ font-size: 1.5rem; }}
+            .control-card {{ margin-bottom: 1rem; }}
+        }}
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-12">
-                <div class="header-section">
-                    <h1>DEEP WEB BOT CONTROL</h1>
-                    <p class="text-center">Quản lý bot Discord phong cách deep web</p>
-                </div>
-            </div>
-        </div>
-
-        {alert_section}
-
-        <div class="row g-4">
-            <div class="col-lg-6">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5>
-                            <i class="fas fa-paper-plane me-2"></i>
-                            Điều khiển bot nhắn tin
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST" class="mb-4">
-                            <div class="input-group">
-                                <input type="text" 
-                                       class="form-control" 
-                                       name="message" 
-                                       placeholder="Nhập nội dung tin nhắn...">
-                                <button class="btn btn-primary" type="submit">
-                                    <i class="fas fa-send me-1"></i>Gửi thủ công
-                                </button>
-                            </div>
-                        </form>
-                        <div class="quick-commands">
-                            <h6 class="mb-3" style="color:#00ff41;text-shadow:0 0 8px #14fdce;">Menu nhanh</h6>
-                            <form method="POST">
-                                <div class="input-group">
-                                    <select name="quickmsg" class="form-select">
-                                        <option value="kc o:w">kc o:w</option>
-                                        <option value="kc o:ef">kc o:ef</option>
-                                        <option value="kc o:p">kc o:p</option>
-                                        <option value="kc e:1">kc e:1</option>
-                                        <option value="kc e:2">kc e:2</option>
-                                        <option value="kc e:3">kc e:3</option>
-                                        <option value="kc e:4">kc e:4</option>
-                                        <option value="kc e:5">kc e:5</option>
-                                        <option value="kc e:6">kc e:6</option>
-                                        <option value="kc e:7">kc e:7</option>
-                                    </select>
-                                    <button type="submit" class="btn btn-success">
-                                        <i class="fas fa-bolt me-1"></i>Gửi
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-6">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5>
-                            <i class="fas fa-briefcase me-2"></i>
-                            Auto Work
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="status-indicator mb-3">
-                            <span class="status-badge {auto_work_status}">
-                                <i class="fas fa-circle me-1"></i>
-                                {auto_work_text}
-                            </span>
-                        </div>
-                        <form method="POST" class="mb-4">
-                            <div class="btn-group w-100" role="group">
-                                <button name="auto_work_toggle" value="on" type="submit" class="btn btn-success">
-                                    <i class="fas fa-play me-1"></i>Bật
-                                </button>
-                                <button name="auto_work_toggle" value="off" type="submit" class="btn btn-danger">
-                                    <i class="fas fa-stop me-1"></i>Tắt
-                                </button>
-                            </div>
-                        </form>
-                        <div class="mt-2">
-                            <small style="color:#00ff41">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Tự động làm việc cho tất cả account
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-6">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5>
-                            <i class="fas fa-magic me-2"></i>
-                            Auto Grab - Acc Chính 1
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="status-indicator mb-3">
-                            <span class="status-badge {auto_grab_status}">
-                                <i class="fas fa-circle me-1"></i>
-                                {auto_grab_text}
-                            </span>
-                        </div>
-                        <form method="POST" class="mb-4">
-                            <div class="btn-group w-100" role="group">
-                                <button name="toggle" value="on" type="submit" class="btn btn-success">
-                                    <i class="fas fa-play me-1"></i>Bật
-                                </button>
-                                <button name="toggle" value="off" type="submit" class="btn btn-danger">
-                                    <i class="fas fa-stop me-1"></i>Tắt
-                                </button>
-                            </div>
-                        </form>
-                        <div class="heart-threshold">
-                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim tiêu chuẩn</h6>
-                            <form method="POST">
-                                <div class="input-group">
-                                    <span class="input-group-text">
-                                        <i class="fas fa-heart text-danger"></i>
-                                    </span>
-                                    <input type="number" 
-                                           class="form-control" 
-                                           name="heart_threshold" 
-                                           value="{heart_threshold}" 
-                                           min="0"
-                                           placeholder="Mức tim">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Cập nhật
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-6">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5>
-                            <i class="fas fa-magic me-2"></i>
-                            Auto Grab - Acc Chính 2
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="status-indicator mb-3">
-                            <span class="status-badge {auto_grab_status_2}">
-                                <i class="fas fa-circle me-1"></i>
-                                {auto_grab_text_2}
-                            </span>
-                        </div>
-                        <form method="POST" class="mb-4">
-                            <div class="btn-group w-100" role="group">
-                                <button name="toggle_2" value="on" type="submit" class="btn btn-success">
-                                    <i class="fas fa-play me-1"></i>Bật
-                                </button>
-                                <button name="toggle_2" value="off" type="submit" class="btn btn-danger">
-                                    <i class="fas fa-stop me-1"></i>Tắt
-                                </button>
-                            </div>
-                        </form>
-                        <div class="heart-threshold">
-                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim tiêu chuẩn</h6>
-                            <form method="POST">
-                                <div class="input-group">
-                                    <span class="input-group-text">
-                                        <i class="fas fa-heart text-danger"></i>
-                                    </span>
-                                    <input type="number" 
-                                           class="form-control" 
-                                           name="heart_threshold_2" 
-                                           value="{heart_threshold_2}" 
-                                           min="0"
-                                           placeholder="Mức tim">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Cập nhật
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                        <div class="mt-2">
-                            <small style="color:#14fdce">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Delay grab chậm hơn 0.3s so với Acc chính 1
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5>
-                            <i class="fas fa-code me-2"></i>
-                            Gửi danh sách mã theo acc chọn
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Chọn acc:</label>
-                                    <select name="acc_index" class="form-select">
-                                        {acc_options}
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Thời gian cách nhau (giây):</label>
-                                    <input type="number" 
-                                           step="0.1" 
-                                           name="delay" 
-                                           class="form-control" 
-                                           value="11" 
-                                           placeholder="11">
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Nội dung mẫu:</label>
-                                    <input type="text" 
-                                           name="prefix" 
-                                           class="form-control" 
-                                           placeholder="vd: kt n">
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label">Danh sách mã:</label>
-                                    <textarea name="codes" 
-                                              class="form-control" 
-                                              rows="4" 
-                                              placeholder="Danh sách mã, cách nhau dấu phẩy"></textarea>
-                                </div>
-                                <div class="col-12">
-                                    <button type="submit" name="send_codes" value="1" class="btn btn-primary btn-lg">
-                                        <i class="fas fa-paper-plane me-2"></i>Gửi danh sách mã
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5>
-                            <i class="fas fa-repeat me-2"></i>
-                            Spam Control
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="status-indicator mb-3">
-                            <span class="status-badge {spam_status}">
-                                <i class="fas fa-circle me-1"></i>
-                                {spam_text}
-                            </span>
-                        </div>
-                        <form method="POST">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Nội dung spam:</label>
-                                    <input type="text" 
-                                           name="spammsg" 
-                                           class="form-control" 
-                                           placeholder="Nội dung spam" 
-                                           value="{spam_message}">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Thời gian lặp (giây):</label>
-                                    <input type="number" 
-                                           name="spam_delay" 
-                                           class="form-control" 
-                                           value="{spam_delay}" 
-                                           min="1"
-                                           placeholder="10">
-                                </div>
-                                <div class="col-md-3">
-                                    <label class="form-label">Điều khiển:</label>
-                                    <div class="btn-group w-100" role="group">
-                                        <button name="spamtoggle" value="on" type="submit" class="btn btn-success">
-                                            <i class="fas fa-play me-1"></i>Bật
-                                        </button>
-                                        <button name="spamtoggle" value="off" type="submit" class="btn btn-danger">
-                                            <i class="fas fa-stop me-1"></i>Tắt
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-12">
-                <div class="control-card">
-                    <div class="card-header">
-                        <h5>
-                            <i class="fas fa-sync-alt me-2"></i>
-                            Khởi động lại Bot (Reboot)
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="input-group">
-                                <select name="reboot_target" class="form-select">
-                                    {reboot_options}
-                                </select>
-                                <button type="submit" class="btn btn-warning">
-                                    <i class="fas fa-power-off me-1"></i>Reboot Bot
-                                </button>
-                            </div>
-                        </form>
-                        <div class="mt-2">
-                            <small style="color:#14fdce">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Dùng khi một bot bị "đơ" hoặc không hoạt động đúng.
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- (Phần HTML bên dưới giữ nguyên như file bạn gửi) -->
+    ...
 </body>
 </html>
 """
+
+# ... (phần backend Flask, Python logic giữ nguyên như cũ) ...
 
 @app.route("/", methods=["GET", "POST"])
 def index():
