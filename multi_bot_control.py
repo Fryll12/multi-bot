@@ -1,4 +1,4 @@
-# multi_bot_control_full_plus_acc3.py
+# multi_bot_control_full_plus_acc3_and_auto_reboot.py
 import discum
 import threading
 import time
@@ -14,7 +14,7 @@ load_dotenv()
 # --- CẤU HÌNH ---
 main_token = os.getenv("MAIN_TOKEN")
 main_token_2 = os.getenv("MAIN_TOKEN_2")
-main_token_3 = os.getenv("MAIN_TOKEN_3") # <-- THÊM MỚI
+main_token_3 = os.getenv("MAIN_TOKEN_3")
 tokens = os.getenv("TOKENS").split(",") if os.getenv("TOKENS") else []
 
 main_channel_id = "1386973916563767396"
@@ -29,13 +29,13 @@ karibbit_id = "1274445226064220273"
 bots = []
 main_bot = None
 main_bot_2 = None
-main_bot_3 = None # <-- THÊM MỚI
+main_bot_3 = None
 auto_grab_enabled = False
 auto_grab_enabled_2 = False
-auto_grab_enabled_3 = False # <-- THÊM MỚI
+auto_grab_enabled_3 = False
 heart_threshold = 50
 heart_threshold_2 = 50
-heart_threshold_3 = 50 # <-- THÊM MỚI
+heart_threshold_3 = 50
 last_drop_msg_id = ""
 acc_names = [
      "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
@@ -49,6 +49,13 @@ spam_delay = 10
 auto_work_enabled = False
 work_delay_between_acc = 10
 work_delay_after_all = 44100
+
+# ++ TÍCH HỢP AUTO REBOOT: BIẾN TRẠNG THÁI ++
+auto_reboot_enabled = False
+auto_reboot_delay = 3600
+auto_reboot_thread = None
+auto_reboot_stop_event = None
+# ++ KẾT THÚC TÍCH HỢP ++
 
 bots_lock = threading.Lock()
 
@@ -75,7 +82,7 @@ def reboot_bot(target_id):
             main_bot_2 = create_bot(main_token_2, is_main_2=True)
             print("[Reboot] Acc Chính 2 đã được khởi động lại.")
 
-        elif target_id == 'main_3' and main_bot_3: # <-- THÊM MỚI
+        elif target_id == 'main_3' and main_bot_3:
             print("[Reboot] Đang xử lý Acc Chính 3...")
             try:
                 main_bot_3.gateway.close()
@@ -104,7 +111,7 @@ def reboot_bot(target_id):
         else:
             print(f"[Reboot] Target không xác định: {target_id}")
 
-def create_bot(token, is_main=False, is_main_2=False, is_main_3=False): # <-- THÊM MỚI
+def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
     bot = discum.Client(token=token, log=False)
 
     @bot.gateway.command
@@ -112,7 +119,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False): # <-- TH
         if resp.event.ready:
             try:
                 user_id = resp.raw["user"]["id"]
-                bot_type = "(Acc chính)" if is_main else "(Acc chính 2)" if is_main_2 else "(Acc chính 3)" if is_main_3 else "" # <-- THÊM MỚI
+                bot_type = "(Acc chính)" if is_main else "(Acc chính 2)" if is_main_2 else "(Acc chính 3)" if is_main_3 else ""
                 print(f"Đã đăng nhập: {user_id} {bot_type}")
             except Exception as e:
                 print(f"Lỗi lấy user_id: {e}")
@@ -240,7 +247,6 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False): # <-- TH
                                     break
                         threading.Thread(target=read_karibbit_2).start()
 
-    # <-- THÊM MỚI NGUYÊN KHỐI NÀY
     if is_main_3:
         @bot.gateway.command
         def on_message(resp):
@@ -287,7 +293,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False): # <-- TH
                                         else:
                                             max_index = heart_numbers.index(max_num)
                                             emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
-                                            delay = {"1️⃣": 1.1, "2️⃣": 2.1, "3️⃣": 2.8}[emoji] # Delay chậm hơn
+                                            delay = {"1️⃣": 1.1, "2️⃣": 2.1, "3️⃣": 2.8}[emoji]
                                             print(f"[Bot 3] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
 
                                             def grab_3():
@@ -447,6 +453,37 @@ def auto_work_loop():
         else:
             time.sleep(10)
 
+# ++ TÍCH HỢP AUTO REBOOT: VÒNG LẶP CHÍNH ++
+def auto_reboot_loop():
+    """Vòng lặp chạy nền để tự động reboot các bot chính theo chu kỳ."""
+    global auto_reboot_stop_event
+    print("[Auto Reboot] Luồng tự động reboot đã bắt đầu.")
+    
+    while not auto_reboot_stop_event.is_set():
+        print(f"[Auto Reboot] Bắt đầu chu kỳ reboot. Chờ {auto_reboot_delay} giây cho chu kỳ tiếp theo...")
+        
+        interrupted = auto_reboot_stop_event.wait(timeout=auto_reboot_delay)
+        
+        if interrupted:
+            break
+            
+        print("[Auto Reboot] Hết thời gian chờ, tiến hành reboot 3 tài khoản chính.")
+        
+        if main_bot:
+            reboot_bot('main_1')
+            time.sleep(5)
+        
+        if main_bot_2:
+            reboot_bot('main_2')
+            time.sleep(5)
+
+        if main_bot_3:
+            reboot_bot('main_3')
+            
+    print("[Auto Reboot] Luồng tự động reboot đã dừng.")
+# ++ KẾT THÚC TÍCH HỢP ++
+
+
 app = Flask(__name__)
 
 # --- HTML Giao diện deep web đã fix lỗi KeyError ---
@@ -498,6 +535,7 @@ HTML = """
             margin-bottom: 1.8rem;
             position: relative;
             z-index: 1;
+            height: 100%;
         }}
         .control-card .card-header {{
             background: transparent;
@@ -939,7 +977,7 @@ HTML = """
                     </div>
                 </div>
             </div>
-            <div class="col-12">
+            <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
                         <h5>
@@ -967,7 +1005,33 @@ HTML = """
                     </div>
                 </div>
             </div>
-        </div>
+            <div class="col-lg-6">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5>
+                            <i class="fas fa-history me-2"></i>
+                             Tự động Reboot Acc Chính
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-indicator mb-3"><span class="status-badge {auto_reboot_status}"><i class="fas fa-circle me-1"></i> {auto_reboot_text}</span></div>
+                        <form method="POST">
+                            <div class="input-group mb-3">
+                                <input type="number" class="form-control" name="auto_reboot_delay" value="{auto_reboot_delay}" min="60" placeholder="Thời gian (giây)">
+                                <button type="submit" class="btn btn-primary">Cập nhật</button>
+                            </div>
+                            <div class="btn-group w-100" role="group"><button name="auto_reboot_toggle" value="on" type="submit" class="btn btn-success"><i class="fas fa-play me-1"></i>Bật</button><button name="auto_reboot_toggle" value="off" type="submit" class="btn btn-danger"><i class="fas fa-stop me-1"></i>Tắt</button></div>
+                        </form>
+                         <div class="mt-2">
+                            <small style="color:#14fdce">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Tự động khởi động lại 3 acc chính theo chu kỳ.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
@@ -976,122 +1040,159 @@ HTML = """
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3, spam_enabled, spam_message, spam_delay, heart_threshold, heart_threshold_2, heart_threshold_3, auto_work_enabled # <-- THÊM MỚI
+    global auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3, spam_enabled, spam_message, spam_delay, heart_threshold, heart_threshold_2, heart_threshold_3, auto_work_enabled
+    # ++ TÍCH HỢP AUTO REBOOT: GLOBAL ++
+    global auto_reboot_enabled, auto_reboot_delay, auto_reboot_thread, auto_reboot_stop_event
+    # ++ KẾT THÚC TÍCH HỢP ++
     msg_status = ""
 
     if request.method == "POST":
-        msg = request.form.get("message")
-        quickmsg = request.form.get("quickmsg")
-        toggle = request.form.get("toggle")
-        toggle_2 = request.form.get("toggle_2")
-        toggle_3 = request.form.get("toggle_3") # <-- THÊM MỚI
-        send_codes = request.form.get("send_codes")
-        spamtoggle = request.form.get("spamtoggle")
-        spammsg = request.form.get("spammsg", "")
-        spam_delay_form = request.form.get("spam_delay")
-        heart_threshold_form = request.form.get("heart_threshold")
-        heart_threshold_2_form = request.form.get("heart_threshold_2")
-        heart_threshold_3_form = request.form.get("heart_threshold_3") # <-- THÊM MỚI
-        auto_work_toggle = request.form.get("auto_work_toggle")
-        reboot_target = request.form.get("reboot_target")
-
-        if msg:
-            with bots_lock:
-                for idx, bot in enumerate(bots):
-                    try:
-                        threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
-                    except Exception as e:
-                        print(f"Lỗi gửi tin nhắn: {e}")
-            msg_status = "Đã gửi thủ công thành công!"
-
-        if quickmsg:
-            with bots_lock:
-                for idx, bot in enumerate(bots):
-                    try:
-                        threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, quickmsg)).start()
-                    except Exception as e:
-                        print(f"Lỗi gửi tin nhắn: {e}")
-            msg_status = f"Đã gửi lệnh {quickmsg} thành công!"
-
-        if toggle:
-            auto_grab_enabled = toggle == "on"
-            msg_status = f"Tự grab Acc chính 1 {'đã bật' if auto_grab_enabled else 'đã tắt'}"
-
-        if toggle_2:
-            auto_grab_enabled_2 = toggle_2 == "on"
-            msg_status = f"Tự grab Acc chính 2 {'đã bật' if auto_grab_enabled_2 else 'đã tắt'}"
-
-        if toggle_3: # <-- THÊM MỚI
-            auto_grab_enabled_3 = toggle_3 == "on"
-            msg_status = f"Tự grab Acc chính 3 {'đã bật' if auto_grab_enabled_3 else 'đã tắt'}"
-
-        if heart_threshold_form:
-            try:
-                heart_threshold = int(heart_threshold_form)
-                msg_status = f"Đã cập nhật mức tim Acc chính 1: {heart_threshold}"
-            except:
-                msg_status = "Mức tim Acc chính 1 không hợp lệ!"
-
-        if heart_threshold_2_form:
-            try:
-                heart_threshold_2 = int(heart_threshold_2_form)
-                msg_status = f"Đã cập nhật mức tim Acc chính 2: {heart_threshold_2}"
-            except:
-                msg_status = "Mức tim Acc chính 2 không hợp lệ!"
-        
-        if heart_threshold_3_form: # <-- THÊM MỚI
-            try:
-                heart_threshold_3 = int(heart_threshold_3_form)
-                msg_status = f"Đã cập nhật mức tim Acc chính 3: {heart_threshold_3}"
-            except:
-                msg_status = "Mức tim Acc chính 3 không hợp lệ!"
-
-        if send_codes:
-            acc_index = request.form.get("acc_index")
-            delay = request.form.get("delay")
-            prefix = request.form.get("prefix")
-            codes = request.form.get("codes")
-
-            if acc_index and delay and codes:
+        # ++ TÍCH HỢP AUTO REBOOT: LOGIC XỬ LÝ ++
+        if "auto_reboot_toggle" in request.form or "auto_reboot_delay" in request.form:
+            if "auto_reboot_toggle" in request.form:
+                toggle_val = request.form.get("auto_reboot_toggle")
+                if toggle_val == "on":
+                    if not auto_reboot_enabled:
+                        auto_reboot_enabled = True
+                        auto_reboot_stop_event = threading.Event()
+                        auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True)
+                        auto_reboot_thread.start()
+                        msg_status = "Đã BẬT chế độ tự động reboot."
+                    else:
+                        msg_status = "Chế độ tự động reboot đã được bật từ trước."
+                elif toggle_val == "off":
+                    if auto_reboot_enabled and auto_reboot_stop_event:
+                        auto_reboot_enabled = False
+                        auto_reboot_stop_event.set()
+                        auto_reboot_thread = None
+                        msg_status = "Đã TẮT chế độ tự động reboot."
+                    else:
+                        msg_status = "Chế độ tự động reboot chưa được bật."
+            # Chỉ xử lý delay nếu nút toggle không được nhấn cùng lúc
+            if "auto_reboot_delay" in request.form and "auto_reboot_toggle" not in request.form:
                 try:
-                    acc_idx = int(acc_index)
-                    delay_val = float(delay)
-                    codes_list = codes.split(",")
-                    
-                    if acc_idx < len(bots):
-                         with bots_lock:
-                            for i, code in enumerate(codes_list):
-                                code = code.strip()
-                                if code:
-                                    final_msg = f"{prefix} {code}" if prefix else code
-                                    try:
-                                        threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
-                                    except Exception as e:
-                                        print(f"Lỗi gửi mã: {e}")
-                except Exception as e:
-                    print(f"Lỗi xử lý codes: {e}")
+                    delay_val = int(request.form.get("auto_reboot_delay"))
+                    if delay_val >= 60:
+                        auto_reboot_delay = delay_val
+                        msg_status = f"Đã cập nhật delay tự động reboot thành {auto_reboot_delay} giây."
+                    else:
+                        msg_status = "Lỗi: Delay phải lớn hơn hoặc bằng 60 giây."
+                except (ValueError, TypeError):
+                    msg_status = "Lỗi: Giá trị delay không hợp lệ."
+        # ++ KẾT THÚC TÍCH HỢP ++
+        else:
+            msg = request.form.get("message")
+            quickmsg = request.form.get("quickmsg")
+            toggle = request.form.get("toggle")
+            toggle_2 = request.form.get("toggle_2")
+            toggle_3 = request.form.get("toggle_3")
+            send_codes = request.form.get("send_codes")
+            spamtoggle = request.form.get("spamtoggle")
+            spammsg = request.form.get("spammsg", "")
+            spam_delay_form = request.form.get("spam_delay")
+            heart_threshold_form = request.form.get("heart_threshold")
+            heart_threshold_2_form = request.form.get("heart_threshold_2")
+            heart_threshold_3_form = request.form.get("heart_threshold_3")
+            auto_work_toggle = request.form.get("auto_work_toggle")
+            reboot_target = request.form.get("reboot_target")
 
-            msg_status = "Đã bắt đầu gửi mã!"
+            if msg:
+                with bots_lock:
+                    for idx, bot in enumerate(bots):
+                        try:
+                            threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
+                        except Exception as e:
+                            print(f"Lỗi gửi tin nhắn: {e}")
+                msg_status = "Đã gửi thủ công thành công!"
 
-        if spamtoggle:
-            spam_enabled = spamtoggle == "on"
-            spam_message = spammsg.strip()
-            msg_status = f"Spam {'đã bật' if spam_enabled else 'đã tắt'}"
+            if quickmsg:
+                with bots_lock:
+                    for idx, bot in enumerate(bots):
+                        try:
+                            threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, quickmsg)).start()
+                        except Exception as e:
+                            print(f"Lỗi gửi tin nhắn: {e}")
+                msg_status = f"Đã gửi lệnh {quickmsg} thành công!"
 
-        if spam_delay_form:
-            try:
-                spam_delay = int(spam_delay_form)
-                msg_status = f"Đã cập nhật thời gian spam: {spam_delay} giây"
-            except:
-                msg_status = "Thời gian spam không hợp lệ!"
+            if toggle:
+                auto_grab_enabled = toggle == "on"
+                msg_status = f"Tự grab Acc chính 1 {'đã bật' if auto_grab_enabled else 'đã tắt'}"
 
-        if auto_work_toggle:
-            auto_work_enabled = auto_work_toggle == "on"
-            msg_status = f"Auto Work {'đã bật' if auto_work_enabled else 'đã tắt'}"
-        
-        if reboot_target:
-            reboot_bot(reboot_target)
-            msg_status = f"Đã gửi yêu cầu khởi động lại cho {reboot_target}!"
+            if toggle_2:
+                auto_grab_enabled_2 = toggle_2 == "on"
+                msg_status = f"Tự grab Acc chính 2 {'đã bật' if auto_grab_enabled_2 else 'đã tắt'}"
+
+            if toggle_3:
+                auto_grab_enabled_3 = toggle_3 == "on"
+                msg_status = f"Tự grab Acc chính 3 {'đã bật' if auto_grab_enabled_3 else 'đã tắt'}"
+
+            if heart_threshold_form:
+                try:
+                    heart_threshold = int(heart_threshold_form)
+                    msg_status = f"Đã cập nhật mức tim Acc chính 1: {heart_threshold}"
+                except:
+                    msg_status = "Mức tim Acc chính 1 không hợp lệ!"
+
+            if heart_threshold_2_form:
+                try:
+                    heart_threshold_2 = int(heart_threshold_2_form)
+                    msg_status = f"Đã cập nhật mức tim Acc chính 2: {heart_threshold_2}"
+                except:
+                    msg_status = "Mức tim Acc chính 2 không hợp lệ!"
+            
+            if heart_threshold_3_form:
+                try:
+                    heart_threshold_3 = int(heart_threshold_3_form)
+                    msg_status = f"Đã cập nhật mức tim Acc chính 3: {heart_threshold_3}"
+                except:
+                    msg_status = "Mức tim Acc chính 3 không hợp lệ!"
+
+            if send_codes:
+                acc_index = request.form.get("acc_index")
+                delay = request.form.get("delay")
+                prefix = request.form.get("prefix")
+                codes = request.form.get("codes")
+
+                if acc_index and delay and codes:
+                    try:
+                        acc_idx = int(acc_index)
+                        delay_val = float(delay)
+                        codes_list = codes.split(",")
+                        
+                        if acc_idx < len(bots):
+                             with bots_lock:
+                                for i, code in enumerate(codes_list):
+                                    code = code.strip()
+                                    if code:
+                                        final_msg = f"{prefix} {code}" if prefix else code
+                                        try:
+                                            threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
+                                        except Exception as e:
+                                            print(f"Lỗi gửi mã: {e}")
+                    except Exception as e:
+                        print(f"Lỗi xử lý codes: {e}")
+
+                msg_status = "Đã bắt đầu gửi mã!"
+
+            if spamtoggle:
+                spam_enabled = spamtoggle == "on"
+                spam_message = spammsg.strip()
+                msg_status = f"Spam {'đã bật' if spam_enabled else 'đã tắt'}"
+
+            if spam_delay_form:
+                try:
+                    spam_delay = int(spam_delay_form)
+                    msg_status = f"Đã cập nhật thời gian spam: {spam_delay} giây"
+                except:
+                    msg_status = "Thời gian spam không hợp lệ!"
+
+            if auto_work_toggle:
+                auto_work_enabled = auto_work_toggle == "on"
+                msg_status = f"Auto Work {'đã bật' if auto_work_enabled else 'đã tắt'}"
+            
+            if reboot_target:
+                reboot_bot(reboot_target)
+                msg_status = f"Đã gửi yêu cầu khởi động lại cho {reboot_target}!"
 
     if msg_status:
         alert_section = f'<div class="row"><div class="col-12"><div class="alert alert-success">{msg_status}</div></div></div>'
@@ -1104,14 +1205,20 @@ def index():
     auto_grab_status_2 = "status-active" if auto_grab_enabled_2 else "status-inactive"
     auto_grab_text_2 = "Đang bật" if auto_grab_enabled_2 else "Đang tắt"
 
-    auto_grab_status_3 = "status-active" if auto_grab_enabled_3 else "status-inactive" # <-- THÊM MỚI
-    auto_grab_text_3 = "Đang bật" if auto_grab_enabled_3 else "Đang tắt" # <-- THÊM MỚI
+    auto_grab_status_3 = "status-active" if auto_grab_enabled_3 else "status-inactive"
+    auto_grab_text_3 = "Đang bật" if auto_grab_enabled_3 else "Đang tắt"
     
     spam_status = "status-active" if spam_enabled else "status-inactive"
     spam_text = "Đang bật" if spam_enabled else "Đang tắt"
 
     auto_work_status = "status-active" if auto_work_enabled else "status-inactive"
     auto_work_text = "Đang bật" if auto_work_enabled else "Đang tắt"
+
+    # ++ TÍCH HỢP AUTO REBOOT: BIẾN GỬI TỚI HTML ++
+    auto_reboot_status = "status-active" if auto_reboot_enabled else "status-inactive"
+    auto_reboot_text = "Đang bật" if auto_reboot_enabled else "Đang tắt"
+    # ++ KẾT THÚC TÍCH HỢP ++
+
 
     acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names))
     
@@ -1120,7 +1227,7 @@ def index():
         reboot_options += '<option value="main_1">Acc Chính 1</option>'
     if main_bot_2:
         reboot_options += '<option value="main_2">Acc Chính 2</option>'
-    if main_bot_3: # <-- THÊM MỚI
+    if main_bot_3:
         reboot_options += '<option value="main_3">Acc Chính 3</option>'
     for i, name in enumerate(acc_names):
         reboot_options += f'<option value="sub_{i}">Acc Phụ {i+1} ({name})</option>'
@@ -1131,19 +1238,24 @@ def index():
         auto_grab_text=auto_grab_text,
         auto_grab_status_2=auto_grab_status_2,
         auto_grab_text_2=auto_grab_text_2,
-        auto_grab_status_3=auto_grab_status_3, # <-- THÊM MỚI
-        auto_grab_text_3=auto_grab_text_3, # <-- THÊM MỚI
+        auto_grab_status_3=auto_grab_status_3,
+        auto_grab_text_3=auto_grab_text_3,
         spam_status=spam_status,
         spam_text=spam_text,
         auto_work_status=auto_work_status,
         auto_work_text=auto_work_text,
         heart_threshold=heart_threshold,
         heart_threshold_2=heart_threshold_2,
-        heart_threshold_3=heart_threshold_3, # <-- THÊM MỚI
+        heart_threshold_3=heart_threshold_3,
         spam_message=spam_message,
         spam_delay=spam_delay,
         acc_options=acc_options,
-        reboot_options=reboot_options
+        reboot_options=reboot_options,
+        # ++ TÍCH HỢP AUTO REBOOT: TRUYỀN BIẾN ++
+        auto_reboot_status=auto_reboot_status,
+        auto_reboot_text=auto_reboot_text,
+        auto_reboot_delay=auto_reboot_delay
+        # ++ KẾT THÚC TÍCH HỢP ++
     ))
 
 def spam_loop():
@@ -1177,7 +1289,7 @@ if __name__ == "__main__":
             main_bot = create_bot(main_token, is_main=True)
         if main_token_2:
             main_bot_2 = create_bot(main_token_2, is_main_2=True)
-        if main_token_3: # <-- THÊM MỚI
+        if main_token_3:
             main_bot_3 = create_bot(main_token_3, is_main_3=True)
 
         for token in tokens:
