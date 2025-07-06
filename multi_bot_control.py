@@ -589,7 +589,7 @@ HTML_TEMPLATE = """
         <div class="flash-messages"><div class="flash-message success"><i class="fas fa-check-circle"></i> {{ msg_status }}</div></div>
         {{% endif %}}
         <div class="control-grid">
-            <div class="control-panel">
+            <div class="control-panel" id="override-panel">
                 <div class="panel-header"><i class="fas fa-terminal"></i><span>MANUAL OPERATIONS</span></div>
                 <div class="panel-content"
                     <form method="POST" class="spam-form">
