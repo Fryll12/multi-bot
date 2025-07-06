@@ -394,327 +394,148 @@ HTML = """
     <title>Karuta Deep</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        /* Global Styles */
-        * {{
-            box-sizing: border-box;
-        }}
-
-        body {{
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #ffffff;
-            margin: 0;
-            padding: 20px 0;
-        }}
-
-        /* Header Styles */
-        .header-section {{
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }}
-
-        .header-section h1 {{
-            font-size: 2.5rem;
-            font-weight: 700;
-            background: linear-gradient(45deg, #00d4ff, #ff9500);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-        }}
-
-        .header-section p {{
-            font-size: 1.1rem;
-            color: #b0b0b0;
-            margin-bottom: 0;
-        }}
-
-        /* Control Card Styles */
-        .control-card {{
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            transition: all 0.3s ease;
-            overflow: hidden;
-            margin-bottom: 2rem;
-        }}
-
-        .control-card:hover {{
-            transform: translateY(-5px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-            border-color: rgba(0, 212, 255, 0.3);
-        }}
-
-        .control-card .card-header {{
-            background: linear-gradient(45deg, rgba(0, 212, 255, 0.2), rgba(255, 149, 0, 0.2));
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 1.5rem;
-            border-radius: 20px 20px 0 0;
-        }}
-
-        .control-card .card-header h5 {{
-            color: #ffffff;
-            font-weight: 600;
-            margin: 0;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-        }}
-
-        .control-card .card-body {{
-            padding: 1.5rem;
-        }}
-
-        /* Form Styles */
-        .form-control {{
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            color: #ffffff;
-            padding: 12px 16px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }}
-
-        .form-control:focus {{
-            background: rgba(255, 255, 255, 0.15);
-            border-color: #00d4ff;
-            box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.25);
-            color: #ffffff;
-        }}
-
-        .form-control::placeholder {{
-            color: #b0b0b0;
-        }}
-
-        .form-select {{
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            color: #ffffff;
-            padding: 12px 16px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }}
-
-        .form-select:focus {{
-            background: rgba(255, 255, 255, 0.15);
-            border-color: #00d4ff;
-            box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.25);
-            color: #ffffff;
-        }}
-
-        .form-select option {{
-            background: #1a1a2e;
-            color: #ffffff;
-        }}
-
-        .form-label {{
-            color: #ffffff;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-        }}
-
-        .input-group-text {{
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #ffffff;
-            border-radius: 12px 0 0 12px;
-        }}
-
-        /* Button Styles */
-        .btn {{
-            border-radius: 12px;
-            padding: 12px 24px;
-            font-weight: 500;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border: none;
-            position: relative;
-            overflow: hidden;
-        }}
-
-        .btn::before {{
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s ease;
-        }}
-
-        .btn:hover::before {{
-            left: 100%;
-        }}
-
-        .btn-primary {{
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
-        }}
-
-        .btn-primary:hover {{
-            background: linear-gradient(45deg, #0099cc, #00d4ff);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 212, 255, 0.6);
-        }}
-        
-        .btn-warning {{
-            background: linear-gradient(45deg, #ffc107, #ff9800);
-            color: #1a1a2e;
-            box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
-        }}
-
-        .btn-warning:hover {{
-            background: linear-gradient(45deg, #ff9800, #ffc107);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 193, 7, 0.6);
-        }}
-
-        .btn-success {{
-            background: linear-gradient(45deg, #28a745, #20c997);
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
-        }}
-
-        .btn-success:hover {{
-            background: linear-gradient(45deg, #20c997, #28a745);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
-        }}
-
-        .btn-danger {{
-            background: linear-gradient(45deg, #dc3545, #e83e8c);
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(220, 53, 69, 0.4);
-        }}
-
-        .btn-danger:hover {{
-            background: linear-gradient(45deg, #e83e8c, #dc3545);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.6);
-        }}
-
-        /* Status Indicators */
-        .status-indicator {{
-            display: flex;
-            align-items: center;
-            margin-bottom: 1rem;
-        }}
-
-        .status-badge {{
-            display: inline-flex;
-            align-items: center;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            transition: all 0.3s ease;
-        }}
-
-        .status-active {{
-            background: linear-gradient(45deg, #28a745, #20c997);
-            color: #ffffff;
-            box-shadow: 0 0 20px rgba(40, 167, 69, 0.3);
-        }}
-
-        .status-inactive {{
-            background: linear-gradient(45deg, #dc3545, #e83e8c);
-            color: #ffffff;
-            box-shadow: 0 0 20px rgba(220, 53, 69, 0.3);
-        }}
-
-        /* Alert Styles */
-        .alert {{
-            background: rgba(40, 167, 69, 0.2);
-            border: 1px solid rgba(40, 167, 69, 0.3);
-            border-radius: 12px;
-            color: #ffffff;
-            backdrop-filter: blur(10px);
-            margin-bottom: 1rem;
-        }}
-
-        .alert-success {{
-            background: rgba(40, 167, 69, 0.2);
-            border-color: rgba(40, 167, 69, 0.3);
-        }}
-
-        /* Animation */
-        @keyframes fadeInUp {{
-            from {{
-                opacity: 0;
-                transform: translateY(30px);
-            }}
-            to {{
-                opacity: 1;
-                transform: translateY(0);
-            }}
-        }}
-
-        .control-card {{
-            animation: fadeInUp 0.6s ease-out;
-        }}
-
-        .quick-commands {{
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }}
-
-        .quick-commands h6 {{
-            color: #ffffff;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }}
-
-        .heart-threshold {{
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }}
-
-        .heart-threshold h6 {{
-            color: #ffffff;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }}
-
-        /* Responsive Design */
-        @media (max-width: 768px) {{
-            .header-section {{
-                padding: 1.5rem;
-                margin-bottom: 1.5rem;
-            }}
-            
-            .header-section h1 {{
-                font-size: 2rem;
-            }}
-            
-            .control-card .card-header,
-            .control-card .card-body {{
-                padding: 1rem;
-            }}
-            
-            .btn {{
-                padding: 10px 20px;
-                font-size: 0.9rem;
-            }}
-        }}
-    </style>
+<style>
+    body {
+        background: #101015;
+        min-height: 100vh;
+        color: #eeeeee;
+        font-family: 'JetBrains Mono', 'Roboto Mono', 'Consolas', monospace;
+        letter-spacing: 0.5px;
+        background-image: url('https://www.transparenttextures.com/patterns/asfalt-dark.png'), linear-gradient(120deg, #0a0a0f 60%, #1d1a20 100%);
+    }
+    .header-section {
+        background: rgba(30, 7, 19, 0.93);
+        border-radius: 18px;
+        border: 1.5px solid #370017;
+        box-shadow: 0 0 10px #17000d, 0 0 40px #0a0a0f;
+        margin-bottom: 2rem;
+    }
+    .header-section h1 {
+        color: #b30000;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 2.3rem;
+        text-shadow: 0 0 10px #2d0404, 0 0 30px #c20000a1;
+        letter-spacing: 1px;
+    }
+    .header-section p {
+        color: #9d597a;
+        font-size: 1.09rem;
+    }
+    .control-card {
+        background: rgba(19, 13, 19, 0.96);
+        border: 1.2px solid #2d0a1a;
+        border-radius: 14px;
+        box-shadow: 0 0 10px #25061a73, 0 4px 40px #0002;
+        margin-bottom: 2rem;
+        transition: border 0.3s, box-shadow 0.3s;
+    }
+    .control-card:hover {
+        border-color: #b30000;
+        box-shadow: 0 0 24px #b3000011, 0 0 60px #1e1e1e;
+    }
+    .card-header {
+        background: linear-gradient(90deg, #0e0010c0 70%, #180014c0 100%);
+        border-bottom: 1px solid #1a0010;
+        border-radius: 14px 14px 0 0;
+        padding: 1.1rem 1.2rem;
+    }
+    .card-header h5 {
+        color: #e20027;
+        font-weight: 700;
+        text-shadow: 0 2px 8px #4e001a1c;
+    }
+    .card-body {
+        padding: 1.2rem;
+    }
+    .form-control, .form-select {
+        background: #18151c;
+        border: 1px solid #2e0d19;
+        color: #fff;
+        border-radius: 7px;
+        font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+    }
+    .form-control:focus, .form-select:focus {
+        background: #1f1a25;
+        border-color: #b30000;
+        color: #fff;
+        box-shadow: 0 0 2px #b30000;
+    }
+    .btn {
+        border-radius: 7px;
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 500;
+        letter-spacing: 1px;
+        border: none;
+        box-shadow: 0 2px 8px #0002;
+        transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+    }
+    .btn-primary {
+        background: linear-gradient(90deg, #b30000 65%, #73003e 100%);
+        color: #fff;
+    }
+    .btn-success {
+        background: linear-gradient(90deg, #1c7d41 70%, #11632b 100%);
+        color: #fff;
+    }
+    .btn-danger {
+        background: linear-gradient(90deg, #370017 70%, #b30000 100%);
+        color: #fff;
+    }
+    .btn-warning {
+        background: linear-gradient(90deg, #7c2b00 70%, #dd8d00 100%);
+        color: #fff;
+    }
+    .btn:hover, .btn:focus {
+        filter: brightness(1.09) contrast(1.1);
+        box-shadow: 0 0 6px #b30000;
+        color: #fff;
+    }
+    .status-badge {
+        border-radius: 999px;
+        padding: 7px 17px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        letter-spacing: 1px;
+        background: #212;
+        color: #e20027;
+        box-shadow: 0 0 10px #2d0015;
+        border: 1px solid #8a0035;
+    }
+    .status-active {
+        background: linear-gradient(90deg, #1a222a 80%, #232 100%);
+        color: #36f336;
+        border-color: #36f33655;
+        box-shadow: 0 0 8px #0f4d1a7a;
+    }
+    .status-inactive {
+        background: linear-gradient(90deg, #2d0017 80%, #1a0010 100%);
+        color: #b30000;
+        border-color: #b3000050;
+        box-shadow: 0 0 8px #b3000088;
+    }
+    .alert {
+        background: #2d0017;
+        color: #fff;
+        border: 1px solid #b30000bb;
+        border-radius: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 1rem;
+    }
+    /* Scrollbar custom */
+    ::-webkit-scrollbar {
+      width: 8px;
+      background: #17000d;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2d0017;
+      border-radius: 4px;
+    }
+    /* Responsive */
+    @media (max-width: 768px) {
+        .header-section { padding: 1rem; }
+        .card-header, .card-body { padding: 1rem;}
+    }
+</style>
 </head>
 <body>
     <div class="container-fluid">
