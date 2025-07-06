@@ -683,7 +683,7 @@ HTML_TEMPLATE = """
              <div class="control-panel">
                 <div class="panel-header"><i class="fas fa-power-off"></i><span>MANUAL OVERRIDE</span></div>
                 <div class="panel-content">
-                    <div class="reboot-grid">
+                    <div class="reboot-grid" style="display: flex; gap: 20px; align-items: flex-start;">
                         <div class="reboot-section"><h4>EMERGENCY CONTROLS</h4>
                             <form method="POST" style="display: inline-block;"><button type="submit" name="reboot_target" value="all" class="btn-cyber btn-danger"><i class="fas fa-bomb"></i> REBOOT ALL SYSTEMS</button></form>
                         </div>
