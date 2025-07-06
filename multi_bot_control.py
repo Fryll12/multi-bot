@@ -217,7 +217,6 @@ def create_bot(token, is_main=False, is_main_2=False):
                                         else:
                                             max_index = heart_numbers.index(max_num)
                                             emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
-                                            # Thêm 0.3 giây delay cho acc chính 2
                                             delay = {"1️⃣": 0.8, "2️⃣": 1.8, "3️⃣": 2.5}[emoji]
                                             print(f"[Bot 2] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
 
@@ -382,12 +381,7 @@ def auto_work_loop():
 
 app = Flask(__name__)
 
-# --- TOÀN BỘ MÃ HTML ĐƯỢC NHÚNG VÀO ĐÂY ---
-HTML = """
-# multi_bot_control_fixed.py
-# ... (các import, hàm python giữ nguyên như file của bạn) ...
-
-# --- TOÀN BỘ MÃ HTML ĐƯỢC NHÚNG VÀO ĐÂY ---
+# --- HTML Giao diện deep web đã fix lỗi KeyError ---
 HTML = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -551,13 +545,330 @@ HTML = """
     </style>
 </head>
 <body>
-    <!-- (Phần HTML bên dưới giữ nguyên như file bạn gửi) -->
-    ...
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="header-section">
+                    <h1>DEEP WEB BOT CONTROL</h1>
+                    <p class="text-center">Quản lý bot Discord phong cách deep web</p>
+                </div>
+            </div>
+        </div>
+        {alert_section}
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5>
+                            <i class="fas fa-paper-plane me-2"></i>
+                            Điều khiển bot nhắn tin
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" class="mb-4">
+                            <div class="input-group">
+                                <input type="text" 
+                                       class="form-control" 
+                                       name="message" 
+                                       placeholder="Nhập nội dung tin nhắn...">
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-send me-1"></i>Gửi thủ công
+                                </button>
+                            </div>
+                        </form>
+                        <div class="quick-commands">
+                            <h6 class="mb-3" style="color:#00ff41;text-shadow:0 0 8px #14fdce;">Menu nhanh</h6>
+                            <form method="POST">
+                                <div class="input-group">
+                                    <select name="quickmsg" class="form-select">
+                                        <option value="kc o:w">kc o:w</option>
+                                        <option value="kc o:ef">kc o:ef</option>
+                                        <option value="kc o:p">kc o:p</option>
+                                        <option value="kc e:1">kc e:1</option>
+                                        <option value="kc e:2">kc e:2</option>
+                                        <option value="kc e:3">kc e:3</option>
+                                        <option value="kc e:4">kc e:4</option>
+                                        <option value="kc e:5">kc e:5</option>
+                                        <option value="kc e:6">kc e:6</option>
+                                        <option value="kc e:7">kc e:7</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-bolt me-1"></i>Gửi
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5>
+                            <i class="fas fa-briefcase me-2"></i>
+                            Auto Work
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-indicator mb-3">
+                            <span class="status-badge {auto_work_status}">
+                                <i class="fas fa-circle me-1"></i>
+                                {auto_work_text}
+                            </span>
+                        </div>
+                        <form method="POST" class="mb-4">
+                            <div class="btn-group w-100" role="group">
+                                <button name="auto_work_toggle" value="on" type="submit" class="btn btn-success">
+                                    <i class="fas fa-play me-1"></i>Bật
+                                </button>
+                                <button name="auto_work_toggle" value="off" type="submit" class="btn btn-danger">
+                                    <i class="fas fa-stop me-1"></i>Tắt
+                                </button>
+                            </div>
+                        </form>
+                        <div class="mt-2">
+                            <small style="color:#00ff41">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Tự động làm việc cho tất cả account
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5>
+                            <i class="fas fa-magic me-2"></i>
+                            Auto Grab - Acc Chính 1
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-indicator mb-3">
+                            <span class="status-badge {auto_grab_status}">
+                                <i class="fas fa-circle me-1"></i>
+                                {auto_grab_text}
+                            </span>
+                        </div>
+                        <form method="POST" class="mb-4">
+                            <div class="btn-group w-100" role="group">
+                                <button name="toggle" value="on" type="submit" class="btn btn-success">
+                                    <i class="fas fa-play me-1"></i>Bật
+                                </button>
+                                <button name="toggle" value="off" type="submit" class="btn btn-danger">
+                                    <i class="fas fa-stop me-1"></i>Tắt
+                                </button>
+                            </div>
+                        </form>
+                        <div class="heart-threshold">
+                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim tiêu chuẩn</h6>
+                            <form method="POST">
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-heart text-danger"></i>
+                                    </span>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           name="heart_threshold" 
+                                           value="{heart_threshold}" 
+                                           min="0"
+                                           placeholder="Mức tim">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>Cập nhật
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5>
+                            <i class="fas fa-magic me-2"></i>
+                            Auto Grab - Acc Chính 2
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-indicator mb-3">
+                            <span class="status-badge {auto_grab_status_2}">
+                                <i class="fas fa-circle me-1"></i>
+                                {auto_grab_text_2}
+                            </span>
+                        </div>
+                        <form method="POST" class="mb-4">
+                            <div class="btn-group w-100" role="group">
+                                <button name="toggle_2" value="on" type="submit" class="btn btn-success">
+                                    <i class="fas fa-play me-1"></i>Bật
+                                </button>
+                                <button name="toggle_2" value="off" type="submit" class="btn btn-danger">
+                                    <i class="fas fa-stop me-1"></i>Tắt
+                                </button>
+                            </div>
+                        </form>
+                        <div class="heart-threshold">
+                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim tiêu chuẩn</h6>
+                            <form method="POST">
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-heart text-danger"></i>
+                                    </span>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           name="heart_threshold_2" 
+                                           value="{heart_threshold_2}" 
+                                           min="0"
+                                           placeholder="Mức tim">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>Cập nhật
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="mt-2">
+                            <small style="color:#14fdce">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Delay grab chậm hơn 0.3s so với Acc chính 1
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5>
+                            <i class="fas fa-code me-2"></i>
+                            Gửi danh sách mã theo acc chọn
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Chọn acc:</label>
+                                    <select name="acc_index" class="form-select">
+                                        {acc_options}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Thời gian cách nhau (giây):</label>
+                                    <input type="number" 
+                                           step="0.1" 
+                                           name="delay" 
+                                           class="form-control" 
+                                           value="11" 
+                                           placeholder="11">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Nội dung mẫu:</label>
+                                    <input type="text" 
+                                           name="prefix" 
+                                           class="form-control" 
+                                           placeholder="vd: kt n">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Danh sách mã:</label>
+                                    <textarea name="codes" 
+                                              class="form-control" 
+                                              rows="4" 
+                                              placeholder="Danh sách mã, cách nhau dấu phẩy"></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" name="send_codes" value="1" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-paper-plane me-2"></i>Gửi danh sách mã
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5>
+                            <i class="fas fa-repeat me-2"></i>
+                            Spam Control
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-indicator mb-3">
+                            <span class="status-badge {spam_status}">
+                                <i class="fas fa-circle me-1"></i>
+                                {spam_text}
+                            </span>
+                        </div>
+                        <form method="POST">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Nội dung spam:</label>
+                                    <input type="text" 
+                                           name="spammsg" 
+                                           class="form-control" 
+                                           placeholder="Nội dung spam" 
+                                           value="{spam_message}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Thời gian lặp (giây):</label>
+                                    <input type="number" 
+                                           name="spam_delay" 
+                                           class="form-control" 
+                                           value="{spam_delay}" 
+                                           min="1"
+                                           placeholder="10">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Điều khiển:</label>
+                                    <div class="btn-group w-100" role="group">
+                                        <button name="spamtoggle" value="on" type="submit" class="btn btn-success">
+                                            <i class="fas fa-play me-1"></i>Bật
+                                        </button>
+                                        <button name="spamtoggle" value="off" type="submit" class="btn btn-danger">
+                                            <i class="fas fa-stop me-1"></i>Tắt
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5>
+                            <i class="fas fa-sync-alt me-2"></i>
+                            Khởi động lại Bot (Reboot)
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST">
+                            <div class="input-group">
+                                <select name="reboot_target" class="form-select">
+                                    {reboot_options}
+                                </select>
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="fas fa-power-off me-1"></i>Reboot Bot
+                                </button>
+                            </div>
+                        </form>
+                        <div class="mt-2">
+                            <small style="color:#14fdce">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Dùng khi một bot bị "đơ" hoặc không hoạt động đúng.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
 """
-
-# ... (phần backend Flask, Python logic giữ nguyên như cũ) ...
 
 @app.route("/", methods=["GET", "POST"])
 def index():
