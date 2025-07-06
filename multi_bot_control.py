@@ -1,3 +1,4 @@
+# multi_bot_control_full.py
 import discum
 import threading
 import time
@@ -380,7 +381,7 @@ def auto_work_loop():
 
 app = Flask(__name__)
 
-# ---- FULL HTML ĐÃ ĐƯỢC CẬP NHẬT ----
+# --- HTML Giao diện deep web đã fix lỗi KeyError ---
 HTML = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -392,146 +393,155 @@ HTML = """
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@800&display=swap" rel="stylesheet">
     <style>
-        body {
-          background: #111827;
-          color: #d1d5db;
-          font-family: 'Orbitron', 'JetBrains Mono', 'Roboto Mono', monospace;
-          min-height: 100vh;
-          letter-spacing: 1px;
-        }
-        .container-fluid { margin-top: 24px; }
-        .header-section {
-          background: transparent;
-          border: none;
-          margin-bottom: 1.7rem;
-          text-align: center;
-        }
-        .header-section h1 {
-          font-family: 'Orbitron', monospace;
-          font-size: 2.5rem;
-          color: #22c55e;
-          text-shadow: 0 0 10px #22c55ea2;
-          letter-spacing: 2.5px;
-          margin-bottom: 0;
-        }
-        .header-section p { color: #a0aec0; font-size: 1.1rem; }
-        .control-card {
-          background: #1f2937;
-          border: 2px solid #374151;
-          border-radius: 14px;
-          box-shadow: 0 0 12px #0008;
-          margin-bottom: 1.8rem;
-          position: relative;
-          z-index: 1;
-        }
-        .control-card .card-header {
-          background: transparent;
-          border-bottom: none;
-          padding: 1rem 1rem 0.5rem 1rem;
-          border-radius: 14px 14px 0 0;
-        }
-        .control-card .card-header h5 {
-          font-family: 'Orbitron', monospace;
-          color: #22c55e;
-          font-size: 1.2rem;
-          margin: 0;
-          letter-spacing: 1.5px;
-        }
-        .control-card .card-body {
-          padding: 1rem 1rem 1.1rem 1rem;
-        }
-        .form-control, .form-select, textarea {
-          background: #111827;
-          border: 1.2px solid #374151;
-          color: #d1d5db;
-          border-radius: 8px;
-          font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
-          font-size: 1rem;
-          margin-bottom: 0.4rem;
-        }
-        .form-control:focus, .form-select:focus, textarea:focus {
-          background: #1f2937;
-          border-color: #22c55e;
-          color: #fff;
-          box-shadow: 0 0 3px #22c55e99;
-        }
-        .btn {
-          border-radius: 8px;
-          font-family: 'Orbitron', monospace;
-          font-weight: 600;
-          letter-spacing: 1.5px;
-          border: none;
-          box-shadow: 0 0 7px #37415122;
-          transition: background 0.2s, box-shadow 0.2s, color 0.2s;
-          text-transform: uppercase;
-        }
-        .btn-primary {
-          background: linear-gradient(90deg, #22c55e 70%, #16a34a 100%);
-          color: #fff;
-          box-shadow: 0 0 8px #22c55e44;
-        }
-        .btn-success {
-          background: #22c55e;
-          color: #fff;
-        }
-        .btn-danger {
-          background: #ef4444;
-          color: #fff;
-        }
-        .btn-warning {
-          background: #eab308;
-          color: #222;
-        }
-        .btn-blue {
-          background: #3b82f6;
-          color: #fff;
-        }
-        .btn:hover, .btn:focus {
-          filter: brightness(1.1) contrast(1.1);
-          box-shadow: 0 0 12px #22c55e55;
-          color: #fff;
-        }
-        .status-badge {
-          border-radius: 999px;
-          padding: 7px 17px;
-          font-size: 0.95rem;
-          font-family: 'Orbitron', monospace;
-          background: #111827;
-          color: #eab308;
-          border: 1.2px solid #374151;
-        }
-        .status-active {
-          background: #1f2937;
-          color: #22c55e;
-          border-color: #22c55e99;
-        }
-        .status-inactive {
-          background: #1f2937;
-          color: #ef4444;
-          border-color: #ef4444bb;
-        }
-        .alert {
-          background: #1f2937;
-          color: #22c55e;
-          border: 1.2px solid #374151;
-          border-radius: 9px;
-          font-family: 'JetBrains Mono', monospace;
-          font-size: 1rem;
-          box-shadow: 0 0 8px #37415133;
-          margin-bottom: 1rem;
-        }
-        ::-webkit-scrollbar {
-          width: 10px;
-          background: #111827;
-        }
-        ::-webkit-scrollbar-thumb {
-          background: #374151;
-          border-radius: 8px;
-        }
-        @media (max-width: 900px) {
-          .header-section h1 { font-size: 1.5rem; }
-          .control-card { margin-bottom: 1rem; }
-        }
+        body {{
+            background: #090a11 url('https://www.transparenttextures.com/patterns/asfalt-dark.png');
+            color: #c6f2ff;
+            font-family: 'Orbitron', 'JetBrains Mono', 'Roboto Mono', monospace;
+            min-height: 100vh;
+            letter-spacing: 1px;
+        }}
+        .container-fluid {{
+            margin-top: 24px;
+        }}
+        .header-section {{
+            background: transparent;
+            border: none;
+            margin-bottom: 1.7rem;
+            text-align: center;
+        }}
+        .header-section h1 {{
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            color: #14fdce;
+            text-shadow: 0 0 5px #14fdce, 0 0 20px #14fdce;
+            letter-spacing: 2.5px;
+            margin-bottom: 0;
+        }}
+        .header-section p {{
+            color: #fafff0;
+            font-size: 1.07rem;
+            text-shadow: 0 0 2px #14fdce;
+        }}
+        .control-card {{
+            background: rgba(20, 20, 20, 0.98);
+            border: 2px solid #00ff41;
+            border-radius: 12px;
+            box-shadow: 0 0 16px #14fdce44;
+            margin-bottom: 1.8rem;
+            position: relative;
+            z-index: 1;
+        }}
+        .control-card .card-header {{
+            background: transparent;
+            border-bottom: none;
+            padding: 1rem 1rem 0.5rem 1rem;
+            border-radius: 12px 12px 0 0;
+        }}
+        .control-card .card-header h5 {{
+            font-family: 'Orbitron', monospace;
+            color: #14fdce;
+            text-shadow: 0 0 12px #14fdce, 0 0 2px #fff;
+            font-size: 1.2rem;
+            margin: 0;
+            letter-spacing: 1.5px;
+        }}
+        .control-card .card-body {{
+            padding: 1rem 1rem 1.1rem 1rem;
+        }}
+        .form-control, .form-select, textarea {{
+            background: #030d10;
+            border: 1.5px solid #14fdce;
+            color: #fff;
+            border-radius: 7px;
+            font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+            font-size: 1rem;
+            margin-bottom: 0.4rem;
+        }}
+        .form-control:focus, .form-select:focus, textarea:focus {{
+            background: #050a0b;
+            border-color: #00ff41;
+            color: #fff;
+            box-shadow: 0 0 2px #00ff41;
+        }}
+        .btn {{
+            border-radius: 7px;
+            font-family: 'Orbitron', monospace;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            border: none;
+            box-shadow: 0 0 8px #14fdce44;
+            transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+            text-transform: uppercase;
+        }}
+        .btn-primary {{
+            background: linear-gradient(90deg, #14fdce 30%, #00ff41 100%);
+            color: #111;
+            box-shadow: 0 0 10px #14fdce;
+        }}
+        .btn-success {{
+            background: linear-gradient(90deg, #00ff41 60%, #14fdce 100%);
+            color: #111;
+            box-shadow: 0 0 8px #00ff41;
+        }}
+        .btn-danger {{
+            background: linear-gradient(90deg, #ff2770 80%, #ff2770 100%);
+            color: #fff;
+            box-shadow: 0 0 8px #ff2770;
+        }}
+        .btn-warning {{
+            background: linear-gradient(90deg, #e9f500 80%, #ff2770 100%);
+            color: #111;
+            box-shadow: 0 0 8px #e9f500;
+        }}
+        .btn:hover, .btn:focus {{
+            filter: brightness(1.2) contrast(1.08);
+            box-shadow: 0 0 14px #14fdce, 0 0 12px #00ff41;
+            color: #fff;
+        }}
+        .status-badge {{
+            border-radius: 999px;
+            padding: 7px 17px;
+            font-size: 0.95rem;
+            font-family: 'Orbitron', monospace;
+            background: #111;
+            color: #ff2770;
+            box-shadow: 0 0 10px #ff2770;
+            border: 1px solid #ff2770;
+        }}
+        .status-active {{
+            background: #111;
+            color: #00ff41;
+            border-color: #00ff41;
+            text-shadow: 0 0 6px #00ff41;
+        }}
+        .status-inactive {{
+            background: #111;
+            color: #ff2770;
+            border-color: #ff2770;
+            text-shadow: 0 0 6px #ff2770;
+        }}
+        .alert {{
+            background: #0a0a0f;
+            color: #00ff41;
+            border: 1.5px solid #14fdce;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            box-shadow: 0 0 10px #14fdce;
+            margin-bottom: 1rem;
+        }}
+        ::-webkit-scrollbar {{
+            width: 10px;
+            background: #090a11;
+        }}
+        ::-webkit-scrollbar-thumb {{
+            background: #00ff4166;
+            border-radius: 8px;
+        }}
+        @media (max-width: 900px) {{
+            .header-section h1 {{ font-size: 1.5rem; }}
+            .control-card {{ margin-bottom: 1rem; }}
+        }}
     </style>
 </head>
 <body>
@@ -544,12 +554,15 @@ HTML = """
                 </div>
             </div>
         </div>
-        {{ alert_section|safe }}
+        {alert_section}
         <div class="row g-4">
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5>Điều khiển bot nhắn tin</h5>
+                        <h5>
+                            <i class="fas fa-paper-plane me-2"></i>
+                            Điều khiển bot nhắn tin
+                        </h5>
                     </div>
                     <div class="card-body">
                         <form method="POST" class="mb-4">
@@ -564,7 +577,7 @@ HTML = """
                             </div>
                         </form>
                         <div class="quick-commands">
-                            <h6 class="mb-3" style="color:#22c55e;">Menu nhanh</h6>
+                            <h6 class="mb-3" style="color:#00ff41;text-shadow:0 0 8px #14fdce;">Menu nhanh</h6>
                             <form method="POST">
                                 <div class="input-group">
                                     <select name="quickmsg" class="form-select">
@@ -591,13 +604,16 @@ HTML = """
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5>Auto Work</h5>
+                        <h5>
+                            <i class="fas fa-briefcase me-2"></i>
+                            Auto Work
+                        </h5>
                     </div>
                     <div class="card-body">
                         <div class="status-indicator mb-3">
-                            <span class="status-badge {{ auto_work_status }}">
+                            <span class="status-badge {auto_work_status}">
                                 <i class="fas fa-circle me-1"></i>
-                                {{ auto_work_text }}
+                                {auto_work_text}
                             </span>
                         </div>
                         <form method="POST" class="mb-4">
@@ -611,7 +627,7 @@ HTML = """
                             </div>
                         </form>
                         <div class="mt-2">
-                            <small style="color:#22c55e">
+                            <small style="color:#00ff41">
                                 <i class="fas fa-info-circle me-1"></i>
                                 Tự động làm việc cho tất cả account
                             </small>
@@ -622,13 +638,16 @@ HTML = """
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5>Auto Grab - Acc Chính 1</h5>
+                        <h5>
+                            <i class="fas fa-magic me-2"></i>
+                            Auto Grab - Acc Chính 1
+                        </h5>
                     </div>
                     <div class="card-body">
                         <div class="status-indicator mb-3">
-                            <span class="status-badge {{ auto_grab_status }}">
+                            <span class="status-badge {auto_grab_status}">
                                 <i class="fas fa-circle me-1"></i>
-                                {{ auto_grab_text }}
+                                {auto_grab_text}
                             </span>
                         </div>
                         <form method="POST" class="mb-4">
@@ -642,7 +661,7 @@ HTML = """
                             </div>
                         </form>
                         <div class="heart-threshold">
-                            <h6 class="mb-3" style="color:#22c55e;">Thiết lập mức tim tiêu chuẩn</h6>
+                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim tiêu chuẩn</h6>
                             <form method="POST">
                                 <div class="input-group">
                                     <span class="input-group-text">
@@ -651,7 +670,7 @@ HTML = """
                                     <input type="number" 
                                            class="form-control" 
                                            name="heart_threshold" 
-                                           value="{{ heart_threshold }}" 
+                                           value="{heart_threshold}" 
                                            min="0"
                                            placeholder="Mức tim">
                                     <button type="submit" class="btn btn-primary">
@@ -666,13 +685,16 @@ HTML = """
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5>Auto Grab - Acc Chính 2</h5>
+                        <h5>
+                            <i class="fas fa-magic me-2"></i>
+                            Auto Grab - Acc Chính 2
+                        </h5>
                     </div>
                     <div class="card-body">
                         <div class="status-indicator mb-3">
-                            <span class="status-badge {{ auto_grab_status_2 }}">
+                            <span class="status-badge {auto_grab_status_2}">
                                 <i class="fas fa-circle me-1"></i>
-                                {{ auto_grab_text_2 }}
+                                {auto_grab_text_2}
                             </span>
                         </div>
                         <form method="POST" class="mb-4">
@@ -686,7 +708,7 @@ HTML = """
                             </div>
                         </form>
                         <div class="heart-threshold">
-                            <h6 class="mb-3" style="color:#22c55e;">Thiết lập mức tim tiêu chuẩn</h6>
+                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim tiêu chuẩn</h6>
                             <form method="POST">
                                 <div class="input-group">
                                     <span class="input-group-text">
@@ -695,7 +717,7 @@ HTML = """
                                     <input type="number" 
                                            class="form-control" 
                                            name="heart_threshold_2" 
-                                           value="{{ heart_threshold_2 }}" 
+                                           value="{heart_threshold_2}" 
                                            min="0"
                                            placeholder="Mức tim">
                                     <button type="submit" class="btn btn-primary">
@@ -705,7 +727,7 @@ HTML = """
                             </form>
                         </div>
                         <div class="mt-2">
-                            <small style="color:#22c55e">
+                            <small style="color:#14fdce">
                                 <i class="fas fa-info-circle me-1"></i>
                                 Delay grab chậm hơn 0.3s so với Acc chính 1
                             </small>
@@ -716,7 +738,10 @@ HTML = """
             <div class="col-12">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5>Gửi danh sách mã theo acc chọn</h5>
+                        <h5>
+                            <i class="fas fa-code me-2"></i>
+                            Gửi danh sách mã theo acc chọn
+                        </h5>
                     </div>
                     <div class="card-body">
                         <form method="POST">
@@ -724,7 +749,7 @@ HTML = """
                                 <div class="col-md-6">
                                     <label class="form-label">Chọn acc:</label>
                                     <select name="acc_index" class="form-select">
-                                        {{ acc_options|safe }}
+                                        {acc_options}
                                     </select>
                                 </div>
                                 <div class="col-md-6">
@@ -763,13 +788,16 @@ HTML = """
             <div class="col-12">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5>Spam Control</h5>
+                        <h5>
+                            <i class="fas fa-repeat me-2"></i>
+                            Spam Control
+                        </h5>
                     </div>
                     <div class="card-body">
                         <div class="status-indicator mb-3">
-                            <span class="status-badge {{ spam_status }}">
+                            <span class="status-badge {spam_status}">
                                 <i class="fas fa-circle me-1"></i>
-                                {{ spam_text }}
+                                {spam_text}
                             </span>
                         </div>
                         <form method="POST">
@@ -780,14 +808,14 @@ HTML = """
                                            name="spammsg" 
                                            class="form-control" 
                                            placeholder="Nội dung spam" 
-                                           value="{{ spam_message }}">
+                                           value="{spam_message}">
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label">Thời gian lặp (giây):</label>
                                     <input type="number" 
                                            name="spam_delay" 
                                            class="form-control" 
-                                           value="{{ spam_delay }}" 
+                                           value="{spam_delay}" 
                                            min="1"
                                            placeholder="10">
                                 </div>
@@ -810,13 +838,16 @@ HTML = """
             <div class="col-12">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5>Khởi động lại Bot (Reboot)</h5>
+                        <h5>
+                            <i class="fas fa-sync-alt me-2"></i>
+                            Khởi động lại Bot (Reboot)
+                        </h5>
                     </div>
                     <div class="card-body">
                         <form method="POST">
                             <div class="input-group">
                                 <select name="reboot_target" class="form-select">
-                                    {{ reboot_options|safe }}
+                                    {reboot_options}
                                 </select>
                                 <button type="submit" class="btn btn-warning">
                                     <i class="fas fa-power-off me-1"></i>Reboot Bot
@@ -824,7 +855,7 @@ HTML = """
                             </div>
                         </form>
                         <div class="mt-2">
-                            <small style="color:#22c55e">
+                            <small style="color:#14fdce">
                                 <i class="fas fa-info-circle me-1"></i>
                                 Dùng khi một bot bị "đơ" hoặc không hoạt động đúng.
                             </small>
@@ -972,7 +1003,7 @@ def index():
     for i, name in enumerate(acc_names):
         reboot_options += f'<option value="sub_{i}">Acc Phụ {i+1} ({name})</option>'
 
-    return render_template_string(HTML,
+    return render_template_string(HTML.format(
         alert_section=alert_section,
         auto_grab_status=auto_grab_status,
         auto_grab_text=auto_grab_text,
@@ -988,7 +1019,7 @@ def index():
         spam_delay=spam_delay,
         acc_options=acc_options,
         reboot_options=reboot_options
-    )
+    ))
 
 def spam_loop():
     global spam_enabled, spam_message, spam_delay
