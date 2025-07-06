@@ -401,32 +401,32 @@ def auto_reboot_loop():
     print("[Auto Reboot] Luồng tự động reboot đã dừng.")
 
 def spam_loop():
+    """
+    MODIFIED: This function now only uses subordinate bots (from the `bots` list) for spamming,
+    excluding the main accounts to prevent errors and ensure sub-accounts run correctly.
+    """
     global spam_enabled, spam_message, spam_delay
     while True:
         if spam_enabled and spam_message:
-            all_bots_to_spam = []
-            all_bot_names = []
+            bots_to_spam = []
+            bot_names_to_spam = []
             with bots_lock:
-                if main_bot:
-                    all_bots_to_spam.append(main_bot)
-                    all_bot_names.append("Acc Chính 1")
-                if main_bot_2:
-                    all_bots_to_spam.append(main_bot_2)
-                    all_bot_names.append("Acc Chính 2")
-                if main_bot_3:
-                    all_bots_to_spam.append(main_bot_3)
-                    all_bot_names.append("Acc Chính 3")
-                all_bots_to_spam.extend(bots)
-                all_bot_names.extend(acc_names[:len(bots)])
-            for idx, bot in enumerate(all_bots_to_spam):
+                # Chỉ lấy các bot phụ để spam, không bao gồm các acc chính.
+                bots_to_spam = bots[:] # Tạo một bản sao của danh sách bot phụ
+                bot_names_to_spam = acc_names[:len(bots)]
+
+            for idx, bot in enumerate(bots_to_spam):
                 try:
-                    bot_name = all_bot_names[idx]
+                    # Đảm bảo có tên cho bot, nếu không sẽ dùng tên mặc định.
+                    bot_name = bot_names_to_spam[idx] if idx < len(bot_names_to_spam) else f"Acc Phụ {idx + 1}"
                     bot.sendMessage(spam_channel_id, spam_message)
                     print(f"[{bot_name}] đã gửi: {spam_message}")
-                    time.sleep(2)
+                    time.sleep(2) # Delay giữa mỗi tin nhắn của các bot
                 except Exception as e:
-                    print(f"Lỗi gửi spam từ {all_bot_names[idx]}: {e}")
+                    bot_name_for_error = bot_names_to_spam[idx] if idx < len(bot_names_to_spam) else f"Acc Phụ {idx + 1}"
+                    print(f"Lỗi gửi spam từ {bot_name_for_error}: {e}")
         time.sleep(spam_delay)
+
 
 def keep_alive():
     while True:
@@ -484,7 +484,7 @@ HTML = """
         {alert_section}
         <div class="row g-4">
             <div class="col-lg-6"><div class="control-card">
-                <div class="card-header"><h5 class="mb-0"><i class="fas fa-paper-plane me-2"></i>Điều khiển bot nhắn tin</h5></div>
+                <div class="card-header"><h5 class="mb-0"><i class="fas fa-paper-plane me-2"></i>Điều khiển bot nhắn tin (Acc phụ)</h5></div>
                 <div class="card-body">
                     <form method="POST" class="mb-4"><div class="input-group">
                         <input type="text" class="form-control" name="message" placeholder="Nhập nội dung tin nhắn...">
@@ -576,7 +576,7 @@ HTML = """
                 </div>
             </div></div>
             <div class="col-12"><div class="control-card">
-                <div class="card-header"><h5 class="mb-0"><i class="fas fa-repeat me-2"></i>Spam Control</h5></div>
+                <div class="card-header"><h5 class="mb-0"><i class="fas fa-repeat me-2"></i>Spam Control (Acc phụ)</h5></div>
                 <div class="card-body">
                     <div class="status-indicator mb-3"><span class="status-badge {spam_status}"><i class="fas fa-circle me-1"></i> {spam_text}</span></div>
                     <form method="POST"><div class="row g-3">
@@ -629,6 +629,7 @@ def index():
                     else: msg_status = "Lỗi: Delay phải lớn hơn hoặc bằng 60 giây."
                 except (ValueError, TypeError): pass # Ignore if toggle is also pressed
         else:
+            # NOTE: This part already uses only sub-bots (`bots` list), so it remains unchanged as per the request.
             if 'message' in request.form:
                  with bots_lock:
                     for idx, bot in enumerate(bots):
