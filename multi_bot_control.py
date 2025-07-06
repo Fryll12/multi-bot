@@ -1,4 +1,4 @@
-# multi_bot_control_full.py
+# multi_bot_control_full_plus_acc3.py
 import discum
 import threading
 import time
@@ -14,6 +14,7 @@ load_dotenv()
 # --- CẤU HÌNH ---
 main_token = os.getenv("MAIN_TOKEN")
 main_token_2 = os.getenv("MAIN_TOKEN_2")
+main_token_3 = os.getenv("MAIN_TOKEN_3") # <-- THÊM MỚI
 tokens = os.getenv("TOKENS").split(",") if os.getenv("TOKENS") else []
 
 main_channel_id = "1386973916563767396"
@@ -28,10 +29,13 @@ karibbit_id = "1274445226064220273"
 bots = []
 main_bot = None
 main_bot_2 = None
+main_bot_3 = None # <-- THÊM MỚI
 auto_grab_enabled = False
 auto_grab_enabled_2 = False
+auto_grab_enabled_3 = False # <-- THÊM MỚI
 heart_threshold = 50
 heart_threshold_2 = 50
+heart_threshold_3 = 50 # <-- THÊM MỚI
 last_drop_msg_id = ""
 acc_names = [
      "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
@@ -49,7 +53,7 @@ work_delay_after_all = 44100
 bots_lock = threading.Lock()
 
 def reboot_bot(target_id):
-    global main_bot, main_bot_2, bots
+    global main_bot, main_bot_2, main_bot_3, bots
 
     with bots_lock:
         print(f"[Reboot] Nhận được yêu cầu reboot cho target: {target_id}")
@@ -71,6 +75,15 @@ def reboot_bot(target_id):
             main_bot_2 = create_bot(main_token_2, is_main_2=True)
             print("[Reboot] Acc Chính 2 đã được khởi động lại.")
 
+        elif target_id == 'main_3' and main_bot_3: # <-- THÊM MỚI
+            print("[Reboot] Đang xử lý Acc Chính 3...")
+            try:
+                main_bot_3.gateway.close()
+            except Exception as e:
+                print(f"[Reboot] Lỗi khi đóng Acc Chính 3: {e}")
+            main_bot_3 = create_bot(main_token_3, is_main_3=True)
+            print("[Reboot] Acc Chính 3 đã được khởi động lại.")
+
         elif target_id.startswith('sub_'):
             try:
                 index = int(target_id.split('_')[1])
@@ -91,7 +104,7 @@ def reboot_bot(target_id):
         else:
             print(f"[Reboot] Target không xác định: {target_id}")
 
-def create_bot(token, is_main=False, is_main_2=False):
+def create_bot(token, is_main=False, is_main_2=False, is_main_3=False): # <-- THÊM MỚI
     bot = discum.Client(token=token, log=False)
 
     @bot.gateway.command
@@ -99,7 +112,7 @@ def create_bot(token, is_main=False, is_main_2=False):
         if resp.event.ready:
             try:
                 user_id = resp.raw["user"]["id"]
-                bot_type = "(Acc chính)" if is_main else "(Acc chính 2)" if is_main_2 else ""
+                bot_type = "(Acc chính)" if is_main else "(Acc chính 2)" if is_main_2 else "(Acc chính 3)" if is_main_3 else "" # <-- THÊM MỚI
                 print(f"Đã đăng nhập: {user_id} {bot_type}")
             except Exception as e:
                 print(f"Lỗi lấy user_id: {e}")
@@ -124,10 +137,10 @@ def create_bot(token, is_main=False, is_main_2=False):
                         def read_karibbit():
                             time.sleep(0.5)
                             messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg in messages:
-                                author_id = msg.get("author", {}).get("id")
-                                if author_id == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
-                                    desc = msg["embeds"][0].get("description", "")
+                            for msg_item in messages:
+                                author_id = msg_item.get("author", {}).get("id")
+                                if author_id == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                                    desc = msg_item["embeds"][0].get("description", "")
                                     print(f"\n[Bot 1] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 1] ===== Kết thúc tin nhắn =====\n")
 
                                     lines = desc.split('\n')
@@ -138,10 +151,8 @@ def create_bot(token, is_main=False, is_main_2=False):
                                         if len(matches) >= 2 and matches[1].isdigit():
                                             num = int(matches[1])
                                             heart_numbers.append(num)
-                                            print(f"[Bot 1] Dòng {i+1} số tim: {num}")
                                         else:
                                             heart_numbers.append(0)
-                                            print(f"[Bot 1] Dòng {i+1} không tìm thấy số tim, mặc định 0")
 
                                     if sum(heart_numbers) == 0:
                                         print("[Bot 1] Không có số tim nào, bỏ qua.\n")
@@ -165,9 +176,7 @@ def create_bot(token, is_main=False, is_main_2=False):
                                                     print(f"[Bot 1] Lỗi khi grab hoặc nhắn kt b: {e}")
 
                                             threading.Timer(delay, grab).start()
-
                                     break
-
                         threading.Thread(target=read_karibbit).start()
     if is_main_2:
         @bot.gateway.command
@@ -189,10 +198,10 @@ def create_bot(token, is_main=False, is_main_2=False):
                         def read_karibbit_2():
                             time.sleep(0.5)
                             messages = bot.getMessages(main_channel_id, num=5).json()
-                            for msg in messages:
-                                author_id = msg.get("author", {}).get("id")
-                                if author_id == karibbit_id and "embeds" in msg and len(msg["embeds"]) > 0:
-                                    desc = msg["embeds"][0].get("description", "")
+                            for msg_item in messages:
+                                author_id = msg_item.get("author", {}).get("id")
+                                if author_id == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                                    desc = msg_item["embeds"][0].get("description", "")
                                     print(f"\n[Bot 2] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 2] ===== Kết thúc tin nhắn =====\n")
 
                                     lines = desc.split('\n')
@@ -203,10 +212,8 @@ def create_bot(token, is_main=False, is_main_2=False):
                                         if len(matches) >= 2 and matches[1].isdigit():
                                             num = int(matches[1])
                                             heart_numbers.append(num)
-                                            print(f"[Bot 2] Dòng {i+1} số tim: {num}")
                                         else:
                                             heart_numbers.append(0)
-                                            print(f"[Bot 2] Dòng {i+1} không tìm thấy số tim, mặc định 0")
 
                                     if sum(heart_numbers) == 0:
                                         print("[Bot 2] Không có số tim nào, bỏ qua.\n")
@@ -230,11 +237,72 @@ def create_bot(token, is_main=False, is_main_2=False):
                                                     print(f"[Bot 2] Lỗi khi grab hoặc nhắn kt b: {e}")
 
                                             threading.Timer(delay, grab_2).start()
-
                                     break
-
                         threading.Thread(target=read_karibbit_2).start()
 
+    # <-- THÊM MỚI NGUYÊN KHỐI NÀY
+    if is_main_3:
+        @bot.gateway.command
+        def on_message(resp):
+            global auto_grab_enabled_3, heart_threshold_3, last_drop_msg_id
+
+            if resp.event.message:
+                msg = resp.parsed.auto()
+                author = msg.get("author", {}).get("id")
+                content = msg.get("content", "")
+                channel = msg.get("channel_id")
+                mentions = msg.get("mentions", [])
+
+                if author == karuta_id and channel == main_channel_id:
+                    if "is dropping" not in content and not mentions and auto_grab_enabled_3:
+                        print("\n[Bot 3] Phát hiện tự drop! Đọc tin nhắn Karibbit...\n")
+                        last_drop_msg_id = msg["id"]
+
+                        def read_karibbit_3():
+                            time.sleep(0.5)
+                            messages = bot.getMessages(main_channel_id, num=5).json()
+                            for msg_item in messages:
+                                author_id = msg_item.get("author", {}).get("id")
+                                if author_id == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                                    desc = msg_item["embeds"][0].get("description", "")
+                                    print(f"\n[Bot 3] ===== Tin nhắn Karibbit đọc được =====\n{desc}\n[Bot 3] ===== Kết thúc tin nhắn =====\n")
+
+                                    lines = desc.split('\n')
+                                    heart_numbers = []
+
+                                    for i, line in enumerate(lines[:3]):
+                                        matches = re.findall(r'`([^`]*)`', line)
+                                        if len(matches) >= 2 and matches[1].isdigit():
+                                            num = int(matches[1])
+                                            heart_numbers.append(num)
+                                        else:
+                                            heart_numbers.append(0)
+
+                                    if sum(heart_numbers) == 0:
+                                        print("[Bot 3] Không có số tim nào, bỏ qua.\n")
+                                    else:
+                                        max_num = max(heart_numbers)
+                                        if max_num < heart_threshold_3:
+                                            print(f"[Bot 3] Số tim lớn nhất {max_num} < {heart_threshold_3}, không grab!\n")
+                                        else:
+                                            max_index = heart_numbers.index(max_num)
+                                            emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
+                                            delay = {"1️⃣": 1.1, "2️⃣": 2.1, "3️⃣": 2.8}[emoji] # Delay chậm hơn
+                                            print(f"[Bot 3] Chọn dòng {max_index+1} với số tim {max_num} → Emoji {emoji} sau {delay}s\n")
+
+                                            def grab_3():
+                                                try:
+                                                    bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                                    print("[Bot 3] Đã thả emoji grab!")
+                                                    bot.sendMessage(ktb_channel_id, "kt b")
+                                                    print("[Bot 3] Đã nhắn 'kt b'!")
+                                                except Exception as e:
+                                                    print(f"[Bot 3] Lỗi khi grab hoặc nhắn kt b: {e}")
+
+                                            threading.Timer(delay, grab_3).start()
+                                    break
+                        threading.Thread(target=read_karibbit_3).start()
+    
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
 
@@ -635,12 +703,11 @@ HTML = """
                     </div>
                 </div>
             </div>
-            <div class="col-lg-6">
-                <div class="control-card">
+            <div class="col-lg-4"> <div class="control-card">
                     <div class="card-header">
                         <h5>
                             <i class="fas fa-magic me-2"></i>
-                            Auto Grab - Acc Chính 1
+                            Auto Grab - Acc 1
                         </h5>
                     </div>
                     <div class="card-body">
@@ -661,7 +728,7 @@ HTML = """
                             </div>
                         </form>
                         <div class="heart-threshold">
-                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim tiêu chuẩn</h6>
+                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim</h6>
                             <form method="POST">
                                 <div class="input-group">
                                     <span class="input-group-text">
@@ -671,10 +738,9 @@ HTML = """
                                            class="form-control" 
                                            name="heart_threshold" 
                                            value="{heart_threshold}" 
-                                           min="0"
-                                           placeholder="Mức tim">
+                                           min="0">
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Cập nhật
+                                        <i class="fas fa-save me-1"></i>Lưu
                                     </button>
                                 </div>
                             </form>
@@ -682,12 +748,11 @@ HTML = """
                     </div>
                 </div>
             </div>
-            <div class="col-lg-6">
-                <div class="control-card">
+            <div class="col-lg-4"> <div class="control-card">
                     <div class="card-header">
                         <h5>
                             <i class="fas fa-magic me-2"></i>
-                            Auto Grab - Acc Chính 2
+                            Auto Grab - Acc 2
                         </h5>
                     </div>
                     <div class="card-body">
@@ -708,7 +773,7 @@ HTML = """
                             </div>
                         </form>
                         <div class="heart-threshold">
-                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim tiêu chuẩn</h6>
+                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim</h6>
                             <form method="POST">
                                 <div class="input-group">
                                     <span class="input-group-text">
@@ -718,19 +783,58 @@ HTML = """
                                            class="form-control" 
                                            name="heart_threshold_2" 
                                            value="{heart_threshold_2}" 
-                                           min="0"
-                                           placeholder="Mức tim">
+                                           min="0">
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-1"></i>Cập nhật
+                                        <i class="fas fa-save me-1"></i>Lưu
                                     </button>
                                 </div>
                             </form>
                         </div>
-                        <div class="mt-2">
-                            <small style="color:#14fdce">
-                                <i class="fas fa-info-circle me-1"></i>
-                                Delay grab chậm hơn 0.3s so với Acc chính 1
-                            </small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="control-card">
+                    <div class="card-header">
+                        <h5>
+                            <i class="fas fa-magic me-2"></i>
+                            Auto Grab - Acc 3
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-indicator mb-3">
+                            <span class="status-badge {auto_grab_status_3}">
+                                <i class="fas fa-circle me-1"></i>
+                                {auto_grab_text_3}
+                            </span>
+                        </div>
+                        <form method="POST" class="mb-4">
+                            <div class="btn-group w-100" role="group">
+                                <button name="toggle_3" value="on" type="submit" class="btn btn-success">
+                                    <i class="fas fa-play me-1"></i>Bật
+                                </button>
+                                <button name="toggle_3" value="off" type="submit" class="btn btn-danger">
+                                    <i class="fas fa-stop me-1"></i>Tắt
+                                </button>
+                            </div>
+                        </form>
+                        <div class="heart-threshold">
+                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim</h6>
+                            <form method="POST">
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-heart text-danger"></i>
+                                    </span>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           name="heart_threshold_3" 
+                                           value="{heart_threshold_3}" 
+                                           min="0">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-1"></i>Lưu
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -872,7 +976,7 @@ HTML = """
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    global auto_grab_enabled, auto_grab_enabled_2, spam_enabled, spam_message, spam_delay, heart_threshold, heart_threshold_2, auto_work_enabled
+    global auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3, spam_enabled, spam_message, spam_delay, heart_threshold, heart_threshold_2, heart_threshold_3, auto_work_enabled # <-- THÊM MỚI
     msg_status = ""
 
     if request.method == "POST":
@@ -880,12 +984,14 @@ def index():
         quickmsg = request.form.get("quickmsg")
         toggle = request.form.get("toggle")
         toggle_2 = request.form.get("toggle_2")
+        toggle_3 = request.form.get("toggle_3") # <-- THÊM MỚI
         send_codes = request.form.get("send_codes")
         spamtoggle = request.form.get("spamtoggle")
         spammsg = request.form.get("spammsg", "")
         spam_delay_form = request.form.get("spam_delay")
         heart_threshold_form = request.form.get("heart_threshold")
         heart_threshold_2_form = request.form.get("heart_threshold_2")
+        heart_threshold_3_form = request.form.get("heart_threshold_3") # <-- THÊM MỚI
         auto_work_toggle = request.form.get("auto_work_toggle")
         reboot_target = request.form.get("reboot_target")
 
@@ -915,6 +1021,10 @@ def index():
             auto_grab_enabled_2 = toggle_2 == "on"
             msg_status = f"Tự grab Acc chính 2 {'đã bật' if auto_grab_enabled_2 else 'đã tắt'}"
 
+        if toggle_3: # <-- THÊM MỚI
+            auto_grab_enabled_3 = toggle_3 == "on"
+            msg_status = f"Tự grab Acc chính 3 {'đã bật' if auto_grab_enabled_3 else 'đã tắt'}"
+
         if heart_threshold_form:
             try:
                 heart_threshold = int(heart_threshold_form)
@@ -928,6 +1038,13 @@ def index():
                 msg_status = f"Đã cập nhật mức tim Acc chính 2: {heart_threshold_2}"
             except:
                 msg_status = "Mức tim Acc chính 2 không hợp lệ!"
+        
+        if heart_threshold_3_form: # <-- THÊM MỚI
+            try:
+                heart_threshold_3 = int(heart_threshold_3_form)
+                msg_status = f"Đã cập nhật mức tim Acc chính 3: {heart_threshold_3}"
+            except:
+                msg_status = "Mức tim Acc chính 3 không hợp lệ!"
 
         if send_codes:
             acc_index = request.form.get("acc_index")
@@ -986,6 +1103,9 @@ def index():
     
     auto_grab_status_2 = "status-active" if auto_grab_enabled_2 else "status-inactive"
     auto_grab_text_2 = "Đang bật" if auto_grab_enabled_2 else "Đang tắt"
+
+    auto_grab_status_3 = "status-active" if auto_grab_enabled_3 else "status-inactive" # <-- THÊM MỚI
+    auto_grab_text_3 = "Đang bật" if auto_grab_enabled_3 else "Đang tắt" # <-- THÊM MỚI
     
     spam_status = "status-active" if spam_enabled else "status-inactive"
     spam_text = "Đang bật" if spam_enabled else "Đang tắt"
@@ -1000,6 +1120,8 @@ def index():
         reboot_options += '<option value="main_1">Acc Chính 1</option>'
     if main_bot_2:
         reboot_options += '<option value="main_2">Acc Chính 2</option>'
+    if main_bot_3: # <-- THÊM MỚI
+        reboot_options += '<option value="main_3">Acc Chính 3</option>'
     for i, name in enumerate(acc_names):
         reboot_options += f'<option value="sub_{i}">Acc Phụ {i+1} ({name})</option>'
 
@@ -1009,12 +1131,15 @@ def index():
         auto_grab_text=auto_grab_text,
         auto_grab_status_2=auto_grab_status_2,
         auto_grab_text_2=auto_grab_text_2,
+        auto_grab_status_3=auto_grab_status_3, # <-- THÊM MỚI
+        auto_grab_text_3=auto_grab_text_3, # <-- THÊM MỚI
         spam_status=spam_status,
         spam_text=spam_text,
         auto_work_status=auto_work_status,
         auto_work_text=auto_work_text,
         heart_threshold=heart_threshold,
         heart_threshold_2=heart_threshold_2,
+        heart_threshold_3=heart_threshold_3, # <-- THÊM MỚI
         spam_message=spam_message,
         spam_delay=spam_delay,
         acc_options=acc_options,
@@ -1052,6 +1177,8 @@ if __name__ == "__main__":
             main_bot = create_bot(main_token, is_main=True)
         if main_token_2:
             main_bot_2 = create_bot(main_token_2, is_main_2=True)
+        if main_token_3: # <-- THÊM MỚI
+            main_bot_3 = create_bot(main_token_3, is_main_3=True)
 
         for token in tokens:
             if token.strip():
