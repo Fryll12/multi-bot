@@ -516,10 +516,7 @@ HTML_TEMPLATE = """
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-         #override-panel {{
-             grid-column: 1 / -1;
-         }}      
+    <style>  
         :root {{
             --neon-green: #00ff41; --neon-cyan: #00ffff; --neon-red: #ff0040; --neon-purple: #8000ff;
             --primary-bg: #0a0a0a; --secondary-bg: #111111; --accent-bg: #1a1a1a;
@@ -589,7 +586,7 @@ HTML_TEMPLATE = """
         <div class="flash-messages"><div class="flash-message success"><i class="fas fa-check-circle"></i> {{ msg_status }}</div></div>
         {{% endif %}}
         <div class="control-grid">
-            <div class="control-panel" id="override-panel">
+            <div class="control-panel"
                 <div class="panel-header"><i class="fas fa-terminal"></i><span>MANUAL OPERATIONS</span></div>
                 <div class="panel-content"
                     <form method="POST" class="spam-form">
@@ -683,7 +680,7 @@ HTML_TEMPLATE = """
                     </form>
                 </div>
             </div>
-             <div class="control-panel" id="override-panel">
+             <div class="control-panel"
                 <div class="panel-header"><i class="fas fa-power-off"></i><span>MANUAL OVERRIDE</span></div>
                 <div class="panel-content">
                     <div class="reboot-grid">
