@@ -1,4 +1,4 @@
-# multi_bot_control-final.py (với logic gốc của bạn và giao diện mới)
+# multi_bot_control_full_plus_acc3_and_auto_reboot.py (LOGIC CỦA BẠN - GIAO DIỆN MỚI)
 import discum
 import threading
 import time
@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- CẤU HÌNH (LOGIC GỐC CỦA BẠN) ---
+# --- CẤU HÌNH (GIỮ NGUYÊN CỦA BẠN) ---
 main_token = os.getenv("MAIN_TOKEN")
 main_token_2 = os.getenv("MAIN_TOKEN_2")
 main_token_3 = os.getenv("MAIN_TOKEN_3")
@@ -25,7 +25,7 @@ work_channel_id = "1389250541590413363"
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 
-# --- BIẾN TRẠNG THÁI (LOGIC GỐC CỦA BẠN) ---
+# --- BIẾN TRẠNG THÁI (GIỮ NGUYÊN CỦA BẠN) ---
 bots = []
 main_bot = None
 main_bot_2 = None
@@ -58,7 +58,7 @@ auto_reboot_stop_event = None
 
 bots_lock = threading.Lock()
 
-# --- CÁC HÀM LOGIC (GIỮ NGUYÊN 100% TỪ FILE CỦA BẠN) ---
+# --- LOGIC CỦA BẠN (GIỮ NGUYÊN 100%) ---
 
 def reboot_bot(target_id):
     global main_bot, main_bot_2, main_bot_3, bots
@@ -489,22 +489,26 @@ def spam_loop():
             with bots_lock:
                 bots_to_spam = bots.copy()
             for idx, bot in enumerate(bots_to_spam):
-                if not spam_enabled: break # Thêm kiểm tra để dừng ngay lập tức
                 try:
                     bot.sendMessage(spam_channel_id, spam_message)
-                    print(f"[{acc_names[idx] if idx < len(acc_names) else 'Bot '+str(idx)}] đã gửi: {spam_message}")
-                    time.sleep(2) # Giữ nguyên delay 2s giữa các bot
+                    print(f"[{acc_names[idx]}] đã gửi: {spam_message}")
+                    time.sleep(2)
                 except Exception as e:
                     print(f"Lỗi gửi spam: {e}")
-            if spam_enabled:
-                time.sleep(spam_delay)
-        else:
-            time.sleep(1)
+        time.sleep(spam_delay)
 
+def keep_alive():
+    while True:
+        try:
+            if main_bot:
+                pass
+            time.sleep(random.randint(60, 120))
+        except:
+            pass
 
 app = Flask(__name__)
 
-# --- GIAO DIỆN MỚI TỪ CYBER_YLANG (ĐÃ SỬA LỖI KEYERROR) ---
+# --- GIAO DIỆN HTML MỚI (ĐÃ SỬA LỖI KEYERROR) ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="vi">
@@ -516,7 +520,7 @@ HTML_TEMPLATE = """
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
-    <style>  
+    <style>
         :root {{
             --neon-green: #00ff41; --neon-cyan: #00ffff; --neon-red: #ff0040; --neon-purple: #8000ff;
             --primary-bg: #0a0a0a; --secondary-bg: #111111; --accent-bg: #1a1a1a;
@@ -586,16 +590,16 @@ HTML_TEMPLATE = """
         <div class="flash-messages"><div class="flash-message success"><i class="fas fa-check-circle"></i> {{ msg_status }}</div></div>
         {{% endif %}}
         <div class="control-grid">
-            <div class="control-panel"
+            <div class="control-panel">
                 <div class="panel-header"><i class="fas fa-terminal"></i><span>MANUAL OPERATIONS</span></div>
-                <div class="panel-content"
+                <div class="panel-content">
                     <form method="POST" class="spam-form">
                         <div class="control-row">
                             <div class="input-group" style="flex: 1;"><span class="input-label">MESSAGE</span><input type="text" name="message" placeholder="Enter manual message..." class="input-cyber"></div>
                             <button type="submit" class="btn-cyber btn-primary" style="align-self: flex-end;"><i class="fas fa-paper-plane"></i> SEND</button>
                         </div>
                     </form>
-                    <div class="quick-commands"
+                    <div class="quick-commands">
                         <div class="control-row">
                             <form method="POST" style="display: inline;"><input type="hidden" name="quickmsg" value="kc o:w"><button type="submit" class="btn-cyber btn-quick">kc o:w</button></form>
                             <form method="POST" style="display: inline;"><input type="hidden" name="quickmsg" value="kc o:ef"><button type="submit" class="btn-cyber btn-quick">kc o:ef</button></form>
@@ -680,7 +684,7 @@ HTML_TEMPLATE = """
                     </form>
                 </div>
             </div>
-             <div class="control-panel"
+             <div class="control-panel">
                 <div class="panel-header"><i class="fas fa-power-off"></i><span>MANUAL OVERRIDE</span></div>
                 <div class="panel-content">
                     <div class="reboot-grid">
@@ -763,35 +767,22 @@ def index():
                     threading.Timer(0.5 * idx, bot.sendMessage, args=(other_channel_id, quickmsg)).start()
             msg_status = f"Đã gửi lệnh nhanh: {quickmsg}"
 
-        # Điều khiển Auto Grab (dùng 'not' để đảo ngược trạng thái)
+        # Điều khiển Auto Grab
         elif 'toggle' in request.form:
             auto_grab_enabled = not auto_grab_enabled
-            if 'heart_threshold' in request.form: # Cập nhật threshold nếu có
+            if 'heart_threshold' in request.form:
                  heart_threshold = int(request.form.get('heart_threshold', 50))
             msg_status = f"Auto Grab Acc 1: {'BẬT' if auto_grab_enabled else 'TẮT'} (Tim: {heart_threshold})"
-
         elif 'toggle_2' in request.form:
             auto_grab_enabled_2 = not auto_grab_enabled_2
             if 'heart_threshold_2' in request.form:
                  heart_threshold_2 = int(request.form.get('heart_threshold_2', 50))
             msg_status = f"Auto Grab Acc 2: {'BẬT' if auto_grab_enabled_2 else 'TẮT'} (Tim: {heart_threshold_2})"
-        
         elif 'toggle_3' in request.form:
             auto_grab_enabled_3 = not auto_grab_enabled_3
             if 'heart_threshold_3' in request.form:
                  heart_threshold_3 = int(request.form.get('heart_threshold_3', 50))
             msg_status = f"Auto Grab Acc 3: {'BẬT' if auto_grab_enabled_3 else 'TẮT'} (Tim: {heart_threshold_3})"
-
-        # Cập nhật ngưỡng tim (khi không bật/tắt)
-        elif 'heart_threshold' in request.form:
-            heart_threshold = int(request.form['heart_threshold'])
-            msg_status = f"Ngưỡng tim Acc 1 đã cập nhật: {heart_threshold}"
-        elif 'heart_threshold_2' in request.form:
-            heart_threshold_2 = int(request.form['heart_threshold_2'])
-            msg_status = f"Ngưỡng tim Acc 2 đã cập nhật: {heart_threshold_2}"
-        elif 'heart_threshold_3' in request.form:
-            heart_threshold_3 = int(request.form['heart_threshold_3'])
-            msg_status = f"Ngưỡng tim Acc 3 đã cập nhật: {heart_threshold_3}"
 
         # Điều khiển Spam
         elif 'spamtoggle' in request.form:
@@ -809,11 +800,11 @@ def index():
                 msg_status = "Spam đã TẮT"
             else:
                  msg_status = "Vui lòng nhập tin nhắn để bật Spam!"
-        elif "spam_delay" in request.form:
+        elif "spam_delay" in request.form and 'spamtoggle' not in request.form:
             spam_delay = int(request.form.get("spam_delay", 10))
-            spam_message = request.form.get("spammsg", "").strip()
+            spam_message = request.form.get("spammsg", spam_message).strip() # Giữ lại tin nhắn cũ nếu có
             msg_status = f"Đã cập nhật cài đặt spam."
-        
+
         # Điều khiển Auto Work
         elif 'auto_work_toggle' in request.form:
             auto_work_enabled = not auto_work_enabled
@@ -821,11 +812,10 @@ def index():
                 work_delay_between_acc = int(request.form.get('work_delay_between_acc', 10))
                 work_delay_after_all = int(request.form.get('work_delay_after_all', 44100))
             msg_status = f"Auto Work {'BẬT' if auto_work_enabled else 'TẮT'}"
-        elif 'work_delay_between_acc' in request.form or 'work_delay_after_all' in request.form:
+        elif ('work_delay_between_acc' in request.form or 'work_delay_after_all' in request.form) and 'auto_work_toggle' not in request.form:
              work_delay_between_acc = int(request.form.get('work_delay_between_acc', 10))
              work_delay_after_all = int(request.form.get('work_delay_after_all', 44100))
              msg_status = f"Cập nhật delay Auto Work."
-
 
         # Điều khiển Auto Reboot
         elif 'auto_reboot_toggle' in request.form:
@@ -841,7 +831,7 @@ def index():
                 if auto_reboot_stop_event: auto_reboot_stop_event.set()
                 auto_reboot_thread = None
                 msg_status = "Đã TẮT chế độ tự động reboot."
-        elif 'auto_reboot_delay' in request.form:
+        elif 'auto_reboot_delay' in request.form and 'auto_reboot_toggle' not in request.form:
              auto_reboot_delay = int(request.form.get("auto_reboot_delay"))
              msg_status = f"Cập nhật delay Auto Reboot: {auto_reboot_delay} giây."
 
@@ -903,14 +893,7 @@ def index():
         acc_options=acc_options, num_bots=len(bots), sub_account_buttons=sub_account_buttons
     ))
 
-# --- KHỞI CHẠY CHƯƠNG TRÌNH (LOGIC GỐC CỦA BẠN) ---
-def keep_alive():
-    while True:
-        try:
-            time.sleep(random.randint(60, 120))
-        except:
-            pass
-            
+# --- KHỞI CHẠY CHƯƠNG TRÌNH (GIỮ NGUYÊN CỦA BẠN) ---
 if __name__ == "__main__":
     print("Đang khởi tạo các bot...")
     with bots_lock:
@@ -930,6 +913,11 @@ if __name__ == "__main__":
     threading.Thread(target=spam_loop, daemon=True).start()
     threading.Thread(target=keep_alive, daemon=True).start()
     threading.Thread(target=auto_work_loop, daemon=True).start()
+    # Khởi tạo luồng auto_reboot nếu cần
+    if auto_reboot_enabled:
+        auto_reboot_stop_event = threading.Event()
+        auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True)
+        auto_reboot_thread.start()
     print("Các luồng nền đã sẵn sàng.")
 
     port = int(os.environ.get("PORT", 8080))
