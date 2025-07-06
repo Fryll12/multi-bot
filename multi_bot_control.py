@@ -49,7 +49,6 @@ work_delay_after_all = 44100
 bots_lock = threading.Lock()
 
 def reboot_bot(target_id):
-    """Khởi động lại một bot dựa trên ID định danh của nó (vd: 'main_1', 'sub_2')."""
     global main_bot, main_bot_2, bots
 
     with bots_lock:
@@ -91,7 +90,6 @@ def reboot_bot(target_id):
                 print(f"[Reboot] Lỗi xử lý target Acc Phụ: {e}")
         else:
             print(f"[Reboot] Target không xác định: {target_id}")
-
 
 def create_bot(token, is_main=False, is_main_2=False):
     bot = discum.Client(token=token, log=False)
@@ -391,162 +389,169 @@ HTML = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Karuta Deep</title>
+    <title>DEEP WEB BOT CONTROL</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-<style>
-    body {
-        background: #101015;
-        min-height: 100vh;
-        color: #eeeeee;
-        font-family: 'JetBrains Mono', 'Roboto Mono', 'Consolas', monospace;
-        letter-spacing: 0.5px;
-        background-image: url('https://www.transparenttextures.com/patterns/asfalt-dark.png'), linear-gradient(120deg, #0a0a0f 60%, #1d1a20 100%);
-    }
-    .header-section {
-        background: rgba(30, 7, 19, 0.93);
-        border-radius: 18px;
-        border: 1.5px solid #370017;
-        box-shadow: 0 0 10px #17000d, 0 0 40px #0a0a0f;
-        margin-bottom: 2rem;
-    }
-    .header-section h1 {
-        color: #b30000;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 2.3rem;
-        text-shadow: 0 0 10px #2d0404, 0 0 30px #c20000a1;
-        letter-spacing: 1px;
-    }
-    .header-section p {
-        color: #9d597a;
-        font-size: 1.09rem;
-    }
-    .control-card {
-        background: rgba(19, 13, 19, 0.96);
-        border: 1.2px solid #2d0a1a;
-        border-radius: 14px;
-        box-shadow: 0 0 10px #25061a73, 0 4px 40px #0002;
-        margin-bottom: 2rem;
-        transition: border 0.3s, box-shadow 0.3s;
-    }
-    .control-card:hover {
-        border-color: #b30000;
-        box-shadow: 0 0 24px #b3000011, 0 0 60px #1e1e1e;
-    }
-    .card-header {
-        background: linear-gradient(90deg, #0e0010c0 70%, #180014c0 100%);
-        border-bottom: 1px solid #1a0010;
-        border-radius: 14px 14px 0 0;
-        padding: 1.1rem 1.2rem;
-    }
-    .card-header h5 {
-        color: #e20027;
-        font-weight: 700;
-        text-shadow: 0 2px 8px #4e001a1c;
-    }
-    .card-body {
-        padding: 1.2rem;
-    }
-    .form-control, .form-select {
-        background: #18151c;
-        border: 1px solid #2e0d19;
-        color: #fff;
-        border-radius: 7px;
-        font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
-    }
-    .form-control:focus, .form-select:focus {
-        background: #1f1a25;
-        border-color: #b30000;
-        color: #fff;
-        box-shadow: 0 0 2px #b30000;
-    }
-    .btn {
-        border-radius: 7px;
-        font-family: 'JetBrains Mono', monospace;
-        font-weight: 500;
-        letter-spacing: 1px;
-        border: none;
-        box-shadow: 0 2px 8px #0002;
-        transition: background 0.2s, box-shadow 0.2s, color 0.2s;
-    }
-    .btn-primary {
-        background: linear-gradient(90deg, #b30000 65%, #73003e 100%);
-        color: #fff;
-    }
-    .btn-success {
-        background: linear-gradient(90deg, #1c7d41 70%, #11632b 100%);
-        color: #fff;
-    }
-    .btn-danger {
-        background: linear-gradient(90deg, #370017 70%, #b30000 100%);
-        color: #fff;
-    }
-    .btn-warning {
-        background: linear-gradient(90deg, #7c2b00 70%, #dd8d00 100%);
-        color: #fff;
-    }
-    .btn:hover, .btn:focus {
-        filter: brightness(1.09) contrast(1.1);
-        box-shadow: 0 0 6px #b30000;
-        color: #fff;
-    }
-    .status-badge {
-        border-radius: 999px;
-        padding: 7px 17px;
-        font-size: 0.95rem;
-        font-weight: 600;
-        letter-spacing: 1px;
-        background: #212;
-        color: #e20027;
-        box-shadow: 0 0 10px #2d0015;
-        border: 1px solid #8a0035;
-    }
-    .status-active {
-        background: linear-gradient(90deg, #1a222a 80%, #232 100%);
-        color: #36f336;
-        border-color: #36f33655;
-        box-shadow: 0 0 8px #0f4d1a7a;
-    }
-    .status-inactive {
-        background: linear-gradient(90deg, #2d0017 80%, #1a0010 100%);
-        color: #b30000;
-        border-color: #b3000050;
-        box-shadow: 0 0 8px #b3000088;
-    }
-    .alert {
-        background: #2d0017;
-        color: #fff;
-        border: 1px solid #b30000bb;
-        border-radius: 8px;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 1rem;
-    }
-    /* Scrollbar custom */
-    ::-webkit-scrollbar {
-      width: 8px;
-      background: #17000d;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #2d0017;
-      border-radius: 4px;
-    }
-    /* Responsive */
-    @media (max-width: 768px) {
-        .header-section { padding: 1rem; }
-        .card-header, .card-body { padding: 1rem;}
-    }
-</style>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: #090a11 url('https://www.transparenttextures.com/patterns/asfalt-dark.png');
+            color: #c6f2ff;
+            font-family: 'Orbitron', 'JetBrains Mono', 'Roboto Mono', monospace;
+            min-height: 100vh;
+            letter-spacing: 1px;
+        }
+        .container-fluid {
+            margin-top: 24px;
+        }
+        .header-section {
+            background: transparent;
+            border: none;
+            margin-bottom: 1.7rem;
+            text-align: center;
+        }
+        .header-section h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 2.5rem;
+            color: #14fdce;
+            text-shadow: 0 0 5px #14fdce, 0 0 20px #14fdce;
+            letter-spacing: 2.5px;
+            margin-bottom: 0;
+        }
+        .header-section p {
+            color: #fafff0;
+            font-size: 1.07rem;
+            text-shadow: 0 0 2px #14fdce;
+        }
+        .control-card {
+            background: rgba(20, 20, 20, 0.98);
+            border: 2px solid #00ff41;
+            border-radius: 12px;
+            box-shadow: 0 0 16px #14fdce44;
+            margin-bottom: 1.8rem;
+            position: relative;
+            z-index: 1;
+        }
+        .control-card .card-header {
+            background: transparent;
+            border-bottom: none;
+            padding: 1rem 1rem 0.5rem 1rem;
+            border-radius: 12px 12px 0 0;
+        }
+        .control-card .card-header h5 {
+            font-family: 'Orbitron', monospace;
+            color: #14fdce;
+            text-shadow: 0 0 12px #14fdce, 0 0 2px #fff;
+            font-size: 1.2rem;
+            margin: 0;
+            letter-spacing: 1.5px;
+        }
+        .control-card .card-body {
+            padding: 1rem 1rem 1.1rem 1rem;
+        }
+        .form-control, .form-select, textarea {
+            background: #030d10;
+            border: 1.5px solid #14fdce;
+            color: #fff;
+            border-radius: 7px;
+            font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+            font-size: 1rem;
+            margin-bottom: 0.4rem;
+        }
+        .form-control:focus, .form-select:focus, textarea:focus {
+            background: #050a0b;
+            border-color: #00ff41;
+            color: #fff;
+            box-shadow: 0 0 2px #00ff41;
+        }
+        .btn {
+            border-radius: 7px;
+            font-family: 'Orbitron', monospace;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            border: none;
+            box-shadow: 0 0 8px #14fdce44;
+            transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+            text-transform: uppercase;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #14fdce 30%, #00ff41 100%);
+            color: #111;
+            box-shadow: 0 0 10px #14fdce;
+        }
+        .btn-success {
+            background: linear-gradient(90deg, #00ff41 60%, #14fdce 100%);
+            color: #111;
+            box-shadow: 0 0 8px #00ff41;
+        }
+        .btn-danger {
+            background: linear-gradient(90deg, #ff2770 80%, #ff2770 100%);
+            color: #fff;
+            box-shadow: 0 0 8px #ff2770;
+        }
+        .btn-warning {
+            background: linear-gradient(90deg, #e9f500 80%, #ff2770 100%);
+            color: #111;
+            box-shadow: 0 0 8px #e9f500;
+        }
+        .btn:hover, .btn:focus {
+            filter: brightness(1.2) contrast(1.08);
+            box-shadow: 0 0 14px #14fdce, 0 0 12px #00ff41;
+            color: #fff;
+        }
+        .status-badge {
+            border-radius: 999px;
+            padding: 7px 17px;
+            font-size: 0.95rem;
+            font-family: 'Orbitron', monospace;
+            background: #111;
+            color: #ff2770;
+            box-shadow: 0 0 10px #ff2770;
+            border: 1px solid #ff2770;
+        }
+        .status-active {
+            background: #111;
+            color: #00ff41;
+            border-color: #00ff41;
+            text-shadow: 0 0 6px #00ff41;
+        }
+        .status-inactive {
+            background: #111;
+            color: #ff2770;
+            border-color: #ff2770;
+            text-shadow: 0 0 6px #ff2770;
+        }
+        .alert {
+            background: #0a0a0f;
+            color: #00ff41;
+            border: 1.5px solid #14fdce;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            box-shadow: 0 0 10px #14fdce;
+            margin-bottom: 1rem;
+        }
+        ::-webkit-scrollbar {
+            width: 10px;
+            background: #090a11;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #00ff4166;
+            border-radius: 8px;
+        }
+        @media (max-width: 900px) {
+            .header-section h1 { font-size: 1.5rem; }
+            .control-card { margin-bottom: 1rem; }
+        }
+    </style>
 </head>
 <body>
     <div class="container-fluid">
         <div class="row">
             <div class="col-12">
                 <div class="header-section">
-                    <h1 class="text-center mb-0">
-                        <i class="fas fa-robot me-3"></i>
-                        Karuta Deep
-                    </h1>
-                    <p class="text-center text-muted">Quản lý bot Discord với giao diện hiện đại</p>
+                    <h1>DEEP WEB BOT CONTROL</h1>
+                    <p class="text-center">Quản lý bot Discord phong cách deep web</p>
                 </div>
             </div>
         </div>
@@ -557,7 +562,7 @@ HTML = """
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5 class="mb-0">
+                        <h5>
                             <i class="fas fa-paper-plane me-2"></i>
                             Điều khiển bot nhắn tin
                         </h5>
@@ -574,9 +579,8 @@ HTML = """
                                 </button>
                             </div>
                         </form>
-
                         <div class="quick-commands">
-                            <h6 class="mb-3">Menu nhanh</h6>
+                            <h6 class="mb-3" style="color:#00ff41;text-shadow:0 0 8px #14fdce;">Menu nhanh</h6>
                             <form method="POST">
                                 <div class="input-group">
                                     <select name="quickmsg" class="form-select">
@@ -604,7 +608,7 @@ HTML = """
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5 class="mb-0">
+                        <h5>
                             <i class="fas fa-briefcase me-2"></i>
                             Auto Work
                         </h5>
@@ -616,7 +620,6 @@ HTML = """
                                 {auto_work_text}
                             </span>
                         </div>
-
                         <form method="POST" class="mb-4">
                             <div class="btn-group w-100" role="group">
                                 <button name="auto_work_toggle" value="on" type="submit" class="btn btn-success">
@@ -627,9 +630,8 @@ HTML = """
                                 </button>
                             </div>
                         </form>
-
                         <div class="mt-2">
-                            <small class="text-muted">
+                            <small style="color:#00ff41">
                                 <i class="fas fa-info-circle me-1"></i>
                                 Tự động làm việc cho tất cả account
                             </small>
@@ -641,7 +643,7 @@ HTML = """
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5 class="mb-0">
+                        <h5>
                             <i class="fas fa-magic me-2"></i>
                             Auto Grab - Acc Chính 1
                         </h5>
@@ -653,7 +655,6 @@ HTML = """
                                 {auto_grab_text}
                             </span>
                         </div>
-
                         <form method="POST" class="mb-4">
                             <div class="btn-group w-100" role="group">
                                 <button name="toggle" value="on" type="submit" class="btn btn-success">
@@ -664,9 +665,8 @@ HTML = """
                                 </button>
                             </div>
                         </form>
-
                         <div class="heart-threshold">
-                            <h6 class="mb-3">Thiết lập mức tim tiêu chuẩn</h6>
+                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim tiêu chuẩn</h6>
                             <form method="POST">
                                 <div class="input-group">
                                     <span class="input-group-text">
@@ -691,7 +691,7 @@ HTML = """
             <div class="col-lg-6">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5 class="mb-0">
+                        <h5>
                             <i class="fas fa-magic me-2"></i>
                             Auto Grab - Acc Chính 2
                         </h5>
@@ -703,7 +703,6 @@ HTML = """
                                 {auto_grab_text_2}
                             </span>
                         </div>
-
                         <form method="POST" class="mb-4">
                             <div class="btn-group w-100" role="group">
                                 <button name="toggle_2" value="on" type="submit" class="btn btn-success">
@@ -714,9 +713,8 @@ HTML = """
                                 </button>
                             </div>
                         </form>
-
                         <div class="heart-threshold">
-                            <h6 class="mb-3">Thiết lập mức tim tiêu chuẩn</h6>
+                            <h6 class="mb-3" style="color:#14fdce;text-shadow:0 0 8px #14fdce;">Thiết lập mức tim tiêu chuẩn</h6>
                             <form method="POST">
                                 <div class="input-group">
                                     <span class="input-group-text">
@@ -735,7 +733,7 @@ HTML = """
                             </form>
                         </div>
                         <div class="mt-2">
-                            <small class="text-muted">
+                            <small style="color:#14fdce">
                                 <i class="fas fa-info-circle me-1"></i>
                                 Delay grab chậm hơn 0.3s so với Acc chính 1
                             </small>
@@ -747,7 +745,7 @@ HTML = """
             <div class="col-12">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5 class="mb-0">
+                        <h5>
                             <i class="fas fa-code me-2"></i>
                             Gửi danh sách mã theo acc chọn
                         </h5>
@@ -798,7 +796,7 @@ HTML = """
             <div class="col-12">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5 class="mb-0">
+                        <h5>
                             <i class="fas fa-repeat me-2"></i>
                             Spam Control
                         </h5>
@@ -810,7 +808,6 @@ HTML = """
                                 {spam_text}
                             </span>
                         </div>
-
                         <form method="POST">
                             <div class="row g-3">
                                 <div class="col-md-6">
@@ -850,7 +847,7 @@ HTML = """
             <div class="col-12">
                 <div class="control-card">
                     <div class="card-header">
-                        <h5 class="mb-0">
+                        <h5>
                             <i class="fas fa-sync-alt me-2"></i>
                             Khởi động lại Bot (Reboot)
                         </h5>
@@ -867,7 +864,7 @@ HTML = """
                             </div>
                         </form>
                         <div class="mt-2">
-                            <small class="text-muted">
+                            <small style="color:#14fdce">
                                 <i class="fas fa-info-circle me-1"></i>
                                 Dùng khi một bot bị "đơ" hoặc không hoạt động đúng.
                             </small>
