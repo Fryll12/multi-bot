@@ -1,4 +1,4 @@
-# multi_bot_control_final.py
+# multi_bot_control_final_fix.py
 import discum
 import threading
 import time
@@ -35,8 +35,8 @@ acc_names = [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Silent",
     "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", 
     "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "HellNBack"]
-spam_enabled, spam_message, spam_delay, spam_channel_id = False, "", 10, "1388802151723302912"
-auto_work_enabled, work_channel_id, work_delay_between_acc, work_delay_after_all = False, "1389250541590413363", 10, 44100
+spam_enabled, spam_message, spam_delay = False, "", 10
+auto_work_enabled, work_delay_between_acc, work_delay_after_all = False, 10, 44100
 
 auto_reboot_enabled = False
 auto_reboot_delay = 3600
@@ -106,12 +106,15 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
     def on_ready(resp):
         if resp.event.ready:
             try:
-                user_id = resp.raw["user"]["id"]
-                bot_type = "(Acc chính)" if is_main else "(Acc chính 2)" if is_main_2 else "(Acc chính 3)" if is_main_3 else ""
-                print(f"Đã đăng nhập: {user_id} {bot_type}")
+                user = resp.raw["user"]
+                bot_type = "(Acc chính 1)" if is_main else "(Acc chính 2)" if is_main_2 else "(Acc chính 3)" if is_main_3 else "(Acc phụ)"
+                print(f"Đã đăng nhập: {user['username']}#{user['discriminator']} {bot_type}")
             except Exception as e:
-                print(f"Lỗi lấy user_id: {e}")
+                # Nếu token sai, lỗi sẽ xảy ra ở đây.
+                print(f"!!! LỖI NGHIÊM TRỌNG KHI KHỞI TẠO BOT. TOKEN CÓ THỂ SAI HOẶC BỊ VÔ HIỆU HÓA. Lỗi: {e}")
 
+
+    # ... (Toàn bộ phần code on_message của bạn được giữ nguyên) ...
     if is_main:
         @bot.gateway.command
         def on_message(resp):
@@ -169,7 +172,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
     
     if is_main_2:
         @bot.gateway.command
-        def on_message(resp):
+        def on_message_2(resp):
             global auto_grab_enabled_2, heart_threshold_2, last_drop_msg_id
             if resp.event.message:
                 msg = resp.parsed.auto()
@@ -224,7 +227,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                         
     if is_main_3:
         @bot.gateway.command
-        def on_message(resp):
+        def on_message_3(resp):
             global auto_grab_enabled_3, heart_threshold_3, last_drop_msg_id
             if resp.event.message:
                 msg = resp.parsed.auto()
@@ -401,30 +404,20 @@ def auto_reboot_loop():
     print("[Auto Reboot] Luồng tự động reboot đã dừng.")
 
 def spam_loop():
-    """
-    MODIFIED: This function now only uses subordinate bots (from the `bots` list) for spamming,
-    excluding the main accounts to prevent errors and ensure sub-accounts run correctly.
-    """
     global spam_enabled, spam_message, spam_delay
     while True:
         if spam_enabled and spam_message:
-            bots_to_spam = []
-            bot_names_to_spam = []
             with bots_lock:
-                # Chỉ lấy các bot phụ để spam, không bao gồm các acc chính.
-                bots_to_spam = bots[:] # Tạo một bản sao của danh sách bot phụ
-                bot_names_to_spam = acc_names[:len(bots)]
-
+                bots_to_spam = bots.copy()
             for idx, bot in enumerate(bots_to_spam):
                 try:
-                    # Đảm bảo có tên cho bot, nếu không sẽ dùng tên mặc định.
-                    bot_name = bot_names_to_spam[idx] if idx < len(bot_names_to_spam) else f"Acc Phụ {idx + 1}"
+                    bot_name = acc_names[idx] if idx < len(acc_names) else f"Acc Phụ {idx + 1}"
                     bot.sendMessage(spam_channel_id, spam_message)
-                    print(f"[{bot_name}] đã gửi: {spam_message}")
-                    time.sleep(2) # Delay giữa mỗi tin nhắn của các bot
+                    print(f"[{bot_name}] đã gửi spam: {spam_message}")
+                    time.sleep(2)
                 except Exception as e:
-                    bot_name_for_error = bot_names_to_spam[idx] if idx < len(bot_names_to_spam) else f"Acc Phụ {idx + 1}"
-                    print(f"Lỗi gửi spam từ {bot_name_for_error}: {e}")
+                    bot_name_for_error = acc_names[idx] if idx < len(acc_names) else f"Acc Phụ {idx + 1}"
+                    print(f"!!! LỖI SPAM từ {bot_name_for_error}: {e}")
         time.sleep(spam_delay)
 
 
@@ -483,6 +476,18 @@ HTML = """
         </div></div></div>
         {alert_section}
         <div class="row g-4">
+            <div class="col-12"><div class="control-card">
+                <div class="card-header"><h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Chẩn đoán & Kiểm tra</h5></div>
+                <div class="card-body text-center">
+                    <p class="text-muted">Nếu bot không hoạt động, hãy nhấn nút này để kiểm tra tất cả các tài khoản. Xem kết quả trong cửa sổ console.</p>
+                    <form method="POST">
+                        <button name="check_all_bots" value="1" type="submit" class="btn btn-warning">
+                            <i class="fas fa-stethoscope me-2"></i>Kiểm tra Toàn bộ Bot
+                        </button>
+                    </form>
+                </div>
+            </div></div>
+
             <div class="col-lg-6"><div class="control-card">
                 <div class="card-header"><h5 class="mb-0"><i class="fas fa-paper-plane me-2"></i>Điều khiển bot nhắn tin (Acc phụ)</h5></div>
                 <div class="card-body">
@@ -499,229 +504,4 @@ HTML = """
                         <button type="submit" class="btn btn-success"><i class="fas fa-bolt me-1"></i>Gửi</button>
                     </div></form></div>
                 </div>
-            </div></div>
-            <div class="col-lg-6"><div class="control-card">
-                <div class="card-header"><h5 class="mb-0"><i class="fas fa-briefcase me-2"></i>Auto Work</h5></div>
-                <div class="card-body">
-                    <div class="status-indicator mb-3"><span class="status-badge {auto_work_status}"><i class="fas fa-circle me-1"></i> {auto_work_text}</span></div>
-                    <form method="POST" class="mb-4"><div class="btn-group w-100" role="group"><button name="auto_work_toggle" value="on" type="submit" class="btn btn-success"><i class="fas fa-play me-1"></i>Bật</button><button name="auto_work_toggle" value="off" type="submit" class="btn btn-danger"><i class="fas fa-stop me-1"></i>Tắt</button></div></form>
-                    <div class="mt-2"><small class="text-muted"><i class="fas fa-info-circle me-1"></i> Tự động làm việc cho tất cả account phụ</small></div>
-                </div>
-            </div></div>
-            <div class="col-lg-6"><div class="control-card">
-                <div class="card-header"><h5 class="mb-0"><i class="fas fa-magic me-2"></i>Auto Grab - Acc Chính 1</h5></div>
-                <div class="card-body">
-                    <div class="status-indicator mb-3"><span class="status-badge {auto_grab_status}"><i class="fas fa-circle me-1"></i> {auto_grab_text}</span></div>
-                    <form method="POST" class="mb-4"><div class="btn-group w-100" role="group"><button name="toggle" value="on" type="submit" class="btn btn-success"><i class="fas fa-play me-1"></i>Bật</button><button name="toggle" value="off" type="submit" class="btn btn-danger"><i class="fas fa-stop me-1"></i>Tắt</button></div></form>
-                    <div class="heart-threshold"><h6 class="mb-3">Mức tim tiêu chuẩn</h6><form method="POST"><div class="input-group"><span class="input-group-text"><i class="fas fa-heart text-danger"></i></span><input type="number" class="form-control" name="heart_threshold" value="{heart_threshold}" min="0" placeholder="Mức tim"><button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Lưu</button></div></form></div>
-                </div>
-            </div></div>
-            <div class="col-lg-6"><div class="control-card">
-                <div class="card-header"><h5 class="mb-0"><i class="fas fa-magic me-2"></i>Auto Grab - Acc Chính 2</h5></div>
-                <div class="card-body">
-                    <div class="status-indicator mb-3"><span class="status-badge {auto_grab_status_2}"><i class="fas fa-circle me-1"></i> {auto_grab_text_2}</span></div>
-                    <form method="POST" class="mb-4"><div class="btn-group w-100" role="group"><button name="toggle_2" value="on" type="submit" class="btn btn-success"><i class="fas fa-play me-1"></i>Bật</button><button name="toggle_2" value="off" type="submit" class="btn btn-danger"><i class="fas fa-stop me-1"></i>Tắt</button></div></form>
-                    <div class="heart-threshold"><h6 class="mb-3">Mức tim tiêu chuẩn</h6><form method="POST"><div class="input-group"><span class="input-group-text"><i class="fas fa-heart text-danger"></i></span><input type="number" class="form-control" name="heart_threshold_2" value="{heart_threshold_2}" min="0" placeholder="Mức tim"><button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Lưu</button></div></form></div>
-                    <div class="mt-2"><small class="text-muted"><i class="fas fa-info-circle me-1"></i> Delay grab chậm hơn 0.3s so với Acc 1</small></div>
-                </div>
-            </div></div>
-            <div class="col-lg-6"><div class="control-card">
-                <div class="card-header"><h5 class="mb-0"><i class="fas fa-magic me-2"></i>Auto Grab - Acc Chính 3</h5></div>
-                <div class="card-body">
-                    <div class="status-indicator mb-3"><span class="status-badge {auto_grab_status_3}"><i class="fas fa-circle me-1"></i> {auto_grab_text_3}</span></div>
-                    <form method="POST" class="mb-4"><div class="btn-group w-100" role="group"><button name="toggle_3" value="on" type="submit" class="btn btn-success"><i class="fas fa-play me-1"></i>Bật</button><button name="toggle_3" value="off" type="submit" class="btn btn-danger"><i class="fas fa-stop me-1"></i>Tắt</button></div></form>
-                    <div class="heart-threshold"><h6 class="mb-3">Mức tim tiêu chuẩn</h6><form method="POST"><div class="input-group"><span class="input-group-text"><i class="fas fa-heart text-danger"></i></span><input type="number" class="form-control" name="heart_threshold_3" value="{heart_threshold_3}" min="0" placeholder="Mức tim"><button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>Lưu</button></div></form></div>
-                    <div class="mt-2"><small class="text-muted"><i class="fas fa-info-circle me-1"></i> Delay grab chậm hơn 0.3s so với Acc 2</small></div>
-                </div>
-            </div></div>
-            <div class="col-lg-6"><div class="control-card">
-                <div class="card-header"><h5 class="mb-0"><i class="fas fa-history me-2"></i> Tự động Reboot Acc Chính</h5></div>
-                <div class="card-body">
-                    <div class="status-indicator mb-3"><span class="status-badge {auto_reboot_status}"><i class="fas fa-circle me-1"></i> {auto_reboot_text}</span></div>
-                    <form method="POST">
-                        <div class="input-group mb-3">
-                            <span class="input-group-text"><i class="fas fa-hourglass-half"></i></span>
-                            <input type="number" class="form-control" name="auto_reboot_delay" value="{auto_reboot_delay}" min="60" placeholder="giây">
-                            <button type="submit" class="btn btn-primary">Cập nhật Delay</button>
-                        </div>
-                        <div class="btn-group w-100" role="group"><button name="auto_reboot_toggle" value="on" type="submit" class="btn btn-success"><i class="fas fa-play me-1"></i>Bật</button><button name="auto_reboot_toggle" value="off" type="submit" class="btn btn-danger"><i class="fas fa-stop me-1"></i>Tắt</button></div>
-                    </form>
-                    <div class="mt-2"><small class="text-muted"><i class="fas fa-info-circle me-1"></i> Tự động khởi động lại 3 acc chính theo chu kỳ.</small></div>
-                </div>
-            </div></div>
-            <div class="col-lg-6"><div class="control-card">
-                <div class="card-header"><h5 class="mb-0"><i class="fas fa-sync-alt me-2"></i> Reboot Thủ Công</h5></div>
-                <div class="card-body">
-                    <form method="POST">
-                        <div class="input-group">
-                            <select name="reboot_target" class="form-select">{reboot_options}</select>
-                            <button type="submit" class="btn btn-warning"><i class="fas fa-power-off me-1"></i>Reboot Bot</button>
-                        </div>
-                    </form>
-                    <div class="mt-2"><small class="text-muted"><i class="fas fa-info-circle me-1"></i> Dùng khi một bot bị "đơ" hoặc không hoạt động đúng.</small></div>
-                </div>
-            </div></div>
-            <div class="col-lg-6"><div class="control-card">
-                <div class="card-header"><h5 class="mb-0"><i class="fas fa-code me-2"></i>Gửi danh sách mã theo acc chọn</h5></div>
-                <div class="card-body">
-                    <form method="POST">
-                        <div class="row g-3">
-                            <div class="col-md-6"><label class="form-label">Chọn acc:</label><select name="acc_index" class="form-select">{acc_options}</select></div>
-                            <div class="col-md-6"><label class="form-label">Thời gian cách nhau (giây):</label><input type="number" step="0.1" name="delay" class="form-control" value="11" placeholder="11"></div>
-                            <div class="col-12"><label class="form-label">Nội dung mẫu:</label><input type="text" name="prefix" class="form-control" placeholder="vd: kt n"></div>
-                            <div class="col-12"><label class="form-label">Danh sách mã:</label><textarea name="codes" class="form-control" rows="4" placeholder="Danh sách mã, cách nhau dấu phẩy"></textarea></div>
-                            <div class="col-12"><button type="submit" name="send_codes" value="1" class="btn btn-primary btn-lg"><i class="fas fa-paper-plane me-2"></i>Gửi danh sách mã</button></div>
-                        </div>
-                    </form>
-                </div>
-            </div></div>
-            <div class="col-12"><div class="control-card">
-                <div class="card-header"><h5 class="mb-0"><i class="fas fa-repeat me-2"></i>Spam Control (Acc phụ)</h5></div>
-                <div class="card-body">
-                    <div class="status-indicator mb-3"><span class="status-badge {spam_status}"><i class="fas fa-circle me-1"></i> {spam_text}</span></div>
-                    <form method="POST"><div class="row g-3">
-                        <div class="col-md-6"><label class="form-label">Nội dung spam:</label><input type="text" name="spammsg" class="form-control" placeholder="Nội dung spam" value="{spam_message}"></div>
-                        <div class="col-md-3"><label class="form-label">Thời gian lặp (giây):</label><input type="number" name="spam_delay" class="form-control" value="{spam_delay}" min="1" placeholder="10"></div>
-                        <div class="col-md-3"><label class="form-label">Điều khiển:</label><div class="btn-group w-100" role="group"><button name="spamtoggle" value="on" type="submit" class="btn btn-success"><i class="fas fa-play me-1"></i>Bật</button><button name="spamtoggle" value="off" type="submit" class="btn btn-danger"><i class="fas fa-stop me-1"></i>Tắt</button></div></div>
-                    </div></form>
-                </div>
-            </div></div>
-        </div>
-    </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
-"""
-
-@app.route("/", methods=["GET", "POST"])
-def index():
-    global auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3
-    global heart_threshold, heart_threshold_2, heart_threshold_3
-    global auto_work_enabled, spam_enabled, spam_message, spam_delay
-    global auto_reboot_enabled, auto_reboot_delay, auto_reboot_thread, auto_reboot_stop_event
-    msg_status = ""
-
-    if request.method == "POST":
-        if "auto_reboot_toggle" in request.form or "auto_reboot_delay" in request.form:
-            if "auto_reboot_toggle" in request.form:
-                auto_reboot_toggle = request.form.get("auto_reboot_toggle")
-                if auto_reboot_toggle == "on":
-                    if not auto_reboot_enabled:
-                        auto_reboot_enabled = True
-                        auto_reboot_stop_event = threading.Event()
-                        auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True)
-                        auto_reboot_thread.start()
-                        msg_status = "Đã BẬT chế độ tự động reboot acc chính."
-                    else: msg_status = "Chế độ tự động reboot đã được bật từ trước."
-                elif auto_reboot_toggle == "off":
-                    if auto_reboot_enabled and auto_reboot_stop_event:
-                        auto_reboot_enabled = False
-                        auto_reboot_stop_event.set()
-                        auto_reboot_thread = None
-                        msg_status = "Đã TẮT chế độ tự động reboot."
-                    else: msg_status = "Chế độ tự động reboot chưa được bật."
-            if "auto_reboot_delay" in request.form:
-                try:
-                    delay_val = int(request.form.get("auto_reboot_delay"))
-                    if delay_val >= 60:
-                        auto_reboot_delay = delay_val
-                        msg_status = f"Đã cập nhật delay tự động reboot thành {auto_reboot_delay} giây."
-                    else: msg_status = "Lỗi: Delay phải lớn hơn hoặc bằng 60 giây."
-                except (ValueError, TypeError): pass # Ignore if toggle is also pressed
-        else:
-            # NOTE: This part already uses only sub-bots (`bots` list), so it remains unchanged as per the request.
-            if 'message' in request.form:
-                 with bots_lock:
-                    for idx, bot in enumerate(bots):
-                        try: threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, request.form['message'])).start()
-                        except Exception as e: print(f"Lỗi gửi tin nhắn: {e}")
-                 msg_status = "Đã gửi thủ công thành công!"
-            if 'quickmsg' in request.form:
-                 with bots_lock:
-                    for idx, bot in enumerate(bots):
-                        try: threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, request.form['quickmsg'])).start()
-                        except Exception as e: print(f"Lỗi gửi tin nhắn: {e}")
-                 msg_status = f"Đã gửi lệnh {request.form['quickmsg']} thành công!"
-            if 'toggle' in request.form: auto_grab_enabled = request.form['toggle'] == "on"; msg_status = f"Tự grab Acc 1 {'đã bật' if auto_grab_enabled else 'đã tắt'}"
-            if 'toggle_2' in request.form: auto_grab_enabled_2 = request.form['toggle_2'] == "on"; msg_status = f"Tự grab Acc 2 {'đã bật' if auto_grab_enabled_2 else 'đã tắt'}"
-            if 'toggle_3' in request.form: auto_grab_enabled_3 = request.form['toggle_3'] == "on"; msg_status = f"Tự grab Acc 3 {'đã bật' if auto_grab_enabled_3 else 'đã tắt'}"
-            if 'heart_threshold' in request.form:
-                try: heart_threshold = int(request.form['heart_threshold']); msg_status = f"Đã cập nhật mức tim Acc 1: {heart_threshold}"
-                except: msg_status = "Mức tim Acc 1 không hợp lệ!"
-            if 'heart_threshold_2' in request.form:
-                try: heart_threshold_2 = int(request.form['heart_threshold_2']); msg_status = f"Đã cập nhật mức tim Acc 2: {heart_threshold_2}"
-                except: msg_status = "Mức tim Acc 2 không hợp lệ!"
-            if 'heart_threshold_3' in request.form:
-                try: heart_threshold_3 = int(request.form['heart_threshold_3']); msg_status = f"Đã cập nhật mức tim Acc 3: {heart_threshold_3}"
-                except: msg_status = "Mức tim Acc 3 không hợp lệ!"
-            if 'send_codes' in request.form:
-                acc_index, delay, prefix, codes = request.form.get("acc_index"), request.form.get("delay"), request.form.get("prefix"), request.form.get("codes")
-                if acc_index and delay and codes:
-                    try:
-                        acc_idx, delay_val, codes_list = int(acc_index), float(delay), codes.split(",")
-                        if acc_idx < len(bots):
-                            with bots_lock:
-                                for i, code in enumerate(codes_list):
-                                    if code.strip():
-                                        final_msg = f"{prefix} {code.strip()}" if prefix else code.strip()
-                                        try: threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
-                                        except Exception as e: print(f"Lỗi gửi mã: {e}")
-                        msg_status = "Đã bắt đầu gửi mã!"
-                    except Exception as e: print(f"Lỗi xử lý codes: {e}")
-            if 'spamtoggle' in request.form:
-                spam_enabled = request.form['spamtoggle'] == "on"
-                spam_message = request.form.get("spammsg", "").strip()
-                if 'spam_delay' in request.form:
-                    try: spam_delay = int(request.form['spam_delay'])
-                    except: pass
-                msg_status = f"Spam {'đã bật' if spam_enabled else 'đã tắt'}"
-            if 'auto_work_toggle' in request.form: auto_work_enabled = request.form['auto_work_toggle'] == "on"; msg_status = f"Auto Work {'đã bật' if auto_work_enabled else 'đã tắt'}"
-            if 'reboot_target' in request.form: reboot_bot(request.form['reboot_target']); msg_status = f"Đã gửi yêu cầu reboot cho {request.form['reboot_target']}!"
-    
-    if msg_status:
-        alert_section = f'<div class="row"><div class="col-12"><div class="alert alert-success">{msg_status}</div></div></div>'
-    else:
-        alert_section = ""
-
-    auto_grab_status, auto_grab_text = ("status-active", "Đang bật") if auto_grab_enabled else ("status-inactive", "Đang tắt")
-    auto_grab_status_2, auto_grab_text_2 = ("status-active", "Đang bật") if auto_grab_enabled_2 else ("status-inactive", "Đang tắt")
-    auto_grab_status_3, auto_grab_text_3 = ("status-active", "Đang bật") if auto_grab_enabled_3 else ("status-inactive", "Đang tắt")
-    auto_work_status, auto_work_text = ("status-active", "Đang bật") if auto_work_enabled else ("status-inactive", "Đang tắt")
-    auto_reboot_status, auto_reboot_text = ("status-active", "Đang bật") if auto_reboot_enabled else ("status-inactive", "Đang tắt")
-    spam_status, spam_text = ("status-active", "Đang bật") if spam_enabled else ("status-inactive", "Đang tắt")
-
-    reboot_options = ""
-    if main_bot: reboot_options += '<option value="main_1">Acc Chính 1</option>'
-    if main_bot_2: reboot_options += '<option value="main_2">Acc Chính 2</option>'
-    if main_bot_3: reboot_options += '<option value="main_3">Acc Chính 3</option>'
-    for i, name in enumerate(acc_names):
-        if i < len(bots): reboot_options += f'<option value="sub_{i}">Acc Phụ {i+1} ({name})</option>'
-    acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names) if i < len(bots))
-
-    return render_template_string(HTML.format(
-        alert_section=alert_section, auto_grab_status=auto_grab_status, auto_grab_text=auto_grab_text,
-        auto_grab_status_2=auto_grab_status_2, auto_grab_text_2=auto_grab_text_2, auto_grab_status_3=auto_grab_status_3,
-        auto_grab_text_3=auto_grab_text_3, auto_work_status=auto_work_status, auto_work_text=auto_work_text,
-        heart_threshold=heart_threshold, heart_threshold_2=heart_threshold_2, heart_threshold_3=heart_threshold_3,
-        reboot_options=reboot_options, auto_reboot_status=auto_reboot_status, auto_reboot_text=auto_reboot_text,
-        auto_reboot_delay=auto_reboot_delay, acc_options=acc_options, spam_status=spam_status, spam_text=spam_text,
-        spam_message=spam_message, spam_delay=spam_delay
-    ))
-
-if __name__ == "__main__":
-    print("Đang khởi tạo các bot...")
-    with bots_lock:
-        if main_token: main_bot = create_bot(main_token, is_main=True)
-        if main_token_2: main_bot_2 = create_bot(main_token_2, is_main_2=True)
-        if main_token_3: main_bot_3 = create_bot(main_token_3, is_main_3=True)
-        for token in tokens:
-            if token.strip(): bots.append(create_bot(token.strip()))
-    print("Tất cả các bot đã được khởi tạo.")
-    print("Đang khởi tạo các luồng nền...")
-    threading.Thread(target=spam_loop, daemon=True).start()
-    threading.Thread(target=keep_alive, daemon=True).start()
-    threading.Thread(target=auto_work_loop, daemon=True).start()
-    print("Các luồng nền đã sẵn sàng.")
-    port = int(os.environ.get("PORT", 8080))
-    print(f"Khởi động Web Server tại cổng {port}...")
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+            </div>
