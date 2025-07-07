@@ -562,6 +562,7 @@ HTML_TEMPLATE = """
         .input-cyber:focus {{ outline: none; border-color: var(--neon-green); box-shadow: var(--shadow-glow) var(--neon-green); background: rgba(0, 255, 65, 0.05); }}
         .btn-cyber {{ padding: 6px 12px; border: 1px solid; border-radius: 4px; background: transparent; color: var(--text-primary); font-family: var(--font-primary); font-weight: 700; font-size: 0.8em; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.5px; }}
         .btn-cyber:hover {{ transform: translateY(-1px); box-shadow: var(--shadow-glow) currentColor; }}
+        .input-cyber option {{ background: var(--primary-bg); color: var(--text-primary); }}
         .btn-primary {{ border-color: var(--neon-green); color: var(--neon-green); }}
         .btn-primary:hover {{ background: var(--neon-green); color: var(--primary-bg); }}
         .btn-danger {{ border-color: var(--neon-red); color: var(--neon-red); }}
