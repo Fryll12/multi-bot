@@ -759,13 +759,13 @@ def index():
             msg = request.form['message']
             with bots_lock:
                 for idx, bot in enumerate(bots):
-                    threading.Timer(0.5 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
+                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
             msg_status = f"Đã gửi tin nhắn: {msg}"
         elif 'quickmsg' in request.form:
             quickmsg = request.form['quickmsg']
             with bots_lock:
                  for idx, bot in enumerate(bots):
-                    threading.Timer(0.5 * idx, bot.sendMessage, args=(other_channel_id, quickmsg)).start()
+                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, quickmsg)).start()
             msg_status = f"Đã gửi lệnh nhanh: {quickmsg}"
 
         # Điều khiển Auto Grab
