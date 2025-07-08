@@ -412,6 +412,54 @@ HTML_TEMPLATE = """
             border-color: var(--blood-red);
             animation: bleeding-glow 1.5s infinite alternate ease-in-out;
         }
+
+        /* --- HIỆU ỨNG GLITCH CHO TIÊU ĐỀ PANEL --- */
+        .panel h2 {
+            position: relative; /* Thêm thuộc tính này */
+        }
+
+        .panel h2::before,
+        .panel h2::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--panel-bg); /* Dùng màu nền của panel */
+            overflow: hidden;
+            clip-path: inset(50% 50% 50% 50%);
+        }
+        
+        .panel h2::before {
+            animation: glitchTop 1s infinite linear alternate-reverse;
+            color: #0ff; /* Màu xanh cyan */
+            left: -2px;
+        }
+        
+        .panel h2::after {
+            animation: glitchBottom 1.5s infinite linear alternate-reverse;
+            color: #f0f; /* Màu tím hồng */
+            left: 2px;
+        }
+
+        @keyframes glitchTop {
+            0% { clip-path: inset(40% 0 61% 0); }
+            20% { clip-path: inset(8% 0 9% 0); }
+            40% { clip-path: inset(79% 0 1% 0); }
+            60% { clip-path: inset(93% 0 5% 0); }
+            80% { clip-path: inset(1% 0 45% 0); }
+            100% { clip-path: inset(43% 0 23% 0); }
+        }
+
+        @keyframes glitchBottom {
+            0% { clip-path: inset(68% 0 10% 0); }
+            20% { clip-path: inset(92% 0 1% 0); }
+            40% { clip-path: inset(45% 0 13% 0); }
+            60% { clip-path: inset(2% 0 78% 0); }
+            80% { clip-path: inset(40% 0 50% 0); }
+            100% { clip-path: inset(74% 0 5% 0); }
+        }
     </style>
 </head>
 <body>
@@ -525,6 +573,12 @@ HTML_TEMPLATE = """
     </div>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Tự động thêm data-text cho hiệu ứng glitch
+        document.querySelectorAll('.panel h2').forEach(header => {
+            const textContent = header.textContent.trim();
+            header.setAttribute('data-text', textContent);
+        });
+
         function formatTime(seconds) {
             if (isNaN(seconds) || seconds < 0) return "--:--:--";
             seconds = Math.floor(seconds);
