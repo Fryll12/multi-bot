@@ -1,4 +1,3 @@
-# PHIÊN BẢN HOÀN CHỈNH: Giao diện mới + đầy đủ tính năng + cập nhật layout
 import discum
 import threading
 import time
@@ -79,7 +78,10 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
     def on_ready(resp):
         if resp.event.ready:
             user_id = resp.raw["user"]["id"]
-            bot_type = "(Acc chính)" if is_main else "(Acc chính 2)" if is_main_2 else "(Acc chính 3)" if is_main_3 else ""
+            if is_main: bot_type = "(ALPHA)"
+            elif is_main_2: bot_type = "(BETA)"
+            elif is_main_3: bot_type = "(GAMMA)"
+            else: bot_type = ""
             print(f"Đã đăng nhập: {user_id} {bot_type}")
 
     if is_main:
@@ -99,7 +101,8 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                     desc = msg_item["embeds"][0].get("description", "")
                                     lines = desc.split('\n')
                                     heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                                    if sum(heart_numbers) > 0 and (max_num := max(heart_numbers)) >= heart_threshold:
+                                    max_num = max(heart_numbers)
+                                    if sum(heart_numbers) > 0 and max_num >= heart_threshold:
                                         max_index = heart_numbers.index(max_num)
                                         emoji, delay = [("1️⃣", 0.5), ("2️⃣", 1.5), ("3️⃣", 2.2)][max_index]
                                         print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s")
@@ -128,7 +131,8 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                     desc = msg_item["embeds"][0].get("description", "")
                                     lines = desc.split('\n')
                                     heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                                    if sum(heart_numbers) > 0 and (max_num := max(heart_numbers)) >= heart_threshold_2:
+                                    max_num = max(heart_numbers)
+                                    if sum(heart_numbers) > 0 and max_num >= heart_threshold_2:
                                         max_index = heart_numbers.index(max_num)
                                         emoji, delay = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)][max_index]
                                         print(f"[Bot 2] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s")
@@ -157,7 +161,8 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                     desc = msg_item["embeds"][0].get("description", "")
                                     lines = desc.split('\n')
                                     heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                                    if sum(heart_numbers) > 0 and (max_num := max(heart_numbers)) >= heart_threshold_3:
+                                    max_num = max(heart_numbers)
+                                    if sum(heart_numbers) > 0 and max_num >= heart_threshold_3:
                                         max_index = heart_numbers.index(max_num)
                                         emoji, delay = [("1️⃣", 1.1), ("2️⃣", 2.1), ("3️⃣", 2.8)][max_index]
                                         print(f"[Bot 3] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s")
@@ -169,7 +174,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                         except Exception as e:
                             print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 3): {e}")
                     threading.Thread(target=read_karibbit_3).start()
-
+    
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
 
@@ -182,7 +187,7 @@ def run_work_bot(token, acc_index):
     def send_kw_command(): bot.sendMessage(work_channel_id, "kw"); step["value"] = 2
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": "a", "data": {"component_type": 2, "custom_id": custom_id}})
+            r = requests.post("[https://discord.com/api/v9/interactions](https://discord.com/api/v9/interactions)", headers=headers, json={"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": "a", "data": {"component_type": 2, "custom_id": custom_id}})
             print(f"[Work Acc {acc_index}] Click tick: Status {r.status_code}")
         except Exception as e: print(f"[Work Acc {acc_index}] Lỗi click tick: {e}")
     @bot.gateway.command
@@ -204,7 +209,8 @@ def run_work_bot(token, acc_index):
                 if match: bot.sendMessage(work_channel_id, f"kjn `{match.group(1)}` a b c d e"); time.sleep(1); send_kw_command()
             elif step["value"] == 2 and author_id == karuta_id and 'components' in m:
                 for comp in m['components']:
-                    if comp['type'] == 1 and (btn := next((b for b in comp['components'] if b['type'] == 2), None)):
+                    btn = next((b for b in comp['components'] if b['type'] == 2), None)
+                    if comp['type'] == 1 and btn:
                         click_tick(work_channel_id, m['id'], btn['custom_id'], m.get('application_id', karuta_id), guild_id)
                         step["value"] = 3; bot.gateway.close(); break
     print(f"[Work Acc {acc_index}] Bắt đầu hoạt động...")
@@ -223,12 +229,13 @@ def auto_work_loop():
             for i, token in enumerate(current_tokens):
                 if not auto_work_enabled: break
                 if token.strip():
-                    print(f"[Work] Đang chạy acc {i+1}...")
-                    run_work_bot(token.strip(), i+1)
-                    print(f"[Work] Acc {i+1} xong, chờ {work_delay_between_acc} giây...")
+                    acc_name = acc_names[i] if i < len(acc_names) else f"Sub {i+1}"
+                    print(f"[Work] Đang chạy acc '{acc_name}'...")
+                    run_work_bot(token.strip(), acc_name)
+                    print(f"[Work] Acc '{acc_name}' xong, chờ {work_delay_between_acc} giây...")
                     time.sleep(work_delay_between_acc)
             if auto_work_enabled:
-                print(f"[Work] Hoàn thành chu kỳ, chờ {work_delay_after_all} giây...")
+                print(f"[Work] Hoàn thành chu kỳ, chờ {work_delay_after_all / 3600:.2f} giờ...")
                 last_work_cycle_time = time.time()
                 start_wait = time.time()
                 while time.time() - start_wait < work_delay_after_all:
@@ -259,10 +266,11 @@ def spam_loop():
             for idx, bot in enumerate(bots_to_spam):
                 if not spam_enabled: break
                 try:
+                    acc_name = acc_names[idx] if idx < len(acc_names) else f"Sub {idx+1}"
                     bot.sendMessage(spam_channel_id, spam_message)
-                    print(f"[{acc_names[idx]}] đã gửi: {spam_message}")
+                    print(f"[{acc_name}] đã gửi: {spam_message}")
                     time.sleep(2)
-                except Exception as e: print(f"Lỗi gửi spam: {e}")
+                except Exception as e: print(f"Lỗi gửi spam từ [{acc_name}]: {e}")
             
             print(f"[Spam] Chờ {spam_delay} giây cho lượt tiếp theo...")
             start_wait = time.time()
@@ -282,8 +290,8 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Karuta Deep - Shadow Network Control</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Orbitron:wght@400;700;900&family=Courier+Prime:wght@400;700&family=Nosifer&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="[https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css](https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css)">
+    <link href="[https://fonts.googleapis.com/css2?family=Creepster&family=Orbitron:wght@400;700;900&family=Courier+Prime:wght@400;700&family=Nosifer&display=swap](https://fonts.googleapis.com/css2?family=Creepster&family=Orbitron:wght@400;700;900&family=Courier+Prime:wght@400;700&family=Nosifer&display=swap)" rel="stylesheet">
     <style>
         :root {
             --primary-bg: #0a0a0a; --secondary-bg: #1a1a1a; --panel-bg: #111111; --border-color: #333333;
@@ -317,7 +325,7 @@ HTML_TEMPLATE = """
         .status-panel { 
             border-color: var(--bone-white); 
             box-shadow: 0 0 20px rgba(248, 248, 255, 0.2);
-            grid-column: 1 / -1; /* <= KÉO DÀI PANEL */
+            grid-column: 1 / -1;
         }
         .status-panel h2 { color: var(--bone-white); border-color: var(--bone-white); }
         .code-panel { border-color: var(--shadow-cyan); box-shadow: var(--shadow-cyan); }
@@ -343,12 +351,11 @@ HTML_TEMPLATE = """
         .status-badge { padding: 4px 10px; border-radius: 15px; text-transform: uppercase; font-size: 0.8em; }
         .status-badge.active { background: var(--necro-green); color: var(--primary-bg); box-shadow: var(--shadow-green); }
         .status-badge.inactive { background: var(--dark-red); color: var(--text-secondary); }
-        .quick-cmd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        .quick-cmd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; }
         
-        /* CSS CHO TRẠNG THÁI BOT */
         .bot-status-container {
             display: grid;
-            grid-template-columns: 1fr 2fr; /* Chia layout thành 2 phần */
+            grid-template-columns: 1fr 2fr;
             gap: 20px;
             margin-top: 15px;
             border-top: 1px solid var(--border-color);
@@ -356,7 +363,7 @@ HTML_TEMPLATE = """
         }
         .bot-status-grid {
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 8px;
         }
         .bot-status-item {
@@ -508,7 +515,6 @@ HTML_TEMPLATE = """
                 const response = await fetch('/status');
                 const data = await response.json();
 
-                // Cập nhật các đồng hồ cũ
                 document.getElementById('work-timer').textContent = formatTime(data.work_countdown);
                 updateStatusBadge('work-status-badge', data.work_enabled);
                 document.getElementById('reboot-timer').textContent = formatTime(data.reboot_countdown);
@@ -516,7 +522,6 @@ HTML_TEMPLATE = """
                 document.getElementById('spam-timer').textContent = formatTime(data.spam_countdown);
                 updateStatusBadge('spam-status-badge', data.spam_enabled);
 
-                // Cập nhật trạng thái các bot
                 const listContainer = document.getElementById('bot-status-list');
                 listContainer.innerHTML = ''; 
 
@@ -552,7 +557,6 @@ def index():
     
     msg_status = ""
     if request.method == "POST":
-        # === MANUAL OPERATIONS LOGIC (RESTORED) ===
         if 'message' in request.form and request.form['message']:
             msg = request.form['message']
             msg_status = f"Sent to slaves: {msg}"
@@ -566,7 +570,6 @@ def index():
                 for idx, bot in enumerate(bots): 
                     threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
 
-        # === AUTO GRAB LOGIC ===
         elif 'toggle' in request.form:
             auto_grab_enabled = not auto_grab_enabled
             heart_threshold = int(request.form.get('heart_threshold', 50))
@@ -580,7 +583,6 @@ def index():
             heart_threshold_3 = int(request.form.get('heart_threshold_3', 50))
             msg_status = f"Auto Grab 3 was {'ENABLED' if auto_grab_enabled_3 else 'DISABLED'}"
         
-        # === SPAM LOGIC ===
         elif 'spamtoggle' in request.form:
             spam_message = request.form.get("spammsg", "").strip()
             spam_delay = int(request.form.get("spam_delay", 10))
@@ -595,7 +597,6 @@ def index():
                 spam_enabled = False
                 msg_status = "Spam DISABLED."
 
-        # === AUTO WORK LOGIC ===
         elif 'auto_work_toggle' in request.form:
             auto_work_enabled = not auto_work_enabled
             if auto_work_enabled: last_work_cycle_time = time.time()
@@ -603,23 +604,42 @@ def index():
             work_delay_after_all = int(request.form.get('work_delay_after_all', 44100))
             msg_status = f"Auto Work {'ENABLED' if auto_work_enabled else 'DISABLED'}."
 
-        # === CODE INJECTION LOGIC ===
         elif 'send_codes' in request.form:
             try:
-                acc_idx = int(request.form.get("acc_index"))
+                target_id_str = request.form.get("acc_index")
                 delay_val = float(request.form.get("delay", 1.0))
                 prefix = request.form.get("prefix", "")
                 codes_list = [c.strip() for c in request.form.get("codes", "").split(',') if c.strip()]
-                if acc_idx < len(bots):
+                
+                target_bot = None
+                target_name = ""
+
+                if target_id_str == 'main_1':
+                    target_bot = main_bot
+                    target_name = "ALPHA NODE (Main)"
+                elif target_id_str == 'main_2':
+                    target_bot = main_bot_2
+                    target_name = "BETA NODE (Main)"
+                elif target_id_str == 'main_3':
+                    target_bot = main_bot_3
+                    target_name = "GAMMA NODE (Main)"
+                else:
+                    acc_idx = int(target_id_str)
+                    if acc_idx < len(bots):
+                        target_bot = bots[acc_idx]
+                        target_name = acc_names[acc_idx]
+
+                if target_bot:
                     with bots_lock:
                         for i, code in enumerate(codes_list):
                             final_msg = f"{prefix} {code}" if prefix else code
-                            threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
-                    msg_status = f"Injecting {len(codes_list)} codes to '{acc_names[acc_idx]}'."
-                else: msg_status = "Error: Invalid account index for code injection."
-            except Exception as e: msg_status = f"Code Injection Error: {e}"
+                            threading.Timer(delay_val * i, target_bot.sendMessage, args=(other_channel_id, final_msg)).start()
+                    msg_status = f"Injecting {len(codes_list)} codes to '{target_name}'."
+                else:
+                    msg_status = "Error: Invalid account selected for injection."
+            except Exception as e:
+                msg_status = f"Code Injection Error: {e}"
 
-        # === AUTO REBOOT LOGIC ===
         elif 'auto_reboot_toggle' in request.form:
             auto_reboot_enabled = not auto_reboot_enabled
             auto_reboot_delay = int(request.form.get("auto_reboot_delay", 3600))
@@ -633,7 +653,6 @@ def index():
                 auto_reboot_thread = None
                 msg_status = "Auto Reboot DISABLED."
 
-        # === MANUAL REBOOT LOGIC ===
         elif 'reboot_target' in request.form:
             target = request.form.get('reboot_target')
             msg_status = f"Rebooting target: {target.upper()}"
@@ -654,6 +673,13 @@ def index():
     reboot_action, reboot_button_class = ("DISABLE", "btn-blood") if auto_reboot_enabled else ("ENABLE", "btn-necro")
     
     acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
+    if main_bot:
+        acc_options += '<option value="main_1">ALPHA NODE (Main)</option>'
+    if main_bot_2:
+        acc_options += '<option value="main_2">BETA NODE (Main)</option>'
+    if main_bot_3:
+        acc_options += '<option value="main_3">GAMMA NODE (Main)</option>'
+
     sub_account_buttons = "".join(f'<button type="submit" name="reboot_target" value="sub_{i}" class="btn btn-necro btn-sm">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
 
     return render_template_string(HTML_TEMPLATE, 
@@ -674,7 +700,6 @@ def status():
     reboot_countdown = (last_reboot_cycle_time + auto_reboot_delay - now) if auto_reboot_enabled else 0
     spam_countdown = (last_spam_time + spam_delay - now) if spam_enabled else 0
 
-    # LẤY TRẠNG THÁI CÁC BOT
     bot_statuses = {
         "main_bots": [
             {"name": "ALPHA NODE", "status": main_bot is not None},
@@ -708,5 +733,5 @@ if __name__ == "__main__":
     threading.Thread(target=auto_work_loop, daemon=True).start()
     
     port = int(os.environ.get("PORT", 8080))
-    print(f"Khởi động Web Server tại http://0.0.0.0:{port}")
+    print(f"Khởi động Web Server tại [http://0.0.0.0](http://0.0.0.0):{port}")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
