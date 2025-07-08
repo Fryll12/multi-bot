@@ -414,50 +414,86 @@ HTML_TEMPLATE = """
         }
 
         /* --- HIỆU ỨNG GLITCH CHO TIÊU ĐỀ PANEL --- */
-        .panel h2 {
+        .glitch {
+            color: white;
+            font-size: 3rem;
             position: relative;
         }
 
-        .panel h2::before,
-        .panel h2::after {
-            content: attr(data-text);
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: var(--panel-bg); /* Dùng màu nền của panel để che chữ gốc */
-        }
-        
-        .panel h2::before {
-            animation: glitchTop 1s infinite linear alternate-reverse;
-            color: #0ff; /* Màu xanh cyan */
-            left: -2px;
-        }
-        
-        .panel h2::after {
-            animation: glitchBottom 1.5s infinite linear alternate-reverse;
-            color: #f0f; /* Màu tím hồng */
-            left: 2px;
-        }
+        .glitch::before,
+        .glitch::after {
+           content: attr(data-text);
+           position: absolute;
+           left: 0;
+           width: 100%;
+           background: black;
+           overflow: hidden;
+         }
+
+        .glitch::before {
+           animation: glitchTop 1s infinite linear alternate-reverse;
+           color: #0ff;
+           top: -2px;
+         }
+
+        .glitch::after {
+           animation: glitchBottom 1s infinite linear alternate-reverse;
+           color: #f0f;
+           top: 2px;
+         }
 
         @keyframes glitchTop {
-            0% { clip-path: inset(0 0 80% 0); transform: translate(-2px, -2px); }
-            20% { clip-path: inset(10% 0 70% 0); transform: translate(2px, 2px); }
-            40% { clip-path: inset(20% 0 60% 0); transform: translate(-2px, -2px); }
-            60% { clip-path: inset(30% 0 50% 0); transform: translate(2px, 2px); }
-            80% { clip-path: inset(40% 0 40% 0); transform: translate(-2px, -2px); }
-            100% { clip-path: inset(50% 0 30% 0); transform: translate(2px, 2px); }
+           0% {
+                clip-path: inset(0 0 80% 0);
+                transform: translate(-2px, -2px);
+          }
+           20% {
+                clip-path: inset(10% 0 70% 0);
+                transform: translate(2px, 2px);
+          }
+           40% {
+                clip-path: inset(20% 0 60% 0);
+                transform: translate(-2px, -2px);
+          }
+          60% {
+               clip-path: inset(30% 0 50% 0);
+               transform: translate(2px, 2px);
+          }
+          80% {
+               clip-path: inset(40% 0 40% 0);
+               transform: translate(-2px, -2px);
+          }
+         100% {
+               clip-path: inset(50% 0 30% 0);
+               transform: translate(2px, 2px);
+          }
         }
 
         @keyframes glitchBottom {
-            0% { clip-path: inset(50% 0 30% 0); transform: translate(2px, 2px); }
-            20% { clip-path: inset(40% 0 40% 0); transform: translate(-2px, -2px); }
-            40% { clip-path: inset(30% 0 50% 0); transform: translate(2px, 2px); }
-            60% { clip-path: inset(20% 0 60% 0); transform: translate(-2px, -2px); }
-            80% { clip-path: inset(10% 0 70% 0); transform: translate(2px, 2px); }
-            100% { clip-path: inset(0 0 80% 0); transform: translate(-2px, -2px); }
+          0% {
+              clip-path: inset(50% 0 30% 0);
+              transform: translate(2px, 2px);
+          }
+          20% {
+               clip-path: inset(40% 0 40% 0);
+               transform: translate(-2px, -2px);
+          }
+          40% {
+               clip-path: inset(30% 0 50% 0);
+               transform: translate(2px, 2px);
+          }
+          60% {
+               clip-path: inset(20% 0 60% 0);
+               transform: translate(-2px, -2px);
+          }
+          80% {
+               clip-path: inset(10% 0 70% 0);
+               transform: translate(2px, 2px);
+          }
+          100% {
+                clip-path: inset(0 0 80% 0);
+                transform: translate(-2px, -2px);
+          }
         }
     </style>
 </head>
@@ -572,10 +608,16 @@ HTML_TEMPLATE = """
     </div>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Dán code mới vào đây
+         // Tự động áp dụng class và data-text cho hiệu ứng glitch
         document.querySelectorAll('.panel h2').forEach(header => {
-            const textContent = header.textContent.trim();
+            // 1. Lấy nội dung text, bỏ qua thẻ <i> của icon
+            const textContent = header.childNodes[header.childNodes.length - 1].textContent.trim();
+            
+            // 2. Gán thuộc tính data-text mà CSS cần
             header.setAttribute('data-text', textContent);
+            
+            // 3. Thêm class "glitch" để kích hoạt hiệu ứng
+            header.classList.add('glitch');
         });
 
         function formatTime(seconds) {
