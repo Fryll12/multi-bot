@@ -21,6 +21,8 @@ other_channel_id = "1387406577040101417"
 ktb_channel_id = "1376777071279214662"
 spam_channel_id = "1388802151723302912"
 work_channel_id = "1389250541590413363"
+daily_channel_id = "1392189578533671093"
+kvi_channel_id = "1312300543326031915"
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 
@@ -45,6 +47,13 @@ auto_daily_enabled = False
 daily_delay_after_all = 87000 
 daily_delay_between_acc = 3
 last_daily_cycle_time = 0
+
+# --- BIẾN CHO AUTO KVI ---
+auto_kvi_enabled = False
+kvi_click_count = 10
+kvi_click_delay = 3
+kvi_loop_delay = 7500 # 2 tiếng (7200s) + 5 phút (300s)
+last_kvi_cycle_time = 0
 
 # --- CÁC HÀM LOGIC BOT ---
 
@@ -265,7 +274,6 @@ def auto_work_loop():
                     time.sleep(1)
         else:
             time.sleep(1)
-# ... (sau hàm auto_work_loop) ...
 
 def run_daily_bot(token, acc_name):
     """
@@ -273,7 +281,7 @@ def run_daily_bot(token, acc_name):
     """
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
-    state = {"step": 0, "target_message_id": None} # step 0: chờ nút 1, step 1: chờ nút 2
+    state = {"step": 0, "target_message_id": None} 
 
     def click_button(channel_id, message_id, custom_id, application_id, guild_id):
         try:
@@ -286,39 +294,35 @@ def run_daily_bot(token, acc_name):
 
     @bot.gateway.command
     def on_message(resp):
-        # Xử lý cả tin nhắn mới và tin nhắn được cập nhật
         event_type = resp.event.message and "message" or resp.event.message_update and "update"
         if not event_type: return
 
         m = resp.parsed.auto()
         author_id = str(m.get('author', {}).get('id', ''))
         
-        # Chỉ xử lý tin nhắn trong kênh work và từ Karuta
-        if str(m.get('channel_id')) != work_channel_id or author_id != karuta_id: return
+        # THAY ĐỔI 1: SỬ DỤNG daily_channel_id ĐỂ KIỂM TRA
+        if str(m.get('channel_id')) != daily_channel_id or author_id != karuta_id: return
         if 'components' not in m or not m['components']: return
 
-        # BƯỚC 1: Nhấn nút lần đầu trên tin nhắn MỚI
         if event_type == "message" and state["step"] == 0:
             btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
-            if btn and click_button(work_channel_id, m['id'], btn['custom_id'], karuta_id, m.get('guild_id')):
+            if btn and click_button(daily_channel_id, m['id'], btn['custom_id'], karuta_id, m.get('guild_id')):
                 print(f"[Daily][{acc_name}] Đã nhấn nút lần 1. Chờ tin nhắn được cập nhật.")
                 state["target_message_id"] = m['id']
-                state["step"] = 1 # Chuyển sang trạng thái chờ nút thứ 2
+                state["step"] = 1
 
-        # BƯỚC 2: Nhấn nút lần hai trên tin nhắn ĐƯỢC CẬP NHẬT
         elif event_type == "update" and state["step"] == 1 and m['id'] == state["target_message_id"]:
             btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
-            if btn and click_button(work_channel_id, m['id'], btn['custom_id'], karuta_id, m.get('guild_id')):
+            if btn and click_button(daily_channel_id, m['id'], btn['custom_id'], karuta_id, m.get('guild_id')):
                 print(f"[Daily][{acc_name}] Đã nhấn nút lần 2. Hoàn thành.")
                 state["step"] = 2
                 bot.gateway.close()
     
     print(f"[Daily][{acc_name}] Bắt đầu hoạt động...")
     threading.Thread(target=bot.gateway.run, daemon=True).start()
-    time.sleep(3) # Chờ bot kết nối
-    bot.sendMessage(work_channel_id, "kdaily")
+    time.sleep(3)
+    bot.sendMessage(daily_channel_id, "kdaily")
     
-    # Đặt thời gian chờ tối đa 60 giây cho mỗi tài khoản
     timeout = time.time() + 60
     while state["step"] != 2 and time.time() < timeout:
         time.sleep(1)
@@ -363,6 +367,75 @@ def auto_daily_loop():
                     time.sleep(1)
         else:
             time.sleep(1)
+
+def auto_kvi_loop():
+    global auto_kvi_enabled, last_kvi_cycle_time
+    while True:
+        if auto_kvi_enabled and main_bot:
+            print("[KVI] Bắt đầu chu trình KVI...")
+            
+            # Gửi lệnh kvi
+            main_bot.sendMessage(kvi_channel_id, "kvi")
+            time.sleep(5) # Chờ Karuta phản hồi
+
+            message_to_click = None
+            button_to_click = None
+
+            # Quét tin nhắn gần đây để tìm nút bấm từ Karuta
+            try:
+                recent_messages = main_bot.getMessages(kvi_channel_id, num=10).json()
+                for msg in recent_messages:
+                    if msg.get("author", {}).get("id") == karuta_id and msg.get("components"):
+                        # Tìm nút bấm đầu tiên trong tin nhắn
+                        btn = next((b for row in msg['components'] for b in row['components'] if b['type'] == 2), None)
+                        if btn:
+                            message_to_click = msg
+                            button_to_click = btn
+                            print(f"[KVI] Đã tìm thấy tin nhắn {msg['id']} để nhấn nút.")
+                            break
+            except Exception as e:
+                print(f"[KVI] Lỗi khi tìm tin nhắn: {e}")
+
+            # Nếu đã tìm thấy nút, bắt đầu vòng lặp nhấn
+            if message_to_click and button_to_click:
+                headers = {"Authorization": main_token, "Content-Type": "application/json"}
+                payload = {
+                    "type": 3,
+                    "guild_id": message_to_click.get('guild_id'),
+                    "channel_id": kvi_channel_id,
+                    "message_id": message_to_click['id'],
+                    "application_id": karuta_id,
+                    "session_id": "a",
+                    "data": {"component_type": 2, "custom_id": button_to_click['custom_id']}
+                }
+                
+                for i in range(kvi_click_count):
+                    if not auto_kvi_enabled:
+                        print("[KVI] Tính năng đã bị tắt, dừng chu trình nhấn nút.")
+                        break
+                    
+                    try:
+                        print(f"[KVI] Đang nhấn nút lần thứ {i + 1}/{kvi_click_count}...")
+                        requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
+                        time.sleep(kvi_click_delay)
+                    except Exception as e:
+                        print(f"[KVI] Lỗi khi nhấn nút: {e}")
+                
+                print("[KVI] Hoàn thành chu trình nhấn nút.")
+            else:
+                print("[KVI] Không tìm thấy nút nào để nhấn.")
+
+            # Chờ cho chu kỳ tiếp theo
+            if auto_kvi_enabled:
+                last_kvi_cycle_time = time.time()
+                print(f"[KVI] Chờ {kvi_loop_delay / 3600:.2f} giờ cho lần chạy tiếp theo.")
+                start_wait = time.time()
+                while time.time() - start_wait < kvi_loop_delay:
+                    if not auto_kvi_enabled: break
+                    time.sleep(1)
+        else:
+            time.sleep(1)
+
 def auto_reboot_loop():
     global auto_reboot_stop_event, last_reboot_cycle_time
     print("[Reboot] Luồng tự động reboot đã bắt đầu.")
@@ -482,7 +555,7 @@ HTML_TEMPLATE = """
         }
         .bot-status-grid {
             display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 8px;
         }
         .bot-status-item {
@@ -607,12 +680,29 @@ HTML_TEMPLATE = """
 
         <div class="main-grid">
             <div class="panel status-panel">
-                <h2><i class="fas fa-heartbeat"></i> System Status</h2>
+                <h2 data-text="System Status"><i class="fas fa-heartbeat"></i> System Status</h2>
                 <div class="bot-status-container">
-                    <div class="status-grid">
-                        <div class="status-row"><span class="status-label"><i class="fas fa-cogs"></i> Auto Work</span><div><span id="work-timer" class="timer-display">--:--:--</span> <span id="work-status-badge" class="status-badge inactive">OFF</span></div></div>
-                        <div class="status-row"><span class="status-label"><i class="fas fa-redo"></i> Auto Reboot</span><div><span id="reboot-timer" class="timer-display">--:--:--</span> <span id="reboot-status-badge" class="status-badge inactive">OFF</span></div></div>
-                        <div class="status-row"><span class="status-label"><i class="fas fa-broadcast-tower"></i> Auto Spam</span><div><span id="spam-timer" class="timer-display">--:--:--</span><span id="spam-status-badge" class="status-badge inactive">OFF</span></div></div>
+                    <div class="status-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="status-row">
+                            <span class="status-label"><i class="fas fa-cogs"></i> Auto Work</span>
+                            <div><span id="work-timer" class="timer-display">--:--:--</span> <span id="work-status-badge" class="status-badge inactive">OFF</span></div>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label"><i class="fas fa-calendar-check"></i> Auto Daily</span>
+                            <div><span id="daily-timer" class="timer-display">--:--:--</span> <span id="daily-status-badge" class="status-badge inactive">OFF</span></div>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label"><i class="fas fa-gem"></i> Auto KVI</span>
+                            <div><span id="kvi-timer" class="timer-display">--:--:--</span> <span id="kvi-status-badge" class="status-badge inactive">OFF</span></div>
+                        </div>
+                         <div class="status-row">
+                            <span class="status-label"><i class="fas fa-broadcast-tower"></i> Auto Spam</span>
+                            <div><span id="spam-timer" class="timer-display">--:--:--</span><span id="spam-status-badge" class="status-badge inactive">OFF</span></div>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label"><i class="fas fa-redo"></i> Auto Reboot</span>
+                            <div><span id="reboot-timer" class="timer-display">--:--:--</span> <span id="reboot-status-badge" class="status-badge inactive">OFF</span></div>
+                        </div>
                          <div class="status-row">
                               <span class="status-label"><i class="fas fa-server"></i> Deep Uptime</span>
                               <div><span id="uptime-timer" class="timer-display">--:--:--</span></div>
@@ -658,9 +748,18 @@ HTML_TEMPLATE = """
             <div class="panel dark-panel">
                 <h2><i class="fas fa-broadcast-tower"></i> Shadow Broadcast</h2>
                 <form method="post">
+                    <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">AUTO SPAM</h3>
                     <div class="input-group"><label>Message</label><textarea name="spammsg" rows="2">{{ spam_message }}</textarea></div>
                     <div class="input-group"><label>Delay (s)</label><input type="number" name="spam_delay" value="{{ spam_delay }}"></div>
-                    <button type="submit" name="spamtoggle" class="btn {{ spam_button_class }}" style="width:100%; margin-top: 10px;">{{ spam_action }} SPAM</button>
+                    <button type="submit" name="spamtoggle" class="btn {{ spam_button_class }}" style="width:100%;">{{ spam_action }} SPAM</button>
+                    
+                    <hr style="border-color: var(--border-color); margin: 25px 0;">
+
+                    <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">AUTO KVI (MAIN ACC 1)</h3>
+                    <div class="input-group"><label>Clicks</label><input type="number" name="kvi_click_count" value="{{ kvi_click_count }}"></div>
+                    <div class="input-group"><label>Click Delay</label><input type="number" name="kvi_click_delay" value="{{ kvi_click_delay }}"></div>
+                    <div class="input-group"><label>Cycle Delay</label><input type="number" name="kvi_loop_delay" value="{{ kvi_loop_delay }}"></div>
+                    <button type="submit" name="auto_kvi_toggle" class="btn {{ kvi_button_class }}" style="width:100%;">{{ kvi_action }} KVI</button>
                 </form>
             </div>
 
@@ -747,14 +846,24 @@ HTML_TEMPLATE = """
                 const response = await fetch('/status');
                 const data = await response.json();
 
+                // Cập nhật các timer cũ
                 document.getElementById('work-timer').textContent = formatTime(data.work_countdown);
                 updateStatusBadge('work-status-badge', data.work_enabled);
+                
                 document.getElementById('reboot-timer').textContent = formatTime(data.reboot_countdown);
                 updateStatusBadge('reboot-status-badge', data.reboot_enabled);
+                
                 document.getElementById('spam-timer').textContent = formatTime(data.spam_countdown);
                 updateStatusBadge('spam-status-badge', data.spam_enabled);
+                
+                // --- CÁC DÒNG MỚI ĐƯỢC THÊM VÀO ---
+                document.getElementById('daily-timer').textContent = formatTime(data.daily_countdown);
+                updateStatusBadge('daily-status-badge', data.daily_enabled);
 
-                // --- THÊM LOGIC MỚI VÀO ĐÂY ---
+                document.getElementById('kvi-timer').textContent = formatTime(data.kvi_countdown);
+                updateStatusBadge('kvi-status-badge', data.kvi_enabled);
+                // --- KẾT THÚC PHẦN THÊM MỚI ---
+
                 const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
                 document.getElementById('uptime-timer').textContent = formatTime(serverUptimeSeconds);
 
@@ -789,7 +898,8 @@ def index():
     global spam_enabled, spam_message, spam_delay, spam_thread, last_spam_time
     global heart_threshold, heart_threshold_2, heart_threshold_3
     global auto_work_enabled, work_delay_between_acc, work_delay_after_all, last_work_cycle_time
-    global auto_daily_enabled, daily_delay_between_acc, daily_delay_after_all, last_daily_cycle_time # <-- DÒNG MỚI
+    global auto_daily_enabled, daily_delay_between_acc, daily_delay_after_all, last_daily_cycle_time
+    global auto_kvi_enabled, kvi_click_count, kvi_click_delay, kvi_loop_delay, last_kvi_cycle_time
     global auto_reboot_enabled, auto_reboot_delay, auto_reboot_thread, auto_reboot_stop_event, last_reboot_cycle_time
     
     msg_status = ""
@@ -841,14 +951,20 @@ def index():
             work_delay_after_all = int(request.form.get('work_delay_after_all', 44100))
             msg_status = f"Auto Work {'ENABLED' if auto_work_enabled else 'DISABLED'}."
 
-         # ----- KHỐI LOGIC MỚI CHO AUTO DAILY -----
         elif 'auto_daily_toggle' in request.form:
             auto_daily_enabled = not auto_daily_enabled
             if auto_daily_enabled: last_daily_cycle_time = time.time()
             daily_delay_between_acc = int(request.form.get('daily_delay_between_acc', 3))
             daily_delay_after_all = int(request.form.get('daily_delay_after_all', 87000))
             msg_status = f"Auto Daily {'ENABLED' if auto_daily_enabled else 'DISABLED'}."
-        # ----- KẾT THÚC KHỐI LOGIC MỚI -----
+
+        elif 'auto_kvi_toggle' in request.form:
+            auto_kvi_enabled = not auto_kvi_enabled
+            if auto_kvi_enabled: last_kvi_cycle_time = time.time()
+            kvi_click_count = int(request.form.get('kvi_click_count', 10))
+            kvi_click_delay = int(request.form.get('kvi_click_delay', 3))
+            kvi_loop_delay = int(request.form.get('kvi_loop_delay', 7500))
+            msg_status = f"Auto KVI {'ENABLED' if auto_kvi_enabled else 'DISABLED'}."
 
         elif 'send_codes' in request.form:
             try:
@@ -916,7 +1032,8 @@ def index():
     grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     spam_action, spam_button_class = ("DISABLE", "btn-blood") if spam_enabled else ("ENABLE", "btn-necro")
     work_action, work_button_class = ("DISABLE", "btn-blood") if auto_work_enabled else ("ENABLE", "btn-necro")
-    daily_action, daily_button_class = ("DISABLE", "btn-blood") if auto_daily_enabled else ("ENABLE", "btn-necro") # <-- DÒNG MỚI
+    daily_action, daily_button_class = ("DISABLE", "btn-blood") if auto_daily_enabled else ("ENABLE", "btn-necro")
+    kvi_action, kvi_button_class = ("DISABLE", "btn-blood") if auto_kvi_enabled else ("ENABLE", "btn-necro")
     reboot_action, reboot_button_class = ("DISABLE", "btn-blood") if auto_reboot_enabled else ("ENABLE", "btn-necro")
     
     acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
@@ -937,6 +1054,7 @@ def index():
         spam_message=spam_message, spam_delay=spam_delay, spam_action=spam_action, spam_button_class=spam_button_class,
         work_delay_between_acc=work_delay_between_acc, work_delay_after_all=work_delay_after_all, work_action=work_action, work_button_class=work_button_class,
         daily_delay_between_acc=daily_delay_between_acc, daily_delay_after_all=daily_delay_after_all, daily_action=daily_action, daily_button_class=daily_button_class,
+        kvi_click_count=kvi_click_count, kvi_click_delay=kvi_click_delay, kvi_loop_delay=kvi_loop_delay, kvi_action=kvi_action, kvi_button_class=kvi_button_class,
         auto_reboot_delay=auto_reboot_delay, reboot_action=reboot_action, reboot_button_class=reboot_button_class,
         acc_options=acc_options, num_bots=len(bots), sub_account_buttons=sub_account_buttons
     )
@@ -945,6 +1063,9 @@ def index():
 def status():
     now = time.time()
     work_countdown = (last_work_cycle_time + work_delay_after_all - now) if auto_work_enabled else 0
+    # THÊM TÍNH TOÁN CHO DAILY VÀ KVI
+    daily_countdown = (last_daily_cycle_time + daily_delay_after_all - now) if auto_daily_enabled else 0
+    kvi_countdown = (last_kvi_cycle_time + kvi_loop_delay - now) if auto_kvi_enabled else 0
     reboot_countdown = (last_reboot_cycle_time + auto_reboot_delay - now) if auto_reboot_enabled else 0
     spam_countdown = (last_spam_time + spam_delay - now) if spam_enabled else 0
 
@@ -961,6 +1082,9 @@ def status():
 
     return jsonify({
         'work_enabled': auto_work_enabled, 'work_countdown': work_countdown,
+        # THÊM DỮ LIỆU MỚI VÀO RESPONSE
+        'daily_enabled': auto_daily_enabled, 'daily_countdown': daily_countdown,
+        'kvi_enabled': auto_kvi_enabled, 'kvi_countdown': kvi_countdown,
         'reboot_enabled': auto_reboot_enabled, 'reboot_countdown': reboot_countdown,
         'spam_enabled': spam_enabled, 'spam_countdown': spam_countdown,
         'bot_statuses': bot_statuses,
@@ -981,6 +1105,7 @@ if __name__ == "__main__":
     threading.Thread(target=spam_loop, daemon=True).start()
     threading.Thread(target=auto_work_loop, daemon=True).start()
     threading.Thread(target=auto_daily_loop, daemon=True).start()
+    threading.Thread(target=auto_kvi_loop, daemon=True).start()
     
     port = int(os.environ.get("PORT", 8080))
     print(f"Khởi động Web Server tại http://0.0.0.0:{port}")
