@@ -37,6 +37,7 @@ spam_message, spam_delay, work_delay_between_acc, work_delay_after_all, auto_reb
 last_work_cycle_time, last_reboot_cycle_time, last_spam_time = 0, 0, 0
 spam_thread, auto_reboot_thread, auto_reboot_stop_event = None, None, None
 bots_lock = threading.Lock()
+server_start_time = time.time()
 
 # --- CÁC HÀM LOGIC BOT ---
 
@@ -508,6 +509,10 @@ HTML_TEMPLATE = """
                         <div class="status-row"><span class="status-label"><i class="fas fa-cogs"></i> Auto Work</span><div><span id="work-timer" class="timer-display">--:--:--</span> <span id="work-status-badge" class="status-badge inactive">OFF</span></div></div>
                         <div class="status-row"><span class="status-label"><i class="fas fa-redo"></i> Auto Reboot</span><div><span id="reboot-timer" class="timer-display">--:--:--</span> <span id="reboot-status-badge" class="status-badge inactive">OFF</span></div></div>
                         <div class="status-row"><span class="status-label"><i class="fas fa-broadcast-tower"></i> Auto Spam</span><div><span id="spam-timer" class="timer-display">--:--:--</span><span id="spam-status-badge" class="status-badge inactive">OFF</span></div></div>
+                         <div class="status-row">
+                              <span class="status-label"><i class="fas fa-server"></i> Server Uptime</span>
+                              <div><span id="uptime-timer" class="timer-display">--:--:--</span></div>
+                        </div> 
                     </div>
                     <div id="bot-status-list" class="bot-status-grid">
                         </div>
@@ -636,6 +641,10 @@ HTML_TEMPLATE = """
                 updateStatusBadge('reboot-status-badge', data.reboot_enabled);
                 document.getElementById('spam-timer').textContent = formatTime(data.spam_countdown);
                 updateStatusBadge('spam-status-badge', data.spam_enabled);
+
+                // --- THÊM LOGIC MỚI VÀO ĐÂY ---
+                const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
+                document.getElementById('uptime-timer').textContent = formatTime(serverUptimeSeconds);
 
                 const listContainer = document.getElementById('bot-status-list');
                 listContainer.innerHTML = ''; 
@@ -831,6 +840,7 @@ def status():
         'reboot_enabled': auto_reboot_enabled, 'reboot_countdown': reboot_countdown,
         'spam_enabled': spam_enabled, 'spam_countdown': spam_countdown,
         'bot_statuses': bot_statuses
+        'server_start_time':
     })
 
 # --- MAIN EXECUTION ---
