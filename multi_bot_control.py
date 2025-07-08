@@ -1,4 +1,4 @@
-# multi_bot_control.py (Giao diện đã được cập nhật)
+# PHIÊN BẢN HOÀN CHỈNH: Giao diện mới + đầy đủ tính năng
 import discum
 import threading
 import time
@@ -44,18 +44,21 @@ def reboot_bot(target_id):
     global main_bot, main_bot_2, main_bot_3, bots
     with bots_lock:
         print(f"[Reboot] Nhận được yêu cầu reboot cho target: {target_id}")
-        if target_id == 'main_1' and main_bot:
-            try: main_bot.gateway.close()
+        if target_id == 'main_1' and main_token:
+            try: 
+                if main_bot: main_bot.gateway.close()
             except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 1: {e}")
             main_bot = create_bot(main_token, is_main=True)
             print("[Reboot] Acc Chính 1 đã được khởi động lại.")
-        elif target_id == 'main_2' and main_bot_2:
-            try: main_bot_2.gateway.close()
+        elif target_id == 'main_2' and main_token_2:
+            try: 
+                if main_bot_2: main_bot_2.gateway.close()
             except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 2: {e}")
             main_bot_2 = create_bot(main_token_2, is_main_2=True)
             print("[Reboot] Acc Chính 2 đã được khởi động lại.")
-        elif target_id == 'main_3' and main_bot_3:
-            try: main_bot_3.gateway.close()
+        elif target_id == 'main_3' and main_token_3:
+            try: 
+                if main_bot_3: main_bot_3.gateway.close()
             except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 3: {e}")
             main_bot_3 = create_bot(main_token_3, is_main_3=True)
             print("[Reboot] Acc Chính 3 đã được khởi động lại.")
@@ -89,21 +92,24 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                     last_drop_msg_id = msg["id"]
                     def read_karibbit():
                         time.sleep(0.5)
-                        messages = bot.getMessages(main_channel_id, num=5).json()
-                        for msg_item in messages:
-                            if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                desc = msg_item["embeds"][0].get("description", "")
-                                lines = desc.split('\n')
-                                heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                                if sum(heart_numbers) > 0 and (max_num := max(heart_numbers)) >= heart_threshold:
-                                    max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 0.5), ("2️⃣", 1.5), ("3️⃣", 2.2)][max_index]
-                                    print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s")
-                                    def grab():
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                        bot.sendMessage(ktb_channel_id, "kt b")
-                                    threading.Timer(delay, grab).start()
-                                break
+                        try:
+                            messages = bot.getMessages(main_channel_id, num=5).json()
+                            for msg_item in messages:
+                                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                                    desc = msg_item["embeds"][0].get("description", "")
+                                    lines = desc.split('\n')
+                                    heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                                    if sum(heart_numbers) > 0 and (max_num := max(heart_numbers)) >= heart_threshold:
+                                        max_index = heart_numbers.index(max_num)
+                                        emoji, delay = [("1️⃣", 0.5), ("2️⃣", 1.5), ("3️⃣", 2.2)][max_index]
+                                        print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s")
+                                        def grab():
+                                            bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            bot.sendMessage(ktb_channel_id, "kt b")
+                                        threading.Timer(delay, grab).start()
+                                    break
+                        except Exception as e:
+                            print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 1): {e}")
                     threading.Thread(target=read_karibbit).start()
     if is_main_2:
         @bot.gateway.command
@@ -115,21 +121,24 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                     last_drop_msg_id = msg["id"]
                     def read_karibbit_2():
                         time.sleep(0.5)
-                        messages = bot.getMessages(main_channel_id, num=5).json()
-                        for msg_item in messages:
-                            if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                desc = msg_item["embeds"][0].get("description", "")
-                                lines = desc.split('\n')
-                                heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                                if sum(heart_numbers) > 0 and (max_num := max(heart_numbers)) >= heart_threshold_2:
-                                    max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)][max_index]
-                                    print(f"[Bot 2] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s")
-                                    def grab_2():
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                        bot.sendMessage(ktb_channel_id, "kt b")
-                                    threading.Timer(delay, grab_2).start()
-                                break
+                        try:
+                            messages = bot.getMessages(main_channel_id, num=5).json()
+                            for msg_item in messages:
+                                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                                    desc = msg_item["embeds"][0].get("description", "")
+                                    lines = desc.split('\n')
+                                    heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                                    if sum(heart_numbers) > 0 and (max_num := max(heart_numbers)) >= heart_threshold_2:
+                                        max_index = heart_numbers.index(max_num)
+                                        emoji, delay = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)][max_index]
+                                        print(f"[Bot 2] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s")
+                                        def grab_2():
+                                            bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            bot.sendMessage(ktb_channel_id, "kt b")
+                                        threading.Timer(delay, grab_2).start()
+                                    break
+                        except Exception as e:
+                            print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 2): {e}")
                     threading.Thread(target=read_karibbit_2).start()
     if is_main_3:
         @bot.gateway.command
@@ -141,21 +150,24 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                     last_drop_msg_id = msg["id"]
                     def read_karibbit_3():
                         time.sleep(0.5)
-                        messages = bot.getMessages(main_channel_id, num=5).json()
-                        for msg_item in messages:
-                            if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                desc = msg_item["embeds"][0].get("description", "")
-                                lines = desc.split('\n')
-                                heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                                if sum(heart_numbers) > 0 and (max_num := max(heart_numbers)) >= heart_threshold_3:
-                                    max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 1.1), ("2️⃣", 2.1), ("3️⃣", 2.8)][max_index]
-                                    print(f"[Bot 3] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s")
-                                    def grab_3():
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                        bot.sendMessage(ktb_channel_id, "kt b")
-                                    threading.Timer(delay, grab_3).start()
-                                break
+                        try:
+                            messages = bot.getMessages(main_channel_id, num=5).json()
+                            for msg_item in messages:
+                                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                                    desc = msg_item["embeds"][0].get("description", "")
+                                    lines = desc.split('\n')
+                                    heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                                    if sum(heart_numbers) > 0 and (max_num := max(heart_numbers)) >= heart_threshold_3:
+                                        max_index = heart_numbers.index(max_num)
+                                        emoji, delay = [("1️⃣", 1.1), ("2️⃣", 2.1), ("3️⃣", 2.8)][max_index]
+                                        print(f"[Bot 3] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s")
+                                        def grab_3():
+                                            bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            bot.sendMessage(ktb_channel_id, "kt b")
+                                        threading.Timer(delay, grab_3).start()
+                                    break
+                        except Exception as e:
+                            print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 3): {e}")
                     threading.Thread(target=read_karibbit_3).start()
 
     threading.Thread(target=bot.gateway.run, daemon=True).start()
@@ -282,14 +294,14 @@ HTML_TEMPLATE = """
             --shadow-green: 0 0 20px rgba(34, 139, 34, 0.5); --shadow-cyan: 0 0 20px rgba(0, 139, 139, 0.5);
         }
         body { font-family: 'Courier Prime', monospace; background: var(--primary-bg); color: var(--text-primary); margin: 0; padding: 0;}
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
         .header { text-align: center; margin-bottom: 30px; padding: 30px; background: linear-gradient(135deg, var(--void-black), rgba(139, 0, 0, 0.3)); border: 2px solid var(--blood-red); border-radius: 15px; box-shadow: var(--shadow-red), inset 0 0 20px rgba(139, 0, 0, 0.1); }
         .skull-icon { font-size: 4rem; color: var(--blood-red); margin-bottom: 15px; }
         .title { font-family: 'Creepster', cursive; font-size: 3.5rem; letter-spacing: 4px; }
         .title-main { color: var(--blood-red); text-shadow: 0 0 30px var(--blood-red); }
         .title-sub { color: var(--deep-purple); text-shadow: 0 0 30px var(--deep-purple); }
         .subtitle { font-size: 1.3rem; color: var(--text-secondary); letter-spacing: 2px; margin-bottom: 15px; font-family: 'Orbitron', monospace; }
-        .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px; margin-bottom: 30px; }
+        .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .panel { background: linear-gradient(135deg, var(--panel-bg), rgba(26, 26, 26, 0.9)); border: 1px solid var(--border-color); border-radius: 10px; padding: 25px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
         .panel h2 { font-family: 'Nosifer', cursive; font-size: 1.4rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid; padding-bottom: 10px; }
         .panel h2 i { margin-right: 10px; }
@@ -305,7 +317,9 @@ HTML_TEMPLATE = """
         .status-panel h2 { color: var(--bone-white); border-color: var(--bone-white); }
         .code-panel { border-color: var(--shadow-cyan); box-shadow: var(--shadow-cyan); }
         .code-panel h2 { color: var(--shadow-cyan); border-color: var(--shadow-cyan); }
-        .btn { background: linear-gradient(135deg, var(--secondary-bg), #333); border: 1px solid var(--border-color); color: var(--text-primary); padding: 12px 20px; border-radius: 8px; cursor: pointer; font-family: 'Orbitron', monospace; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; }
+        .ops-panel { border-color: var(--neon-yellow, #fff000); box-shadow: 0 0 20px rgba(255, 240, 0, 0.4); }
+        .ops-panel h2 { color: var(--neon-yellow, #fff000); border-color: var(--neon-yellow, #fff000); }
+        .btn { background: linear-gradient(135deg, var(--secondary-bg), #333); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 15px; border-radius: 4px; cursor: pointer; font-family: 'Orbitron', monospace; font-weight: 700; text-transform: uppercase; }
         .btn-blood { border-color: var(--blood-red); color: var(--blood-red); } .btn-blood:hover { background: var(--blood-red); color: var(--primary-bg); box-shadow: var(--shadow-red); }
         .btn-necro { border-color: var(--necro-green); color: var(--necro-green); } .btn-necro:hover { background: var(--necro-green); color: var(--primary-bg); box-shadow: var(--shadow-green); }
         .btn-primary { border-color: var(--shadow-cyan); color: var(--shadow-cyan); } .btn-primary:hover { background: var(--shadow-cyan); color: var(--primary-bg); box-shadow: var(--shadow-cyan); }
@@ -324,6 +338,7 @@ HTML_TEMPLATE = """
         .status-badge { padding: 4px 10px; border-radius: 15px; text-transform: uppercase; font-size: 0.8em; }
         .status-badge.active { background: var(--necro-green); color: var(--primary-bg); box-shadow: var(--shadow-green); }
         .status-badge.inactive { background: var(--dark-red); color: var(--text-secondary); }
+        .quick-cmd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
     </style>
 </head>
 <body>
@@ -342,61 +357,40 @@ HTML_TEMPLATE = """
             <div class="panel status-panel">
                 <h2><i class="fas fa-heartbeat"></i> System Status</h2>
                 <div class="status-grid">
-                    <div class="status-row">
-                        <span class="status-label"><i class="fas fa-cogs"></i> Auto Work</span>
-                        <div>
-                           <span id="work-timer" class="timer-display">--:--:--</span>
-                           <span id="work-status-badge" class="status-badge inactive">OFF</span>
-                        </div>
-                    </div>
-                    <div class="status-row">
-                        <span class="status-label"><i class="fas fa-redo"></i> Auto Reboot</span>
-                        <div>
-                            <span id="reboot-timer" class="timer-display">--:--:--</span>
-                            <span id="reboot-status-badge" class="status-badge inactive">OFF</span>
-                        </div>
-                    </div>
-                     <div class="status-row">
-                        <span class="status-label"><i class="fas fa-broadcast-tower"></i> Auto Spam</span>
-                        <div>
-                            <span id="spam-timer" class="timer-display">--:--:--</span>
-                            <span id="spam-status-badge" class="status-badge inactive">OFF</span>
-                        </div>
-                    </div>
+                    <div class="status-row"><span class="status-label"><i class="fas fa-cogs"></i> Auto Work</span><div><span id="work-timer" class="timer-display">--:--:--</span> <span id="work-status-badge" class="status-badge inactive">OFF</span></div></div>
+                    <div class="status-row"><span class="status-label"><i class="fas fa-redo"></i> Auto Reboot</span><div><span id="reboot-timer" class="timer-display">--:--:--</span> <span id="reboot-status-badge" class="status-badge inactive">OFF</span></div></div>
+                    <div class="status-row"><span class="status-label"><i class="fas fa-broadcast-tower"></i> Auto Spam</span><div><span id="spam-timer" class="timer-display">--:--:--</span><span id="spam-status-badge" class="status-badge inactive">OFF</span></div></div>
                 </div>
             </div>
 
             <div class="panel blood-panel">
                 <h2><i class="fas fa-crosshairs"></i> Soul Harvest</h2>
                 <form method="post">
-                    <div class="grab-section">
-                        <h3>ALPHA NODE <span class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3>
-                        <div class="input-group">
-                            <input type="number" name="heart_threshold" value="{{ heart_threshold }}" min="1" max="100">
-                            <button type="submit" name="toggle" value="1" class="btn {{ grab_button_class }}">{{ grab_action }}</button>
-                        </div>
-                    </div>
-                    <div class="grab-section">
-                        <h3>BETA NODE <span class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3>
-                        <div class="input-group">
-                             <input type="number" name="heart_threshold_2" value="{{ heart_threshold_2 }}" min="1" max="100">
-                             <button type="submit" name="toggle_2" value="1" class="btn {{ grab_button_class_2 }}">{{ grab_action_2 }}</button>
-                        </div>
-                    </div>
-                    <div class="grab-section">
-                        <h3>GAMMA NODE <span class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3>
-                        <div class="input-group">
-                             <input type="number" name="heart_threshold_3" value="{{ heart_threshold_3 }}" min="1" max="100">
-                             <button type="submit" name="toggle_3" value="1" class="btn {{ grab_button_class_3 }}">{{ grab_action_3 }}</button>
-                        </div>
-                    </div>
+                    <div class="grab-section"><h3>ALPHA NODE <span class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" name="heart_threshold" value="{{ heart_threshold }}" min="1" max="100"><button type="submit" name="toggle" value="1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
+                    <div class="grab-section"><h3>BETA NODE <span class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3><div class="input-group"><input type="number" name="heart_threshold_2" value="{{ heart_threshold_2 }}" min="1" max="100"><button type="submit" name="toggle_2" value="1" class="btn {{ grab_button_class_2 }}">{{ grab_action_2 }}</button></div></div>
+                    <div class="grab-section"><h3>GAMMA NODE <span class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3><div class="input-group"><input type="number" name="heart_threshold_3" value="{{ heart_threshold_3 }}" min="1" max="100"><button type="submit" name="toggle_3" value="1" class="btn {{ grab_button_class_3 }}">{{ grab_action_3 }}</button></div></div>
                 </form>
             </div>
 
+            <div class="panel ops-panel">
+                <h2><i class="fas fa-keyboard"></i> Manual Operations</h2>
+                <form method="post" style="display: flex; flex-direction: column; gap: 15px;">
+                    <div class="input-group">
+                        <input type="text" name="message" placeholder="Enter manual message for slaves..." style="border-radius: 5px;">
+                        <button type="submit" class="btn btn-primary" style="flex-shrink: 0; border-color: var(--neon-yellow, #fff000); color: var(--neon-yellow, #fff000);">SEND</button>
+                    </div>
+                    <div class="quick-cmd-grid">
+                        <button type="submit" name="quickmsg" value="kc o:w" class="btn">KC O:W</button>
+                        <button type="submit" name="quickmsg" value="kc o:ef" class="btn">KC O:EF</button>
+                        <button type="submit" name="quickmsg" value="kc o:p" class="btn">KC O:P</button>
+                    </div>
+                </form>
+            </div>
+            
             <div class="panel dark-panel">
                 <h2><i class="fas fa-broadcast-tower"></i> Shadow Broadcast</h2>
                 <form method="post">
-                    <div class="input-group"><label>Message</label><textarea name="spammsg" class="input-cyber" rows="2">{{ spam_message }}</textarea></div>
+                    <div class="input-group"><label>Message</label><textarea name="spammsg" rows="2">{{ spam_message }}</textarea></div>
                     <div class="input-group"><label>Delay (s)</label><input type="number" name="spam_delay" value="{{ spam_delay }}"></div>
                     <button type="submit" name="spamtoggle" class="btn {{ spam_button_class }}" style="width:100%; margin-top: 10px;">{{ spam_action }} SPAM</button>
                 </form>
@@ -490,8 +484,22 @@ def index():
     
     msg_status = ""
     if request.method == "POST":
-        # Auto Grab
-        if 'toggle' in request.form:
+        # === MANUAL OPERATIONS LOGIC (RESTORED) ===
+        if 'message' in request.form and request.form['message']:
+            msg = request.form['message']
+            msg_status = f"Sent to slaves: {msg}"
+            with bots_lock:
+                for idx, bot in enumerate(bots): 
+                    threading.Timer(0.5 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
+        elif 'quickmsg' in request.form:
+            msg = request.form['quickmsg']
+            msg_status = f"Sent to slaves: {msg}"
+            with bots_lock:
+                for idx, bot in enumerate(bots): 
+                    threading.Timer(0.5 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
+
+        # === AUTO GRAB LOGIC ===
+        elif 'toggle' in request.form:
             auto_grab_enabled = not auto_grab_enabled
             heart_threshold = int(request.form.get('heart_threshold', 50))
             msg_status = f"Auto Grab 1 was {'ENABLED' if auto_grab_enabled else 'DISABLED'}"
@@ -504,18 +512,22 @@ def index():
             heart_threshold_3 = int(request.form.get('heart_threshold_3', 50))
             msg_status = f"Auto Grab 3 was {'ENABLED' if auto_grab_enabled_3 else 'DISABLED'}"
         
-        # Spam toggle
+        # === SPAM LOGIC ===
         elif 'spamtoggle' in request.form:
             spam_message = request.form.get("spammsg", "").strip()
             spam_delay = int(request.form.get("spam_delay", 10))
             if not spam_enabled and spam_message:
-                spam_enabled = True; last_spam_time = time.time(); msg_status = "Spam ENABLED."
+                spam_enabled = True
+                last_spam_time = time.time()
+                msg_status = "Spam ENABLED."
                 if spam_thread is None or not spam_thread.is_alive():
-                    spam_thread = threading.Thread(target=spam_loop, daemon=True); spam_thread.start()
+                    spam_thread = threading.Thread(target=spam_loop, daemon=True)
+                    spam_thread.start()
             else:
-                spam_enabled = False; msg_status = "Spam DISABLED."
+                spam_enabled = False
+                msg_status = "Spam DISABLED."
 
-        # Auto Work toggle
+        # === AUTO WORK LOGIC ===
         elif 'auto_work_toggle' in request.form:
             auto_work_enabled = not auto_work_enabled
             if auto_work_enabled: last_work_cycle_time = time.time()
@@ -523,7 +535,7 @@ def index():
             work_delay_after_all = int(request.form.get('work_delay_after_all', 44100))
             msg_status = f"Auto Work {'ENABLED' if auto_work_enabled else 'DISABLED'}."
 
-        # Code Injection
+        # === CODE INJECTION LOGIC ===
         elif 'send_codes' in request.form:
             try:
                 acc_idx = int(request.form.get("acc_index"))
@@ -539,18 +551,21 @@ def index():
                 else: msg_status = "Error: Invalid account index for code injection."
             except Exception as e: msg_status = f"Code Injection Error: {e}"
 
-        # Auto Reboot toggle
+        # === AUTO REBOOT LOGIC ===
         elif 'auto_reboot_toggle' in request.form:
             auto_reboot_enabled = not auto_reboot_enabled
             auto_reboot_delay = int(request.form.get("auto_reboot_delay", 3600))
             if auto_reboot_enabled and (auto_reboot_thread is None or not auto_reboot_thread.is_alive()):
                 auto_reboot_stop_event = threading.Event()
-                auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True); auto_reboot_thread.start()
+                auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True)
+                auto_reboot_thread.start()
                 msg_status = "Auto Reboot ENABLED."
             elif not auto_reboot_enabled and auto_reboot_stop_event:
-                auto_reboot_stop_event.set(); auto_reboot_thread = None; msg_status = "Auto Reboot DISABLED."
+                auto_reboot_stop_event.set()
+                auto_reboot_thread = None
+                msg_status = "Auto Reboot DISABLED."
 
-        # Manual Reboot
+        # === MANUAL REBOOT LOGIC ===
         elif 'reboot_target' in request.form:
             target = request.form.get('reboot_target')
             msg_status = f"Rebooting target: {target.upper()}"
@@ -563,9 +578,9 @@ def index():
             else:
                 reboot_bot(target)
     
-    grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
-    grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn-blood") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn-necro")
-    grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn-necro")
+    grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn btn-necro")
+    grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
+    grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     spam_action, spam_button_class = ("DISABLE", "btn-blood") if spam_enabled else ("ENABLE", "btn-necro")
     work_action, work_button_class = ("DISABLE", "btn-blood") if auto_work_enabled else ("ENABLE", "btn-necro")
     reboot_action, reboot_button_class = ("DISABLE", "btn-blood") if auto_reboot_enabled else ("ENABLE", "btn-necro")
