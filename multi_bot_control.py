@@ -328,7 +328,7 @@ def auto_work_loop():
 def run_daily_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
-    state = {"step": 0, "target_message_id": None, "guild_id": None}
+    state = {"step": 0, "message_id": None, "guild_id": None}
 
     def click_button(channel_id, message_id, custom_id, application_id, guild_id):
         try:
@@ -341,47 +341,45 @@ def run_daily_bot(token, acc_name):
                 "session_id": "a",
                 "data": {"component_type": 2, "custom_id": custom_id}
             })
-            print(f"[Daily][{acc_name}] Click button: Status {r.status_code}")
-            return r.ok
+            print(f"[Daily][{acc_name}] Click {custom_id}: {r.status_code}")
         except Exception as e:
-            print(f"[Daily][{acc_name}] Lỗi click button: {e}")
-            return False
+            print(f"[Daily][{acc_name}] Error click: {e}")
+
+    def get_message(channel_id, message_id):
+        try:
+            r = requests.get(f"https://discord.com/api/v9/channels/{channel_id}/messages/{message_id}", headers=headers)
+            if r.status_code == 200:
+                return r.json()
+        except:
+            pass
+        return None
 
     @bot.gateway.command
     def on_message(resp):
+        if not resp.event.message:
+            return
         m = resp.parsed.auto()
-        author_id = str(m.get('author', {}).get('id', ''))
-        msg_id = m.get("id")
-        channel_id = str(m.get("channel_id"))
-
-        # Bỏ qua nếu không phải kênh daily hoặc không phải từ karuta
-        if channel_id != daily_channel_id or author_id != karuta_id:
+        if str(m.get("channel_id")) != daily_channel_id or str(m.get("author", {}).get("id", "")) != karuta_id:
+            return
+        if "components" not in m or not m["components"]:
             return
 
-        # Phải có button
-        if 'components' not in m or not m['components']:
-            return
+        # Lấy custom_id lần đầu
+        for comp in m["components"]:
+            if comp["type"] == 1 and len(comp["components"]) >= 1:
+                btn = comp["components"][0]
+                custom_id = btn["custom_id"]
+                message_id = m["id"]
+                guild_id = m.get("guild_id", "")
+                app_id = m.get("application_id", karuta_id)
 
-        # Xử lý lần đầu
-        if resp.event.message and state["step"] == 0:
-            btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
-            if btn:
-                state["target_message_id"] = msg_id
-                state["guild_id"] = m.get("guild_id")
-                success = click_button(daily_channel_id, msg_id, btn['custom_id'], karuta_id, state["guild_id"])
-                if success:
-                    print(f"[Daily][{acc_name}] Đã click lần 1.")
-                    state["step"] = 1
-
-        # Xử lý update tin nhắn
-        elif resp.event.message_update and state["step"] == 1 and msg_id == state["target_message_id"]:
-            btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
-            if btn and state["guild_id"]:
-                success = click_button(daily_channel_id, msg_id, btn['custom_id'], karuta_id, state["guild_id"])
-                if success:
-                    print(f"[Daily][{acc_name}] Đã click lần 2. DONE.")
-                    state["step"] = 2
-                    bot.gateway.close()
+                click_button(daily_channel_id, message_id, custom_id, app_id, guild_id)
+                print(f"[Daily][{acc_name}] Click lần 1.")
+                state["step"] = 1
+                state["message_id"] = message_id
+                state["guild_id"] = guild_id
+                bot.gateway.removeCommand(on_message)
+                return
 
     print(f"[Daily][{acc_name}] Bắt đầu...")
     threading.Thread(target=bot.gateway.run, daemon=True).start()
@@ -389,12 +387,29 @@ def run_daily_bot(token, acc_name):
     bot.sendMessage(daily_channel_id, "kdaily")
 
     timeout = time.time() + 15
-    while state["step"] != 2 and time.time() < timeout:
+    while state["step"] != 1 and time.time() < timeout:
         time.sleep(1)
 
+    if state["step"] != 1:
+        print(f"[Daily][{acc_name}] FAIL: không click lần 1")
+        bot.gateway.close()
+        return
+
+    time.sleep(2.5)  # đợi Karuta update
+
+    updated = get_message(daily_channel_id, state["message_id"])
+    if updated and "components" in updated:
+        for comp in updated["components"]:
+            if comp["type"] == 1 and len(comp["components"]) >= 1:
+                btn = comp["components"][0]
+                custom_id = btn["custom_id"]
+                click_button(daily_channel_id, state["message_id"], custom_id, karuta_id, state["guild_id"])
+                print(f"[Daily][{acc_name}] Click lần 2. DONE.")
+                bot.gateway.close()
+                return
+
+    print(f"[Daily][{acc_name}] FAIL: không click lần 2.")
     bot.gateway.close()
-    if state["step"] != 2:
-        print(f"[Daily][{acc_name}] FAIL. Không nhấn được lần 2.")
 
 def auto_daily_loop():
     global auto_daily_enabled, last_daily_cycle_time
