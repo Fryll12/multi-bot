@@ -796,20 +796,26 @@ HTML_TEMPLATE = """
 
             <div class="panel void-panel">
                 <h2><i class="fas fa-cogs"></i> Shadow Labor</h2>
+
+                <!-- AUTO WORK -->
                 <form method="post">
                     <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">AUTO WORK</h3>
                     <div class="input-group"><label>Node Delay</label><input type="number" name="work_delay_between_acc" value="{{ work_delay_between_acc }}"></div>
                     <div class="input-group"><label>Cycle Delay</label><input type="number" name="work_delay_after_all" value="{{ work_delay_after_all }}"></div>
                     <button type="submit" name="auto_work_toggle" class="btn {{ work_button_class }}" style="width:100%;">{{ work_action }} WORK</button>
+                </form>
 
-                    <hr style="border-color: var(--border-color); margin: 25px 0;">
+                <hr style="border-color: var(--border-color); margin: 25px 0;">
 
+                <!-- AUTO DAILY -->
+                <form method="post">
                     <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">DAILY RITUAL</h3>
                     <div class="input-group"><label>Node Delay</label><input type="number" name="daily_delay_between_acc" value="{{ daily_delay_between_acc }}"></div>
                     <div class="input-group"><label>Cycle Delay</label><input type="number" name="daily_delay_after_all" value="{{ daily_delay_after_all }}"></div>
                     <button type="submit" name="auto_daily_toggle" class="btn {{ daily_button_class }}" style="width:100%;">{{ daily_action }} DAILY</button>
                 </form>
             </div>
+
 
             <div class="panel necro-panel">
                  <h2><i class="fas fa-skull"></i> Shadow Resurrection</h2>
