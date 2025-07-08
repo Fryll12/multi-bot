@@ -321,7 +321,7 @@ HTML_TEMPLATE = """
         .container { max-width: 1600px; margin: 0 auto; padding: 20px; }
         .header { text-align: center; margin-bottom: 30px; padding: 30px; background: linear-gradient(135deg, var(--void-black), rgba(139, 0, 0, 0.3)); border: 2px solid var(--blood-red); border-radius: 15px; box-shadow: var(--shadow-red), inset 0 0 20px rgba(139, 0, 0, 0.1); }
         .skull-icon { font-size: 4rem; color: var(--blood-red); margin-bottom: 15px; }
-        .title { font-family: 'Creepster', cursive; font-size: 3.5rem; letter-spacing: 4px; }
+        .title { font-family: 'Nosifer', cursive; font-size: 3.5rem; letter-spacing: 4px; }
         .title-main { color: var(--blood-red); text-shadow: 0 0 30px var(--blood-red); }
         .title-sub { color: var(--deep-purple); text-shadow: 0 0 30px var(--deep-purple); }
         .subtitle { font-size: 1.3rem; color: var(--text-secondary); letter-spacing: 2px; margin-bottom: 15px; font-family: 'Orbitron', monospace; }
@@ -397,6 +397,56 @@ HTML_TEMPLATE = """
         }
         .status-indicator.online { color: var(--necro-green); }
         .status-indicator.offline { color: var(--blood-red); }
+
+        /* --- CSS CHO HIỆU ỨNG TRANG BÌA --- */
+        .header::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAABnSURBVHja7M5RDYAwDEXRDgmvEocnlrQS2SwBCVyHi2H6CSS9Tft9/v7N2xxyAwAURY_R4/APwB/0eHwS8McAnuQHiQBwKB9IAsBgeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYAB/wAARiL15T6kAAAAAElFTkSuQmCC');
+            opacity: 0.05;
+            animation: noise 0.2s infinite;
+            pointer-events: none; /* Quan trọng để không chặn click chuột */
+        }
+        @keyframes noise {
+            0%, 100% { transform: translate(0, 0); }
+            10% { transform: translate(-5%, -10%); }
+            20% { transform: translate(-15%, 5%); }
+            30% { transform: translate(7%, -25%); }
+            40% { transform: translate(-5%, 25%); }
+            50% { transform: translate(-15%, 10%); }
+            60% { transform: translate(15%, 0%); }
+            70% { transform: translate(0%, 15%); }
+            80% { transform: translate(3%, 35%); }
+            90% { transform: translate(-10%, 10%); }
+        }
+        .creepy-subtitle {
+            font-family: 'Courier Prime', monospace;
+            font-style: italic;
+            color: var(--blood-red);
+            font-size: 1rem;
+            margin-top: 10px;
+            opacity: 0.7;
+            text-shadow: 0 0 5px var(--blood-red);
+        }
+
+        /* --- HIỆU ỨNG CHẢY MÁU CHO PANEL --- */
+        @keyframes bleeding-glow {
+            from {
+                box-shadow: 0 0 10px rgba(139, 0, 0, 0.5), 0 0 5px rgba(255, 0, 0, 0.3);
+            }
+            to {
+                box-shadow: 0 0 25px rgba(139, 0, 0, 0.9), 0 0 10px rgba(255, 0, 0, 0.6);
+            }
+        }
+
+        .panel:hover {
+            border-color: var(--blood-red);
+            animation: bleeding-glow 1.5s infinite alternate ease-in-out;
+        }
     </style>
 </head>
 <body>
@@ -405,6 +455,7 @@ HTML_TEMPLATE = """
             <div class="skull-icon">💀</div>
             <h1 class="title"><span class="title-main">KARUTA</span> <span class="title-sub">DEEP</span></h1>
             <p class="subtitle">Shadow Network Control Interface</p>
+            <p class="creepy-subtitle">The Abyss Gazes Back...</p>
         </div>
         
         {% if msg_status %}
