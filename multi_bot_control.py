@@ -398,41 +398,6 @@ HTML_TEMPLATE = """
         .status-indicator.online { color: var(--necro-green); }
         .status-indicator.offline { color: var(--blood-red); }
 
-        /* --- CSS CHO HIỆU ỨNG TRANG BÌA --- */
-        .header::after {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAIAAACRXR/mAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXb5JfxUYAAABnSURBVHja7M5RDYAwDEXRDgmvEocnlrQS2SwBCVyHi2H6CSS9Tft9/v7N2xxyAwAURY_R4/APwB/0eHwS8McAnuQHiQBwKB9IAsBgeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYABeSABgAF5IAmAAHkgCYAB/wAARiL15T6kAAAAAElFTkSuQmCC');
-            opacity: 0.05;
-            animation: noise 0.2s infinite;
-            pointer-events: none; /* Quan trọng để không chặn click chuột */
-        }
-        @keyframes noise {
-            0%, 100% { transform: translate(0, 0); }
-            10% { transform: translate(-5%, -10%); }
-            20% { transform: translate(-15%, 5%); }
-            30% { transform: translate(7%, -25%); }
-            40% { transform: translate(-5%, 25%); }
-            50% { transform: translate(-15%, 10%); }
-            60% { transform: translate(15%, 0%); }
-            70% { transform: translate(0%, 15%); }
-            80% { transform: translate(3%, 35%); }
-            90% { transform: translate(-10%, 10%); }
-        }
-        .creepy-subtitle {
-            font-family: 'Courier Prime', monospace;
-            font-style: italic;
-            color: var(--blood-red);
-            font-size: 1rem;
-            margin-top: 10px;
-            opacity: 0.7;
-            text-shadow: 0 0 5px var(--blood-red);
-        }
-
         /* --- HIỆU ỨNG CHẢY MÁU CHO PANEL --- */
         @keyframes bleeding-glow {
             from {
