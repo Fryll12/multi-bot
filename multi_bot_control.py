@@ -1,4 +1,4 @@
-# PHIÊN BẢN HOÀN CHỈNH: Giao diện mới + đầy đủ tính năng
+# PHIÊN BẢN HOÀN CHỈNH: Giao diện mới + đầy đủ tính năng + cập nhật layout
 import discum
 import threading
 import time
@@ -290,6 +290,7 @@ HTML_TEMPLATE = """
             --shadow-color: #660000; --blood-red: #8b0000; --dark-red: #550000; --bone-white: #f8f8ff;
             --ghost-gray: #666666; --void-black: #000000; --deep-purple: #2d1b69; --necro-green: #228b22;
             --shadow-cyan: #008b8b; --text-primary: #f0f0f0; --text-secondary: #cccccc; --text-muted: #888888;
+            --neon-yellow: #fff000;
             --shadow-red: 0 0 20px rgba(139, 0, 0, 0.5); --shadow-purple: 0 0 20px rgba(45, 27, 105, 0.5);
             --shadow-green: 0 0 20px rgba(34, 139, 34, 0.5); --shadow-cyan: 0 0 20px rgba(0, 139, 139, 0.5);
         }
@@ -313,7 +314,11 @@ HTML_TEMPLATE = """
         .void-panel h2 { color: var(--ghost-gray); border-color: var(--ghost-gray); }
         .necro-panel { border-color: var(--necro-green); box-shadow: var(--shadow-green); }
         .necro-panel h2 { color: var(--necro-green); border-color: var(--necro-green); }
-        .status-panel { border-color: var(--bone-white); box-shadow: 0 0 20px rgba(248, 248, 255, 0.2); }
+        .status-panel { 
+            border-color: var(--bone-white); 
+            box-shadow: 0 0 20px rgba(248, 248, 255, 0.2);
+            grid-column: 1 / -1; /* <= KÉO DÀI PANEL */
+        }
         .status-panel h2 { color: var(--bone-white); border-color: var(--bone-white); }
         .code-panel { border-color: var(--shadow-cyan); box-shadow: var(--shadow-cyan); }
         .code-panel h2 { color: var(--shadow-cyan); border-color: var(--shadow-cyan); }
@@ -339,6 +344,38 @@ HTML_TEMPLATE = """
         .status-badge.active { background: var(--necro-green); color: var(--primary-bg); box-shadow: var(--shadow-green); }
         .status-badge.inactive { background: var(--dark-red); color: var(--text-secondary); }
         .quick-cmd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        
+        /* CSS CHO TRẠNG THÁI BOT */
+        .bot-status-container {
+            display: grid;
+            grid-template-columns: 1fr 2fr; /* Chia layout thành 2 phần */
+            gap: 20px;
+            margin-top: 15px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 15px;
+        }
+        .bot-status-grid {
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px;
+        }
+        .bot-status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            font-family: 'Courier Prime', monospace;
+        }
+        .status-indicator {
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        .status-indicator.online { color: var(--necro-green); }
+        .status-indicator.offline { color: var(--blood-red); }
+
     </style>
 </head>
 <body>
@@ -356,10 +393,14 @@ HTML_TEMPLATE = """
         <div class="main-grid">
             <div class="panel status-panel">
                 <h2><i class="fas fa-heartbeat"></i> System Status</h2>
-                <div class="status-grid">
-                    <div class="status-row"><span class="status-label"><i class="fas fa-cogs"></i> Auto Work</span><div><span id="work-timer" class="timer-display">--:--:--</span> <span id="work-status-badge" class="status-badge inactive">OFF</span></div></div>
-                    <div class="status-row"><span class="status-label"><i class="fas fa-redo"></i> Auto Reboot</span><div><span id="reboot-timer" class="timer-display">--:--:--</span> <span id="reboot-status-badge" class="status-badge inactive">OFF</span></div></div>
-                    <div class="status-row"><span class="status-label"><i class="fas fa-broadcast-tower"></i> Auto Spam</span><div><span id="spam-timer" class="timer-display">--:--:--</span><span id="spam-status-badge" class="status-badge inactive">OFF</span></div></div>
+                <div class="bot-status-container">
+                    <div class="status-grid">
+                        <div class="status-row"><span class="status-label"><i class="fas fa-cogs"></i> Auto Work</span><div><span id="work-timer" class="timer-display">--:--:--</span> <span id="work-status-badge" class="status-badge inactive">OFF</span></div></div>
+                        <div class="status-row"><span class="status-label"><i class="fas fa-redo"></i> Auto Reboot</span><div><span id="reboot-timer" class="timer-display">--:--:--</span> <span id="reboot-status-badge" class="status-badge inactive">OFF</span></div></div>
+                        <div class="status-row"><span class="status-label"><i class="fas fa-broadcast-tower"></i> Auto Spam</span><div><span id="spam-timer" class="timer-display">--:--:--</span><span id="spam-status-badge" class="status-badge inactive">OFF</span></div></div>
+                    </div>
+                    <div id="bot-status-list" class="bot-status-grid">
+                        </div>
                 </div>
             </div>
 
@@ -377,12 +418,20 @@ HTML_TEMPLATE = """
                 <form method="post" style="display: flex; flex-direction: column; gap: 15px;">
                     <div class="input-group">
                         <input type="text" name="message" placeholder="Enter manual message for slaves..." style="border-radius: 5px;">
-                        <button type="submit" class="btn btn-primary" style="flex-shrink: 0; border-color: var(--neon-yellow, #fff000); color: var(--neon-yellow, #fff000);">SEND</button>
+                        <button type="submit" class="btn" style="flex-shrink: 0; border-color: var(--neon-yellow, #fff000); color: var(--neon-yellow, #fff000);">SEND</button>
                     </div>
                     <div class="quick-cmd-grid">
                         <button type="submit" name="quickmsg" value="kc o:w" class="btn">KC O:W</button>
                         <button type="submit" name="quickmsg" value="kc o:ef" class="btn">KC O:EF</button>
                         <button type="submit" name="quickmsg" value="kc o:p" class="btn">KC O:P</button>
+
+                        <button type="submit" name="quickmsg" value="kc e:1" class="btn">KC E:1</button>
+                        <button type="submit" name="quickmsg" value="kc e:2" class="btn">KC E:2</button>
+                        <button type="submit" name="quickmsg" value="kc e:3" class="btn">KC E:3</button>
+                        <button type="submit" name="quickmsg" value="kc e:4" class="btn">KC E:4</button>
+                        <button type="submit" name="quickmsg" value="kc e:5" class="btn">KC E:5</button>
+                        <button type="submit" name="quickmsg" value="kc e:6" class="btn">KC E:6</button>
+                        <button type="submit" name="quickmsg" value="kc e:7" class="btn">KC E:7</button>
                     </div>
                 </form>
             </div>
@@ -457,12 +506,30 @@ HTML_TEMPLATE = """
             try {
                 const response = await fetch('/status');
                 const data = await response.json();
+
+                // Cập nhật các đồng hồ cũ
                 document.getElementById('work-timer').textContent = formatTime(data.work_countdown);
                 updateStatusBadge('work-status-badge', data.work_enabled);
                 document.getElementById('reboot-timer').textContent = formatTime(data.reboot_countdown);
                 updateStatusBadge('reboot-status-badge', data.reboot_enabled);
                 document.getElementById('spam-timer').textContent = formatTime(data.spam_countdown);
                 updateStatusBadge('spam-status-badge', data.spam_enabled);
+
+                // Cập nhật trạng thái các bot
+                const listContainer = document.getElementById('bot-status-list');
+                listContainer.innerHTML = ''; 
+
+                const allBots = [...data.bot_statuses.main_bots, ...data.bot_statuses.sub_accounts];
+
+                allBots.forEach(bot => {
+                    const statusClass = bot.status ? 'online' : 'offline';
+                    const statusText = bot.status ? 'ONLINE' : 'OFFLINE';
+                    const item = document.createElement('div');
+                    item.className = 'bot-status-item';
+                    item.innerHTML = `<span>${bot.name}</span><span class="status-indicator ${statusClass}">${statusText}</span>`;
+                    listContainer.appendChild(item);
+                });
+
             } catch (error) { console.error('Error fetching status:', error); }
         }
         setInterval(fetchStatus, 1000);
@@ -605,10 +672,24 @@ def status():
     work_countdown = (last_work_cycle_time + work_delay_after_all - now) if auto_work_enabled else 0
     reboot_countdown = (last_reboot_cycle_time + auto_reboot_delay - now) if auto_reboot_enabled else 0
     spam_countdown = (last_spam_time + spam_delay - now) if spam_enabled else 0
+
+    # LẤY TRẠNG THÁI CÁC BOT
+    bot_statuses = {
+        "main_bots": [
+            {"name": "ALPHA NODE", "status": main_bot is not None},
+            {"name": "BETA NODE", "status": main_bot_2 is not None},
+            {"name": "GAMMA NODE", "status": main_bot_3 is not None}
+        ],
+        "sub_accounts": []
+    }
+    with bots_lock:
+        bot_statuses["sub_accounts"] = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "status": bot is not None} for i, bot in enumerate(bots)]
+
     return jsonify({
         'work_enabled': auto_work_enabled, 'work_countdown': work_countdown,
         'reboot_enabled': auto_reboot_enabled, 'reboot_countdown': reboot_countdown,
         'spam_enabled': spam_enabled, 'spam_countdown': spam_countdown,
+        'bot_statuses': bot_statuses
     })
 
 # --- MAIN EXECUTION ---
@@ -628,3 +709,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     print(f"Khởi động Web Server tại http://0.0.0.0:{port}")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+}
