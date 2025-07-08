@@ -268,14 +268,13 @@ def run_work_bot(token, acc_name):
             message_id = m["id"]
             application_id = m.get("application_id", karuta_id)
             for comp in m["components"]:
-                if comp["type"] == 1:
-                    for btn in comp["components"]:
-                        if btn["type"] == 2:
-                            print(f"[Work][{acc_name}] Click button ID: {btn['custom_id']}")
-                            click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id)
-                            step["value"] = 3
-                            bot.gateway.close()
-                            return
+                 if comp["type"] == 1 and len(comp["components"]) >= 2:	
+                    btn = comp["components"][1]  # chọn nút thứ 2
+                    print(f"[Work][{acc_name}] Click nút thứ 2: {btn['custom_id']}")
+                    click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id)
+                    step["value"] = 3
+                    bot.gateway.close()
+                    return
 
     print(f"[Work][{acc_name}] Bắt đầu...")
     threading.Thread(target=bot.gateway.run, daemon=True).start()
