@@ -398,87 +398,91 @@ HTML_TEMPLATE = """
         .status-indicator.online { color: var(--necro-green); }
         .status-indicator.offline { color: var(--blood-red); }
 
-        /* Dán nguyên văn đoạn code này vào */
-.glitch {
-    color: white;
-    font-size: 3rem;
+        /* --- HIỆU ỨNG GLITCH MỚI (TỐC ĐỘ) --- */
+.panel h2 {
     position: relative;
+    /* Dòng animation này sẽ làm toàn bộ tiêu đề bị "nghiêng" nhẹ */
+    animation: glitch-skew 1s infinite linear alternate-reverse;
 }
 
-.glitch::before,
-.glitch::after {
+.panel h2::before,
+.panel h2::after {
     content: attr(data-text);
     position: absolute;
+    top: 0;
     left: 0;
     width: 100%;
-    background: black;
+    height: 100%;
     overflow: hidden;
 }
 
-.glitch::before {
-    animation: glitchTop 1s infinite linear alternate-reverse;
-    color: #0ff;
-    top: -2px;
+.panel h2::before {
+    left: 2px;
+    text-shadow: -2px 0 red;
+    clip: rect(44px, 450px, 56px, 0);
+    /* Animation cho lớp giả màu đỏ */
+    animation: glitch-anim 2s infinite linear alternate-reverse;
 }
 
-.glitch::after {
-    animation: glitchBottom 1s infinite linear alternate-reverse;
-    color: #f0f;
-    top: 2px;
+.panel h2::after {
+    left: -2px;
+    text-shadow: -2px 0 blue;
+    clip: rect(85px, 450px, 140px, 0);
+    /* Animation cho lớp giả màu xanh */
+    animation: glitch-anim2 3s infinite linear alternate-reverse;
 }
 
-@keyframes glitchTop {
-    0% {
-        clip-path: inset(0 0 80% 0);
-        transform: translate(-2px, -2px);
-    }
-    20% {
-        clip-path: inset(10% 0 70% 0);
-        transform: translate(2px, 2px);
-    }
-    40% {
-        clip-path: inset(20% 0 60% 0);
-        transform: translate(-2px, -2px);
-    }
-    60% {
-        clip-path: inset(30% 0 50% 0);
-        transform: translate(2px, 2px);
-    }
-    80% {
-        clip-path: inset(40% 0 40% 0);
-        transform: translate(-2px, -2px);
-    }
-    100% {
-        clip-path: inset(50% 0 30% 0);
-        transform: translate(2px, 2px);
-    }
+@keyframes glitch-skew {
+    0% { transform: skew(0deg); }
+    100% { transform: skew(1.5deg); }
 }
 
-@keyframes glitchBottom {
-    0% {
-        clip-path: inset(50% 0 30% 0);
-        transform: translate(2px, 2px);
-    }
-    20% {
-        clip-path: inset(40% 0 40% 0);
-        transform: translate(-2px, -2px);
-    }
-    40% {
-        clip-path: inset(30% 0 50% 0);
-        transform: translate(2px, 2px);
-    }
-    60% {
-        clip-path: inset(20% 0 60% 0);
-        transform: translate(-2px, -2px);
-    }
-    80% {
-        clip-path: inset(10% 0 70% 0);
-        transform: translate(2px, 2px);
-    }
-    100% {
-        clip-path: inset(0 0 80% 0);
-        transform: translate(-2px, -2px);
-    }
+@keyframes glitch-anim {
+    0% { clip: rect(42px, 9999px, 44px, 0); transform: skew(0.3deg); }
+    5% { clip: rect(17px, 9999px, 94px, 0); transform: skew(0.5deg); }
+    10% { clip: rect(40px, 9999px, 90px, 0); transform: skew(0.2deg); }
+    15% { clip: rect(37px, 9999px, 20px, 0); transform: skew(0.8deg); }
+    20% { clip: rect(67px, 9999px, 80px, 0); transform: skew(0.1deg); }
+    25% { clip: rect(30px, 9999px, 50px, 0); transform: skew(0.6deg); }
+    30% { clip: rect(50px, 9999px, 75px, 0); transform: skew(0.4deg); }
+    35% { clip: rect(22px, 9999px, 69px, 0); transform: skew(0.2deg); }
+    40% { clip: rect(80px, 9999px, 100px, 0); transform: skew(0.7deg); }
+    45% { clip: rect(10px, 9999px, 95px, 0); transform: skew(0.1deg); }
+    50% { clip: rect(85px, 9999px, 40px, 0); transform: skew(0.3deg); }
+    55% { clip: rect(5px, 9999px, 80px, 0); transform: skew(0.9deg); }
+    60% { clip: rect(30px, 9999px, 90px, 0); transform: skew(0.2deg); }
+    65% { clip: rect(90px, 9999px, 10px, 0); transform: skew(0.5deg); }
+    70% { clip: rect(10px, 9999px, 55px, 0); transform: skew(0.3deg); }
+    75% { clip: rect(55px, 9999px, 25px, 0); transform: skew(0.6deg); }
+    80% { clip: rect(25px, 9999px, 75px, 0); transform: skew(0.4deg); }
+    85% { clip: rect(75px, 9999px, 50px, 0); transform: skew(0.2deg); }
+    90% { clip: rect(50px, 9999px, 30px, 0); transform: skew(0.7deg); }
+    95% { clip: rect(30px, 9999px, 10px, 0); transform: skew(0.1deg); }
+    100% { clip: rect(10px, 9999px, 90px, 0); transform: skew(0.4deg); }
+}
+
+@keyframes glitch-anim2 {
+    0% { clip: rect(85px, 9999px, 140px, 0); transform: skew(0.8deg); }
+    5% { clip: rect(20px, 9999px, 70px, 0); transform: skew(0.1deg); }
+    10% { clip: rect(70px, 9999px, 10px, 0); transform: skew(0.4deg); }
+    15% { clip: rect(30px, 9999px, 90px, 0); transform: skew(0.7deg); }
+    20% { clip: rect(90px, 9999px, 20px, 0); transform: skew(0.2deg); }
+    25% { clip: rect(40px, 9999px, 80px, 0); transform: skew(0.5deg); }
+    30% { clip-path: inset(50% 0 30% 0); transform: skew(0.3deg); }
+    35% { clip: rect(80px, 9999px, 40px, 0); transform: skew(0.1deg); }
+    40% { clip: rect(10px, 9999px, 70px, 0); transform: skew(0.9deg); }
+    45% { clip: rect(70px, 9999px, 30px, 0); transform: skew(0.2deg); }
+    50% { clip: rect(30px, 9999px, 90px, 0); transform: skew(0.6deg); }
+    55% { clip: rect(90px, 9999px, 10px, 0); transform: skew(0.4deg); }
+    60% { clip: rect(10px, 9999px, 60px, 0); transform: skew(0.1deg); }
+    65% { clip: rect(60px, 9999px, 20px, 0); transform: skew(0.8deg); }
+    70% { clip: rect(20px, 9999px, 80px, 0); transform: skew(0.2deg); }
+    75% { clip: rect(80px, 9999px, 40px, 0); transform: skew(0.5deg); }
+    80% { clip: rect(40px, 9999px, 60px, 0); transform: skew(0.3deg); }
+    85% { clip: rect(60px, 9999px, 30px, 0); transform: skew(0.7deg); }
+    90% { clip: rect(30px, 9999px, 70px, 0); transform: skew(0.1deg); }
+    95% { clip: rect(70px, 9999px, 10px, 0); transform: skew(0.4deg); }
+    100% { clip: rect(10px, 9999px, 80px, 0); transform: skew(0.9deg); }
 }
     </style>
 </head>
