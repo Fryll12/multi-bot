@@ -367,6 +367,7 @@ HTML_TEMPLATE = """
             background: rgba(0,0,0,0.3);
             border-radius: 4px;
             font-family: 'Courier Prime', monospace;
+            border: 1px solid var(--blood-red);
         }
         .status-indicator {
             font-weight: 700;
