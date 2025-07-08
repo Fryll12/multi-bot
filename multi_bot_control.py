@@ -1,4 +1,4 @@
-# multi_bot_control_final_fixed_full.py
+# multi_bot_control.py (Giao diện đã được cập nhật)
 import discum
 import threading
 import time
@@ -82,7 +82,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
     if is_main:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled, heart_threshold, last_drop_msg_id
+            global auto_grab_enabled, heart_threshold
             if resp.event.message:
                 msg = resp.parsed.auto()
                 if msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []) and auto_grab_enabled:
@@ -108,7 +108,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
     if is_main_2:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled_2, heart_threshold_2, last_drop_msg_id
+            global auto_grab_enabled_2, heart_threshold_2
             if resp.event.message:
                 msg = resp.parsed.auto()
                 if msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []) and auto_grab_enabled_2:
@@ -134,7 +134,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
     if is_main_3:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled_3, heart_threshold_3, last_drop_msg_id
+            global auto_grab_enabled_3, heart_threshold_3
             if resp.event.message:
                 msg = resp.parsed.auto()
                 if msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []) and auto_grab_enabled_3:
@@ -262,74 +262,103 @@ def spam_loop():
 
 app = Flask(__name__)
 
+# --- GIAO DIỆN WEB ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BOT CONTROL MATRIX</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karuta Deep - Shadow Network Control</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Orbitron:wght@400;700;900&family=Courier+Prime:wght@400;700&family=Nosifer&display=swap" rel="stylesheet">
     <style>
-        :root { --neon-green: #00ff41; --neon-cyan: #00ffff; --neon-red: #ff0040; --neon-yellow: #fff000; --primary-bg: #0a0a0a; --secondary-bg: #111111; --accent-bg: #1a1a1a; --border-color: #333333; --text-primary: #ffffff; --text-muted: #cccccc; --shadow-glow: 0 0 15px; --font-primary: 'Orbitron', monospace; --font-mono: 'Courier Prime', monospace; }
-        body { font-family: var(--font-primary); background-color: var(--primary-bg); color: var(--text-primary); margin:0; padding:0; }
-        .container { max-width: 1600px; margin: 0 auto; padding: 15px; }
-        .header { text-align: center; margin-bottom: 20px; padding: 15px; border: 2px solid var(--neon-green); border-radius: 8px; box-shadow: var(--shadow-glow) var(--neon-green); }
-        .title { font-size: 2.2em; font-weight: 900; color: var(--neon-green); text-shadow: var(--shadow-glow) var(--neon-green); }
-        .control-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 15px; }
-        .control-panel { background: var(--secondary-bg); border: 1px solid var(--border-color); border-radius: 8px; display: flex; flex-direction: column; }
-        .panel-header { padding: 10px 15px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--neon-cyan); }
-        .panel-content { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; gap: 15px; }
-        .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 0.75em; font-weight: 700; border: 1px solid; }
-        .status-badge.active { border-color: var(--neon-green); background: rgba(0, 255, 65, 0.2); color: var(--neon-green); }
-        .status-badge.inactive { border-color: var(--neon-red); background: rgba(255, 0, 64, 0.2); color: var(--neon-red); }
-        .status-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; background-color: var(--accent-bg); border-radius: 4px;}
-        .status-name { font-weight: 700; display: flex; align-items: center; gap: 8px; }
-        .timer-display { font-family: var(--font-mono); font-size: 1.1em; color: var(--neon-yellow); font-weight: 700; }
-        .status-timer { display: flex; align-items: center; gap: 10px; }
-        .input-group { display: flex; flex-direction: column; gap: 5px; }
-        .input-label { font-size: 0.8em; color: var(--text-muted); font-weight: 700; }
-        .input-cyber, textarea.input-cyber, select.input-cyber { padding: 8px; background: var(--primary-bg); border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-primary); font-family: var(--font-mono); width: 100%; box-sizing: border-box; resize: vertical; }
-        .btn-cyber { padding: 10px 15px; border: 1px solid; border-radius: 4px; background: transparent; color: var(--text-primary); font-family: var(--font-primary); font-weight: 700; cursor: pointer; transition: all 0.2s ease; width: 100%; }
-        .btn-primary { border-color: var(--neon-green); color: var(--neon-green); } .btn-primary:hover { background: var(--neon-green); color: var(--primary-bg); box-shadow: var(--shadow-glow) var(--neon-green); }
-        .btn-danger { border-color: var(--neon-red); color: var(--neon-red); } .btn-danger:hover { background: var(--neon-red); color: var(--primary-bg); box-shadow: var(--shadow-glow) var(--neon-red); }
-        .control-row { display: flex; gap: 10px; align-items: flex-end; }
-        .sub-accounts-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
-        .msg-status { text-align: center; color: var(--neon-yellow); font-family: var(--font-mono); padding: 10px; border: 1px dashed var(--border-color); border-radius: 4px; margin-top: 15px; margin-bottom: 15px;}
-        .account-section { margin-bottom: 10px; padding: 10px; background: var(--accent-bg); border-radius: 4px; border: 1px solid var(--border-color); }
-        .account-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .account-name { font-size: 1em; font-weight: 700; color: var(--neon-cyan); }
+        :root {
+            --primary-bg: #0a0a0a; --secondary-bg: #1a1a1a; --panel-bg: #111111; --border-color: #333333;
+            --shadow-color: #660000; --blood-red: #8b0000; --dark-red: #550000; --bone-white: #f8f8ff;
+            --ghost-gray: #666666; --void-black: #000000; --deep-purple: #2d1b69; --necro-green: #228b22;
+            --shadow-cyan: #008b8b; --text-primary: #f0f0f0; --text-secondary: #cccccc; --text-muted: #888888;
+            --shadow-red: 0 0 20px rgba(139, 0, 0, 0.5); --shadow-purple: 0 0 20px rgba(45, 27, 105, 0.5);
+            --shadow-green: 0 0 20px rgba(34, 139, 34, 0.5); --shadow-cyan: 0 0 20px rgba(0, 139, 139, 0.5);
+        }
+        body { font-family: 'Courier Prime', monospace; background: var(--primary-bg); color: var(--text-primary); margin: 0; padding: 0;}
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; padding: 30px; background: linear-gradient(135deg, var(--void-black), rgba(139, 0, 0, 0.3)); border: 2px solid var(--blood-red); border-radius: 15px; box-shadow: var(--shadow-red), inset 0 0 20px rgba(139, 0, 0, 0.1); }
+        .skull-icon { font-size: 4rem; color: var(--blood-red); margin-bottom: 15px; }
+        .title { font-family: 'Creepster', cursive; font-size: 3.5rem; letter-spacing: 4px; }
+        .title-main { color: var(--blood-red); text-shadow: 0 0 30px var(--blood-red); }
+        .title-sub { color: var(--deep-purple); text-shadow: 0 0 30px var(--deep-purple); }
+        .subtitle { font-size: 1.3rem; color: var(--text-secondary); letter-spacing: 2px; margin-bottom: 15px; font-family: 'Orbitron', monospace; }
+        .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 25px; margin-bottom: 30px; }
+        .panel { background: linear-gradient(135deg, var(--panel-bg), rgba(26, 26, 26, 0.9)); border: 1px solid var(--border-color); border-radius: 10px; padding: 25px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
+        .panel h2 { font-family: 'Nosifer', cursive; font-size: 1.4rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid; padding-bottom: 10px; }
+        .panel h2 i { margin-right: 10px; }
+        .blood-panel { border-color: var(--blood-red); box-shadow: var(--shadow-red); }
+        .blood-panel h2 { color: var(--blood-red); border-color: var(--blood-red); }
+        .dark-panel { border-color: var(--deep-purple); box-shadow: var(--shadow-purple); }
+        .dark-panel h2 { color: var(--deep-purple); border-color: var(--deep-purple); }
+        .void-panel { border-color: var(--ghost-gray); box-shadow: 0 0 20px rgba(102, 102, 102, 0.3); }
+        .void-panel h2 { color: var(--ghost-gray); border-color: var(--ghost-gray); }
+        .necro-panel { border-color: var(--necro-green); box-shadow: var(--shadow-green); }
+        .necro-panel h2 { color: var(--necro-green); border-color: var(--necro-green); }
+        .status-panel { border-color: var(--bone-white); box-shadow: 0 0 20px rgba(248, 248, 255, 0.2); }
+        .status-panel h2 { color: var(--bone-white); border-color: var(--bone-white); }
+        .code-panel { border-color: var(--shadow-cyan); box-shadow: var(--shadow-cyan); }
+        .code-panel h2 { color: var(--shadow-cyan); border-color: var(--shadow-cyan); }
+        .btn { background: linear-gradient(135deg, var(--secondary-bg), #333); border: 1px solid var(--border-color); color: var(--text-primary); padding: 12px 20px; border-radius: 8px; cursor: pointer; font-family: 'Orbitron', monospace; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; }
+        .btn-blood { border-color: var(--blood-red); color: var(--blood-red); } .btn-blood:hover { background: var(--blood-red); color: var(--primary-bg); box-shadow: var(--shadow-red); }
+        .btn-necro { border-color: var(--necro-green); color: var(--necro-green); } .btn-necro:hover { background: var(--necro-green); color: var(--primary-bg); box-shadow: var(--shadow-green); }
+        .btn-primary { border-color: var(--shadow-cyan); color: var(--shadow-cyan); } .btn-primary:hover { background: var(--shadow-cyan); color: var(--primary-bg); box-shadow: var(--shadow-cyan); }
+        .btn-sm { padding: 8px 12px; font-size: 0.8rem; }
+        .input-group { display: flex; align-items: stretch; gap: 10px; margin-bottom: 15px; }
+        .input-group label { color: var(--text-secondary); font-weight: 600; font-family: 'Orbitron', monospace; padding: 10px; background: rgba(0,0,0,0.4); border: 1px solid var(--border-color); border-right: none; border-radius: 5px 0 0 5px;}
+        .input-group input, .input-group textarea, .input-group select { flex-grow: 1; background: rgba(0, 0, 0, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 15px; border-radius: 0 5px 5px 0; font-family: 'Courier Prime', monospace; }
+        .grab-section { margin-bottom: 15px; padding: 15px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px;}
+        .grab-section h3 { color: var(--text-secondary); margin-top:0; margin-bottom: 15px; font-family: 'Orbitron', monospace; text-shadow: 0 0 10px var(--text-secondary); display: flex; justify-content: space-between; align-items: center;}
+        .reboot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+        .msg-status { text-align: center; color: var(--shadow-cyan); font-family: 'Courier Prime', monospace; padding: 12px; border: 1px dashed var(--border-color); border-radius: 4px; margin-bottom: 20px; background: rgba(0, 139, 139, 0.1); }
+        .status-grid { display: flex; flex-direction: column; gap: 15px; }
+        .status-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(0,0,0,0.6); border: 1px solid var(--border-color); border-radius: 8px; }
+        .status-label { font-weight: 600; font-family: 'Orbitron'; }
+        .timer-display { font-family: 'Courier Prime', monospace; font-size: 1.2em; font-weight: 700; }
+        .status-badge { padding: 4px 10px; border-radius: 15px; text-transform: uppercase; font-size: 0.8em; }
+        .status-badge.active { background: var(--necro-green); color: var(--primary-bg); box-shadow: var(--shadow-green); }
+        .status-badge.inactive { background: var(--dark-red); color: var(--text-secondary); }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header"><div class="title">BOT CONTROL MATRIX</div></div>
+        <div class="header">
+            <div class="skull-icon">💀</div>
+            <h1 class="title"><span class="title-main">KARUTA</span> <span class="title-sub">DEEP</span></h1>
+            <p class="subtitle">Shadow Network Control Interface</p>
+        </div>
         
         {% if msg_status %}
-        <div class="msg-status">{{ msg_status }}</div>
+        <div class="msg-status"><i class="fas fa-info-circle"></i> {{ msg_status }}</div>
         {% endif %}
 
-        <div class="control-grid">
-            <div class="control-panel">
-                <div class="panel-header"><i class="fas fa-clock"></i><span>REAL-TIME STATUS</span></div>
-                <div class="panel-content">
+        <div class="main-grid">
+            <div class="panel status-panel">
+                <h2><i class="fas fa-heartbeat"></i> System Status</h2>
+                <div class="status-grid">
                     <div class="status-row">
-                        <div class="status-name"><i class="fas fa-cogs"></i><span>AUTO WORK</span></div>
-                        <div class="status-timer">
-                            <span id="work-timer" class="timer-display">--:--:--</span>
-                            <span id="work-status-badge" class="status-badge inactive">OFF</span>
+                        <span class="status-label"><i class="fas fa-cogs"></i> Auto Work</span>
+                        <div>
+                           <span id="work-timer" class="timer-display">--:--:--</span>
+                           <span id="work-status-badge" class="status-badge inactive">OFF</span>
                         </div>
                     </div>
                     <div class="status-row">
-                        <div class="status-name"><i class="fas fa-redo"></i><span>AUTO REBOOT</span></div>
-                        <div class="status-timer">
+                        <span class="status-label"><i class="fas fa-redo"></i> Auto Reboot</span>
+                        <div>
                             <span id="reboot-timer" class="timer-display">--:--:--</span>
                             <span id="reboot-status-badge" class="status-badge inactive">OFF</span>
                         </div>
                     </div>
-                    <div class="status-row">
-                        <div class="status-name"><i class="fas fa-comments"></i><span>SPAM</span></div>
-                        <div class="status-timer">
+                     <div class="status-row">
+                        <span class="status-label"><i class="fas fa-broadcast-tower"></i> Auto Spam</span>
+                        <div>
                             <span id="spam-timer" class="timer-display">--:--:--</span>
                             <span id="spam-status-badge" class="status-badge inactive">OFF</span>
                         </div>
@@ -337,180 +366,119 @@ HTML_TEMPLATE = """
                 </div>
             </div>
 
-            <div class="control-panel">
-                <div class="panel-header"><i class="fas fa-crosshairs"></i><span>AUTO GRAB PROTOCOL</span></div>
-                <div class="panel-content">
-                    <form method="post" class="account-section">
-                        <div class="account-header">
-                            <span class="account-name">ALPHA NODE</span>
-                            <div class="status-badge {{ grab_status }}">{{ grab_text }}</div>
-                        </div>
-                        <div class="control-row">
-                             <div class="input-group" style="flex: 1;"><label class="input-label">THRESHOLD</label><input type="number" name="heart_threshold" value="{{ heart_threshold }}" class="input-cyber"></div>
-                             <button type="submit" name="toggle" value="1" class="{{ grab_button_class }}">{{ grab_action }}</button>
-                        </div>
-                    </form>
-                    <form method="post" class="account-section">
-                         <div class="account-header">
-                             <span class="account-name">BETA NODE</span>
-                             <div class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</div>
-                         </div>
-                         <div class="control-row">
-                              <div class="input-group" style="flex: 1;"><label class="input-label">THRESHOLD</label><input type="number" name="heart_threshold_2" value="{{ heart_threshold_2 }}" class="input-cyber"></div>
-                              <button type="submit" name="toggle_2" value="1" class="{{ grab_button_class_2 }}">{{ grab_action_2 }}</button>
-                         </div>
-                    </form>
-                    <form method="post" class="account-section">
-                         <div class="account-header">
-                             <span class="account-name">GAMMA NODE</span>
-                             <div class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</div>
-                         </div>
-                         <div class="control-row">
-                              <div class="input-group" style="flex: 1;"><label class="input-label">THRESHOLD</label><input type="number" name="heart_threshold_3" value="{{ heart_threshold_3 }}" class="input-cyber"></div>
-                              <button type="submit" name="toggle_3" value="1" class="{{ grab_button_class_3 }}">{{ grab_action_3 }}</button>
-                         </div>
-                    </form>
-                </div>
-            </div>
-
-            <div class="control-panel">
-                <div class="panel-header"><i class="fas fa-keyboard"></i><span>MANUAL OPERATIONS</span></div>
-                <div class="panel-content">
-                    <form method="post" style="display: flex; flex-direction: column; gap: 15px;">
-                        <div class="control-row">
-                            <input type="text" name="message" class="input-cyber" placeholder="Enter manual message..." style="flex-grow: 1;">
-                            <button type="submit" class="btn-cyber btn-primary" style="width: auto; padding: 10px;"><i class="fas fa-paper-plane"></i> SEND</button>
-                        </div>
-                        <div class="control-row">
-                            <button type="submit" name="quickmsg" value="kc o:w" class="btn-cyber">KC O:W</button>
-                            <button type="submit" name="quickmsg" value="kc o:ef" class="btn-cyber">KC O:EF</button>
-                            <button type="submit" name="quickmsg" value="kc o:p" class="btn-cyber">KC O:P</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <div class="control-panel">
-                <div class="panel-header"><i class="fas fa-satellite-dish"></i><span>SPAM INJECTION</span></div>
-                <div class="panel-content">
-                    <form method="post">
+            <div class="panel blood-panel">
+                <h2><i class="fas fa-crosshairs"></i> Soul Harvest</h2>
+                <form method="post">
+                    <div class="grab-section">
+                        <h3>ALPHA NODE <span class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3>
                         <div class="input-group">
-                            <label class="input-label">MESSAGE</label>
-                            <textarea name="spammsg" class="input-cyber" rows="2">{{ spam_message }}</textarea>
+                            <input type="number" name="heart_threshold" value="{{ heart_threshold }}" min="1" max="100">
+                            <button type="submit" name="toggle" value="1" class="btn {{ grab_button_class }}">{{ grab_action }}</button>
                         </div>
-                        <div class="control-row" style="margin-top:15px;">
-                            <div class="input-group" style="flex-grow: 1;">
-                                <label class="input-label">DELAY (s)</label>
-                                <input type="number" name="spam_delay" value="{{ spam_delay }}" class="input-cyber">
-                            </div>
-                            <button type="submit" name="spamtoggle" class="{{ spam_button_class }}">{{ spam_action }}</button>
+                    </div>
+                    <div class="grab-section">
+                        <h3>BETA NODE <span class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3>
+                        <div class="input-group">
+                             <input type="number" name="heart_threshold_2" value="{{ heart_threshold_2 }}" min="1" max="100">
+                             <button type="submit" name="toggle_2" value="1" class="btn {{ grab_button_class_2 }}">{{ grab_action_2 }}</button>
                         </div>
-                    </form>
-                </div>
+                    </div>
+                    <div class="grab-section">
+                        <h3>GAMMA NODE <span class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3>
+                        <div class="input-group">
+                             <input type="number" name="heart_threshold_3" value="{{ heart_threshold_3 }}" min="1" max="100">
+                             <button type="submit" name="toggle_3" value="1" class="btn {{ grab_button_class_3 }}">{{ grab_action_3 }}</button>
+                        </div>
+                    </div>
+                </form>
             </div>
 
-            <div class="control-panel">
-                <div class="panel-header"><i class="fas fa-robot"></i><span>WORK AUTOMATION</span></div>
-                <div class="panel-content">
-                     <form method="post">
-                        <div class="control-row">
-                            <div class="input-group" style="flex: 1;">
-                                <label class="input-label">ACC DELAY (s)</label>
-                                <input type="number" name="work_delay_between_acc" value="{{ work_delay_between_acc }}" class="input-cyber">
-                            </div>
-                             <div class="input-group" style="flex: 1;">
-                                <label class="input-label">CYCLE DELAY (s)</label>
-                                <input type="number" name="work_delay_after_all" value="{{ work_delay_after_all }}" class="input-cyber">
-                            </div>
-                        </div>
-                        <button type="submit" name="auto_work_toggle" class="{{ work_button_class }}" style="margin-top: 15px;">{{ work_action }}</button>
-                    </form>
-                </div>
+            <div class="panel dark-panel">
+                <h2><i class="fas fa-broadcast-tower"></i> Shadow Broadcast</h2>
+                <form method="post">
+                    <div class="input-group"><label>Message</label><textarea name="spammsg" class="input-cyber" rows="2">{{ spam_message }}</textarea></div>
+                    <div class="input-group"><label>Delay (s)</label><input type="number" name="spam_delay" value="{{ spam_delay }}"></div>
+                    <button type="submit" name="spamtoggle" class="btn {{ spam_button_class }}" style="width:100%; margin-top: 10px;">{{ spam_action }} SPAM</button>
+                </form>
+            </div>
+
+            <div class="panel void-panel">
+                <h2><i class="fas fa-cogs"></i> Shadow Labor</h2>
+                <form method="post">
+                    <div class="input-group"><label>Node Delay</label><input type="number" name="work_delay_between_acc" value="{{ work_delay_between_acc }}"></div>
+                    <div class="input-group"><label>Cycle Delay</label><input type="number" name="work_delay_after_all" value="{{ work_delay_after_all }}"></div>
+                    <button type="submit" name="auto_work_toggle" class="btn {{ work_button_class }}" style="width:100%; margin-top: 10px;">{{ work_action }} WORK</button>
+                </form>
+            </div>
+
+            <div class="panel necro-panel">
+                 <h2><i class="fas fa-skull"></i> Shadow Resurrection</h2>
+                 <form method="post">
+                    <div class="input-group"><label>Interval (s)</label><input type="number" name="auto_reboot_delay" value="{{ auto_reboot_delay }}"></div>
+                    <button type="submit" name="auto_reboot_toggle" class="btn {{ reboot_button_class }}" style="width:100%;">{{ reboot_action }} AUTO REBOOT</button>
+                    <hr style="border-color: var(--border-color); margin: 20px 0;">
+                    <h3 style="text-align:center; font-family: 'Orbitron';">MANUAL OVERRIDE</h3>
+                    <div class="reboot-grid" style="margin-top: 15px;">
+                        <button type="submit" name="reboot_target" value="main_1" class="btn btn-necro btn-sm">NODE 1</button>
+                        <button type="submit" name="reboot_target" value="main_2" class="btn btn-necro btn-sm">NODE 2</button>
+                        <button type="submit" name="reboot_target" value="main_3" class="btn btn-necro btn-sm">NODE 3</button>
+                        {{ sub_account_buttons|safe }}
+                    </div>
+                     <button type="submit" name="reboot_target" value="all" class="btn btn-blood" style="width:100%; margin-top: 15px;">REBOOT ALL SYSTEMS</button>
+                 </form>
             </div>
             
-            <div class="control-panel">
-                <div class="panel-header"><i class="fas fa-code"></i><span>CODE INJECTION</span></div>
-                <div class="panel-content">
-                     <form method="post" style="display: flex; flex-direction: column; gap: 15px;">
-                        <div class="control-row">
-                            <div class="input-group" style="flex: 1;"><label class="input-label">TARGET ACC</label><select name="acc_index" class="input-cyber">{{ acc_options|safe }}</select></div>
-                            <div class="input-group" style="width: 80px;"><label class="input-label">DELAY</label><input type="number" name="delay" value="1.0" step="0.1" class="input-cyber"></div>
-                        </div>
-                         <div class="input-group"><label class="input-label">PREFIX</label><input type="text" name="prefix" placeholder="kt n" class="input-cyber"></div>
-                         <div class="input-group"><label class="input-label">CODE LIST</label><textarea name="codes" placeholder="dán mã vào đây, cách nhau bằng dấu phẩy" rows="3" class="input-cyber"></textarea></div>
-                        <button type="submit" name="send_codes" value="1" class="btn-cyber btn-primary">INJECT CODES</button>
-                    </form>
-                </div>
-            </div>
-
-            <div class="control-panel">
-                <div class="panel-header"><i class="fas fa-history"></i><span>AUTO REBOOT CYCLE</span></div>
-                <div class="panel-content">
-                    <form method="post">
-                        <div class="control-row">
-                            <div class="input-group" style="flex: 1;">
-                                <label class="input-label">INTERVAL (s)</label>
-                                <input type="number" name="auto_reboot_delay" value="{{ auto_reboot_delay }}" class="input-cyber">
-                            </div>
-                            <button type="submit" name="auto_reboot_toggle" class="{{ reboot_button_class }}" style="width: 120px;">{{ reboot_action }}</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <div class="control-panel">
-                <div class="panel-header"><i class="fas fa-power-off"></i><span>MANUAL OVERRIDE</span></div>
-                <div class="panel-content">
-                    <form method="post">
-                        <button type="submit" name="reboot_target" value="all" class="btn-cyber btn-danger" style="margin-bottom: 15px;">REBOOT ALL SYSTEMS</button>
-                        <h4>MAIN NODES</h4>
-                        <div class="sub-accounts-grid">
-                            <button type="submit" name="reboot_target" value="main_1" class="btn-cyber">ALPHA</button>
-                            <button type="submit" name="reboot_target" value="main_2" class="btn-cyber">BETA</button>
-                            <button type="submit" name="reboot_target" value="main_3" class="btn-cyber">GAMMA</button>
-                        </div>
-                        <h4 style="margin-top: 15px;">SLAVE NODES ({{ num_bots }})</h4>
-                        <div class="sub-accounts-grid">
-                            {{ sub_account_buttons|safe }}
-                        </div>
-                    </form>
-                </div>
+            <div class="panel code-panel">
+                <h2><i class="fas fa-code"></i> Code Injection</h2>
+                <form method="post">
+                    <div class="input-group"><label>Target</label><select name="acc_index">{{ acc_options|safe }}</select></div>
+                    <div class="input-group"><label>Prefix</label><input type="text" name="prefix" placeholder="e.g. kt n"></div>
+                    <div class="input-group"><label>Delay</label><input type="number" name="delay" value="1.0" step="0.1"></div>
+                    <div class="input-group" style="flex-direction: column; align-items: stretch;">
+                        <label style="border-radius: 5px 5px 0 0; border-bottom: none;">Code List (comma-separated)</label>
+                        <textarea name="codes" placeholder="paste codes here, separated by commas" rows="3" style="border-radius: 0 0 5px 5px;"></textarea>
+                    </div>
+                    <button type="submit" name="send_codes" value="1" class="btn btn-primary" style="width: 100%; margin-top:10px;">Inject Codes</button>
+                </form>
             </div>
         </div>
     </div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            function formatTime(seconds) {
-                if (isNaN(seconds) || seconds < 0) return "--:--:--";
-                seconds = Math.floor(seconds);
-                const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
-                const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
-                const s = (seconds % 60).toString().padStart(2, '0');
-                return `${h}:${m}:${s}`;
-            }
-            function updateStatusBadge(elementId, isActive) {
-                const badge = document.getElementById(elementId);
-                badge.textContent = isActive ? 'ON' : 'OFF';
-                badge.className = `status-badge ${isActive ? 'active' : 'inactive'}`;
-            }
-            async function fetchStatus() {
-                try {
-                    const response = await fetch('/status');
-                    const data = await response.json();
-                    document.getElementById('work-timer').textContent = formatTime(data.work_countdown);
-                    updateStatusBadge('work-status-badge', data.work_enabled);
-                    document.getElementById('reboot-timer').textContent = formatTime(data.reboot_countdown);
-                    updateStatusBadge('reboot-status-badge', data.reboot_enabled);
-                    document.getElementById('spam-timer').textContent = formatTime(data.spam_countdown);
-                    updateStatusBadge('spam-status-badge', data.spam_enabled);
-                } catch (error) { console.error('Error fetching status:', error); }
-            }
-            setInterval(fetchStatus, 1000);
-        });
-    </script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        function formatTime(seconds) {
+            if (isNaN(seconds) || seconds < 0) return "--:--:--";
+            seconds = Math.floor(seconds);
+            const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+            const s = (seconds % 60).toString().padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+        function updateStatusBadge(elementId, isActive) {
+            const badge = document.getElementById(elementId);
+            if (!badge) return;
+            badge.textContent = isActive ? 'ON' : 'OFF';
+            badge.className = `status-badge ${isActive ? 'active' : 'inactive'}`;
+        }
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                document.getElementById('work-timer').textContent = formatTime(data.work_countdown);
+                updateStatusBadge('work-status-badge', data.work_enabled);
+                document.getElementById('reboot-timer').textContent = formatTime(data.reboot_countdown);
+                updateStatusBadge('reboot-status-badge', data.reboot_enabled);
+                document.getElementById('spam-timer').textContent = formatTime(data.spam_countdown);
+                updateStatusBadge('spam-status-badge', data.spam_enabled);
+            } catch (error) { console.error('Error fetching status:', error); }
+        }
+        setInterval(fetchStatus, 1000);
+    });
+</script>
 </body>
 </html>
 """
+
+# --- FLASK ROUTES ---
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -522,40 +490,30 @@ def index():
     
     msg_status = ""
     if request.method == "POST":
-        # Manual message
-        if 'message' in request.form and request.form['message']:
-            msg = request.form['message']; msg_status = f"Sent: {msg}"
-            with bots_lock:
-                for idx, bot in enumerate(bots): threading.Timer(0.5 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
-        elif 'quickmsg' in request.form:
-            msg = request.form['quickmsg']; msg_status = f"Sent: {msg}"
-            with bots_lock:
-                for idx, bot in enumerate(bots): threading.Timer(0.5 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
-        
         # Auto Grab
-        elif 'toggle' in request.form:
+        if 'toggle' in request.form:
             auto_grab_enabled = not auto_grab_enabled
             heart_threshold = int(request.form.get('heart_threshold', 50))
-            msg_status = f"Auto Grab 1 {'enabled' if auto_grab_enabled else 'disabled'}"
+            msg_status = f"Auto Grab 1 was {'ENABLED' if auto_grab_enabled else 'DISABLED'}"
         elif 'toggle_2' in request.form:
             auto_grab_enabled_2 = not auto_grab_enabled_2
             heart_threshold_2 = int(request.form.get('heart_threshold_2', 50))
-            msg_status = f"Auto Grab 2 {'enabled' if auto_grab_enabled_2 else 'disabled'}"
+            msg_status = f"Auto Grab 2 was {'ENABLED' if auto_grab_enabled_2 else 'DISABLED'}"
         elif 'toggle_3' in request.form:
             auto_grab_enabled_3 = not auto_grab_enabled_3
             heart_threshold_3 = int(request.form.get('heart_threshold_3', 50))
-            msg_status = f"Auto Grab 3 {'enabled' if auto_grab_enabled_3 else 'disabled'}"
+            msg_status = f"Auto Grab 3 was {'ENABLED' if auto_grab_enabled_3 else 'DISABLED'}"
         
         # Spam toggle
         elif 'spamtoggle' in request.form:
             spam_message = request.form.get("spammsg", "").strip()
             spam_delay = int(request.form.get("spam_delay", 10))
             if not spam_enabled and spam_message:
-                spam_enabled = True; last_spam_time = time.time(); msg_status = "Spam enabled."
+                spam_enabled = True; last_spam_time = time.time(); msg_status = "Spam ENABLED."
                 if spam_thread is None or not spam_thread.is_alive():
                     spam_thread = threading.Thread(target=spam_loop, daemon=True); spam_thread.start()
             else:
-                spam_enabled = False; msg_status = "Spam disabled."
+                spam_enabled = False; msg_status = "Spam DISABLED."
 
         # Auto Work toggle
         elif 'auto_work_toggle' in request.form:
@@ -563,7 +521,7 @@ def index():
             if auto_work_enabled: last_work_cycle_time = time.time()
             work_delay_between_acc = int(request.form.get('work_delay_between_acc', 10))
             work_delay_after_all = int(request.form.get('work_delay_after_all', 44100))
-            msg_status = f"Auto Work {'enabled' if auto_work_enabled else 'disabled'}."
+            msg_status = f"Auto Work {'ENABLED' if auto_work_enabled else 'DISABLED'}."
 
         # Code Injection
         elif 'send_codes' in request.form:
@@ -571,15 +529,14 @@ def index():
                 acc_idx = int(request.form.get("acc_index"))
                 delay_val = float(request.form.get("delay", 1.0))
                 prefix = request.form.get("prefix", "")
-                codes_list = request.form.get("codes", "").split(',')
+                codes_list = [c.strip() for c in request.form.get("codes", "").split(',') if c.strip()]
                 if acc_idx < len(bots):
                     with bots_lock:
                         for i, code in enumerate(codes_list):
-                            if code.strip():
-                                final_msg = f"{prefix} {code.strip()}" if prefix else code.strip()
-                                threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
-                    msg_status = f"Injecting {len(codes_list)} codes to {acc_names[acc_idx]}..."
-                else: msg_status = "Error: Invalid account index."
+                            final_msg = f"{prefix} {code}" if prefix else code
+                            threading.Timer(delay_val * i, bots[acc_idx].sendMessage, args=(other_channel_id, final_msg)).start()
+                    msg_status = f"Injecting {len(codes_list)} codes to '{acc_names[acc_idx]}'."
+                else: msg_status = "Error: Invalid account index for code injection."
             except Exception as e: msg_status = f"Code Injection Error: {e}"
 
         # Auto Reboot toggle
@@ -589,14 +546,14 @@ def index():
             if auto_reboot_enabled and (auto_reboot_thread is None or not auto_reboot_thread.is_alive()):
                 auto_reboot_stop_event = threading.Event()
                 auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True); auto_reboot_thread.start()
-                msg_status = "Auto Reboot enabled."
+                msg_status = "Auto Reboot ENABLED."
             elif not auto_reboot_enabled and auto_reboot_stop_event:
-                auto_reboot_stop_event.set(); auto_reboot_thread = None; msg_status = "Auto Reboot disabled."
+                auto_reboot_stop_event.set(); auto_reboot_thread = None; msg_status = "Auto Reboot DISABLED."
 
         # Manual Reboot
         elif 'reboot_target' in request.form:
             target = request.form.get('reboot_target')
-            msg_status = f"Rebooting {target}..."
+            msg_status = f"Rebooting target: {target.upper()}"
             if target == "all":
                 if main_bot: reboot_bot('main_1'); time.sleep(1)
                 if main_bot_2: reboot_bot('main_2'); time.sleep(1)
@@ -606,18 +563,15 @@ def index():
             else:
                 reboot_bot(target)
     
-    grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn-cyber btn-danger") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn-cyber btn-primary")
-    grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn-cyber btn-danger") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn-cyber btn-primary")
-    grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn-cyber btn-danger") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn-cyber btn-primary")
-    spam_action = "DISABLE" if spam_enabled else "ENABLE"
-    spam_button_class = "btn-cyber btn-danger" if spam_enabled else "btn-cyber btn-primary"
-    work_action = "DISABLE" if auto_work_enabled else "ENABLE"
-    work_button_class = "btn-cyber btn-danger" if auto_work_enabled else "btn-cyber btn-primary"
-    reboot_action = "DISABLE" if auto_reboot_enabled else "ENABLE"
-    reboot_button_class = "btn-cyber btn-danger" if auto_reboot_enabled else "btn-cyber btn-primary"
+    grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
+    grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn-blood") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn-necro")
+    grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn-necro")
+    spam_action, spam_button_class = ("DISABLE", "btn-blood") if spam_enabled else ("ENABLE", "btn-necro")
+    work_action, work_button_class = ("DISABLE", "btn-blood") if auto_work_enabled else ("ENABLE", "btn-necro")
+    reboot_action, reboot_button_class = ("DISABLE", "btn-blood") if auto_reboot_enabled else ("ENABLE", "btn-necro")
     
     acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
-    sub_account_buttons = "".join(f'<button type="submit" name="reboot_target" value="sub_{i}" class="btn-cyber">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
+    sub_account_buttons = "".join(f'<button type="submit" name="reboot_target" value="sub_{i}" class="btn btn-necro btn-sm">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
 
     return render_template_string(HTML_TEMPLATE, 
         msg_status=msg_status,
@@ -642,6 +596,7 @@ def status():
         'spam_enabled': spam_enabled, 'spam_countdown': spam_countdown,
     })
 
+# --- MAIN EXECUTION ---
 if __name__ == "__main__":
     print("Đang khởi tạo các bot...")
     with bots_lock:
@@ -656,5 +611,5 @@ if __name__ == "__main__":
     threading.Thread(target=auto_work_loop, daemon=True).start()
     
     port = int(os.environ.get("PORT", 8080))
-    print(f"Khởi động Web Server tại http://localhost:{port}")
+    print(f"Khởi động Web Server tại http://0.0.0.0:{port}")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
