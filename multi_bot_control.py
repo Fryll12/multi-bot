@@ -415,7 +415,7 @@ HTML_TEMPLATE = """
 
         /* --- HIỆU ỨNG GLITCH CHO TIÊU ĐỀ PANEL --- */
         .panel h2 {
-            position: relative; /* Thêm thuộc tính này */
+            position: relative;
         }
 
         .panel h2::before,
@@ -426,9 +426,8 @@ HTML_TEMPLATE = """
             left: 0;
             width: 100%;
             height: 100%;
-            background: var(--panel-bg); /* Dùng màu nền của panel */
             overflow: hidden;
-            clip-path: inset(50% 50% 50% 50%);
+            background: var(--panel-bg); /* Dùng màu nền của panel để che chữ gốc */
         }
         
         .panel h2::before {
@@ -444,21 +443,21 @@ HTML_TEMPLATE = """
         }
 
         @keyframes glitchTop {
-            0% { clip-path: inset(40% 0 61% 0); }
-            20% { clip-path: inset(8% 0 9% 0); }
-            40% { clip-path: inset(79% 0 1% 0); }
-            60% { clip-path: inset(93% 0 5% 0); }
-            80% { clip-path: inset(1% 0 45% 0); }
-            100% { clip-path: inset(43% 0 23% 0); }
+            0% { clip-path: inset(0 0 80% 0); transform: translate(-2px, -2px); }
+            20% { clip-path: inset(10% 0 70% 0); transform: translate(2px, 2px); }
+            40% { clip-path: inset(20% 0 60% 0); transform: translate(-2px, -2px); }
+            60% { clip-path: inset(30% 0 50% 0); transform: translate(2px, 2px); }
+            80% { clip-path: inset(40% 0 40% 0); transform: translate(-2px, -2px); }
+            100% { clip-path: inset(50% 0 30% 0); transform: translate(2px, 2px); }
         }
 
         @keyframes glitchBottom {
-            0% { clip-path: inset(68% 0 10% 0); }
-            20% { clip-path: inset(92% 0 1% 0); }
-            40% { clip-path: inset(45% 0 13% 0); }
-            60% { clip-path: inset(2% 0 78% 0); }
-            80% { clip-path: inset(40% 0 50% 0); }
-            100% { clip-path: inset(74% 0 5% 0); }
+            0% { clip-path: inset(50% 0 30% 0); transform: translate(2px, 2px); }
+            20% { clip-path: inset(40% 0 40% 0); transform: translate(-2px, -2px); }
+            40% { clip-path: inset(30% 0 50% 0); transform: translate(2px, 2px); }
+            60% { clip-path: inset(20% 0 60% 0); transform: translate(-2px, -2px); }
+            80% { clip-path: inset(10% 0 70% 0); transform: translate(2px, 2px); }
+            100% { clip-path: inset(0 0 80% 0); transform: translate(-2px, -2px); }
         }
     </style>
 </head>
@@ -573,7 +572,7 @@ HTML_TEMPLATE = """
     </div>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Tự động thêm data-text cho hiệu ứng glitch
+        // Dán code mới vào đây
         document.querySelectorAll('.panel h2').forEach(header => {
             const textContent = header.textContent.trim();
             header.setAttribute('data-text', textContent);
