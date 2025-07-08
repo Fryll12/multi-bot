@@ -377,7 +377,7 @@ HTML_TEMPLATE = """
         }
         .bot-status-grid {
             display: grid; 
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 8px;
         }
         .bot-status-item {
@@ -388,7 +388,7 @@ HTML_TEMPLATE = """
             background: rgba(0,0,0,0.3);
             border-radius: 4px;
             font-family: 'Courier Prime', monospace;
-            border: 1px solid var(--blood-red);
+            border: 1px solid var(--ghost-gray);
         }
         .status-indicator {
             font-weight: 700;
@@ -483,9 +483,9 @@ HTML_TEMPLATE = """
                     <hr style="border-color: var(--border-color); margin: 20px 0;">
                     <h3 style="text-align:center; font-family: 'Orbitron';">MANUAL OVERRIDE</h3>
                     <div class="reboot-grid" style="margin-top: 15px;">
-                        <button type="submit" name="reboot_target" value="main_1" class="btn btn-necro btn-sm">NODE 1</button>
-                        <button type="submit" name="reboot_target" value="main_2" class="btn btn-necro btn-sm">NODE 2</button>
-                        <button type="submit" name="reboot_target" value="main_3" class="btn btn-necro btn-sm">NODE 3</button>
+                        <button type="submit" name="reboot_target" value="main_1" class="btn btn-necro btn-sm">ALPHA</button>
+                        <button type="submit" name="reboot_target" value="main_2" class="btn btn-necro btn-sm">BETA</button>
+                        <button type="submit" name="reboot_target" value="main_3" class="btn btn-necro btn-sm">GAMMA</button>
                         {{ sub_account_buttons|safe }}
                     </div>
                      <button type="submit" name="reboot_target" value="all" class="btn btn-blood" style="width:100%; margin-top: 15px;">REBOOT ALL SYSTEMS</button>
