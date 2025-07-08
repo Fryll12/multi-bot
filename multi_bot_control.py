@@ -200,44 +200,95 @@ def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
     step = {"value": 0}
+
     def send_karuta_command(): bot.sendMessage(work_channel_id, "kc o:ef")
     def send_kn_command(): bot.sendMessage(work_channel_id, "kn")
     def send_kw_command(): bot.sendMessage(work_channel_id, "kw"); step["value"] = 2
+
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": "a", "data": {"component_type": 2, "custom_id": custom_id}})
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={
+                "type": 3,
+                "guild_id": guild_id,
+                "channel_id": channel_id,
+                "message_id": message_id,
+                "application_id": application_id,
+                "session_id": "a",
+                "data": {
+                    "component_type": 2,
+                    "custom_id": custom_id
+                }
+            })
             print(f"[Work][{acc_name}] Click tick: Status {r.status_code}")
-        except Exception as e: print(f"[Work][{acc_name}] Lỗi click tick: {e}")
+        except Exception as e:
+            print(f"[Work][{acc_name}] Lỗi click tick: {e}")
+
     @bot.gateway.command
     def on_message(resp):
-        if resp.event.message:
-            m = resp.parsed.auto()
-            if str(m.get('channel_id')) != work_channel_id: return
-            author_id = str(m.get('author', {}).get('id', ''))
-            guild_id = m.get('guild_id')
-            if step["value"] == 0 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
-                card_codes = re.findall(r'\b\w{4,}\b', m['embeds'][0].get('description', ''))
-                if len(card_codes) >= 10:
-                    first_5, last_5 = card_codes[:5], card_codes[-5:]
-                    for i, code in enumerate(last_5): bot.sendMessage(work_channel_id, f"kjw {code} {chr(97 + i)}"); time.sleep(1.5)
-                    for i, code in enumerate(first_5): bot.sendMessage(work_channel_id, f"kjw {code} {chr(97 + i)}"); time.sleep(1.5)
-                    send_kn_command(); step["value"] = 1
-            elif step["value"] == 1 and author_id == karuta_id and 'embeds' in m and len(m['embeds']) > 0:
-                match = re.search(r'\d+\.\s*`([^`]+)`', m['embeds'][0].get('description', '').split('\n')[1])
-                if match: bot.sendMessage(work_channel_id, f"kjn `{match.group(1)}` a b c d e"); time.sleep(1); send_kw_command()
-            elif step["value"] == 2 and author_id == karuta_id and 'components' in m:
-                for comp in m['components']:
-                    btn = next((b for b in comp['components'] if b['type'] == 2), None)
-                    if comp['type'] == 1 and btn:
-                        click_tick(work_channel_id, m['id'], btn['custom_id'], m.get('application_id', karuta_id), guild_id)
-                        step["value"] = 3; bot.gateway.close(); break
-    print(f"[Work][{acc_name}] Bắt đầu hoạt động...")
+        if not (resp.event.message or resp.event.message_update): return
+        m = resp.parsed.auto()
+        if str(m.get("channel_id")) != work_channel_id: return
+        author_id = str(m.get("author", {}).get("id", ""))
+        guild_id = m.get("guild_id")
+
+        if step["value"] == 0 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
+            desc = m["embeds"][0].get("description", "")
+            card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc)
+            if len(card_codes) >= 10:
+                print(f"[Work][{acc_name}] Phát hiện {len(card_codes)} card, bắt đầu pick...")
+                first_5 = card_codes[:5]
+                last_5 = card_codes[-5:]
+
+                for i, code in enumerate(last_5):
+                    time.sleep(2 if i == 0 else 1.5)
+                    bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+
+                for i, code in enumerate(first_5):
+                    time.sleep(1.5)
+                    bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+
+                time.sleep(1)
+                send_kn_command()
+                step["value"] = 1
+
+        elif step["value"] == 1 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
+            desc = m["embeds"][0].get("description", "")
+            lines = desc.split("\n")
+            if len(lines) >= 2:
+                match = re.search(r"\d+\.\s*`([^`]+)`", lines[1])
+                if match:
+                    resource = match.group(1)
+                    print(f"[Work][{acc_name}] Resource: {resource}")
+                    time.sleep(2)
+                    bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
+                    time.sleep(1)
+                    send_kw_command()
+
+        elif step["value"] == 2 and author_id == karuta_id and "components" in m:
+            message_id = m["id"]
+            application_id = m.get("application_id", karuta_id)
+            for comp in m["components"]:
+                if comp["type"] == 1:
+                    for btn in comp["components"]:
+                        if btn["type"] == 2:
+                            print(f"[Work][{acc_name}] Click button ID: {btn['custom_id']}")
+                            click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id)
+                            step["value"] = 3
+                            bot.gateway.close()
+                            return
+
+    print(f"[Work][{acc_name}] Bắt đầu...")
     threading.Thread(target=bot.gateway.run, daemon=True).start()
-    time.sleep(3); send_karuta_command()
+    time.sleep(3)
+    send_karuta_command()
+
     timeout = time.time() + 90
-    while step["value"] != 3 and time.time() < timeout: time.sleep(1)
+    while step["value"] != 3 and time.time() < timeout:
+        time.sleep(1)
+
     bot.gateway.close()
     print(f"[Work][{acc_name}] Đã hoàn thành.")
+
 
 def auto_work_loop():
     global auto_work_enabled, last_work_cycle_time
