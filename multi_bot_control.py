@@ -276,17 +276,21 @@ def auto_work_loop():
             time.sleep(1)
 
 def run_daily_bot(token, acc_name):
-    """
-    Bot tạm thời để chạy kdaily, nhấn nút 1, chờ update và nhấn nút 1 lần nữa.
-    """
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
-    # THAY ĐỔI 1: Thêm 'guild_id' vào state để lưu trữ
-    state = {"step": 0, "target_message_id": None, "guild_id": None} 
+    state = {"step": 0, "target_message_id": None, "guild_id": None}
 
     def click_button(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": "a", "data": {"component_type": 2, "custom_id": custom_id}})
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={
+                "type": 3,
+                "guild_id": guild_id,
+                "channel_id": channel_id,
+                "message_id": message_id,
+                "application_id": application_id,
+                "session_id": "a",
+                "data": {"component_type": 2, "custom_id": custom_id}
+            })
             print(f"[Daily][{acc_name}] Click button: Status {r.status_code}")
             return r.ok
         except Exception as e:
@@ -295,47 +299,52 @@ def run_daily_bot(token, acc_name):
 
     @bot.gateway.command
     def on_message(resp):
-        event_type = resp.event.message and "message" or resp.event.message_update and "update"
-        if not event_type: return
-
         m = resp.parsed.auto()
         author_id = str(m.get('author', {}).get('id', ''))
-        
-        if str(m.get('channel_id')) != daily_channel_id or author_id != karuta_id: return
-        if 'components' not in m or not m['components']: return
+        msg_id = m.get("id")
+        channel_id = str(m.get("channel_id"))
 
-        if event_type == "message" and state["step"] == 0:
-            btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
-            guild_id_from_msg = m.get('guild_id')
-            if btn and guild_id_from_msg and click_button(daily_channel_id, m['id'], btn['custom_id'], karuta_id, guild_id_from_msg):
-                print(f"[Daily][{acc_name}] Đã nhấn nút lần 1. Chờ tin nhắn được cập nhật.")
-                state["target_message_id"] = m['id']
-                state["guild_id"] = guild_id_from_msg # THAY ĐỔI 2: Lưu lại guild_id
-                state["step"] = 1
+        # Bỏ qua nếu không phải kênh daily hoặc không phải từ karuta
+        if channel_id != daily_channel_id or author_id != karuta_id:
+            return
 
-        elif event_type == "update" and state["step"] == 1 and m['id'] == state["target_message_id"]:
+        # Phải có button
+        if 'components' not in m or not m['components']:
+            return
+
+        # Xử lý lần đầu
+        if resp.event.message and state["step"] == 0:
             btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
-            # THAY ĐỔI 3: Sử dụng guild_id đã lưu
-            if btn and state["guild_id"] and click_button(daily_channel_id, m['id'], btn['custom_id'], karuta_id, state["guild_id"]):
-                print(f"[Daily][{acc_name}] Đã nhấn nút lần 2. Hoàn thành.")
-                state["step"] = 2
-                bot.gateway.close()
-    
-    print(f"[Daily][{acc_name}] Bắt đầu hoạt động...")
+            if btn:
+                state["target_message_id"] = msg_id
+                state["guild_id"] = m.get("guild_id")
+                success = click_button(daily_channel_id, msg_id, btn['custom_id'], karuta_id, state["guild_id"])
+                if success:
+                    print(f"[Daily][{acc_name}] Đã click lần 1.")
+                    state["step"] = 1
+
+        # Xử lý update tin nhắn
+        elif resp.event.message_update and state["step"] == 1 and msg_id == state["target_message_id"]:
+            btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
+            if btn and state["guild_id"]:
+                success = click_button(daily_channel_id, msg_id, btn['custom_id'], karuta_id, state["guild_id"])
+                if success:
+                    print(f"[Daily][{acc_name}] Đã click lần 2. DONE.")
+                    state["step"] = 2
+                    bot.gateway.close()
+
+    print(f"[Daily][{acc_name}] Bắt đầu...")
     threading.Thread(target=bot.gateway.run, daemon=True).start()
-    time.sleep(3)
+    time.sleep(1)
     bot.sendMessage(daily_channel_id, "kdaily")
-    
-    timeout = time.time() + 60
+
+    timeout = time.time() + 15
     while state["step"] != 2 and time.time() < timeout:
         time.sleep(1)
 
     bot.gateway.close()
-    if state["step"] == 2:
-        print(f"[Daily][{acc_name}] Đã hoàn thành chu trình daily.")
-    else:
-        print(f"[Daily][{acc_name}] Hết thời gian chờ. Không thể hoàn thành daily.")
-
+    if state["step"] != 2:
+        print(f"[Daily][{acc_name}] FAIL. Không nhấn được lần 2.")
 
 def auto_daily_loop():
     global auto_daily_enabled, last_daily_cycle_time
@@ -391,16 +400,26 @@ def auto_kvi_loop():
             time.sleep(1)
 
 def run_kvi_bot(token):
-    """
-    Bot tạm thời để chạy KVI, lắng nghe message update và nhấn nút liên tục.
-    """
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
-    state = {"clicks_done": 0, "target_message_id": None, "guild_id": None}
+    state = {
+        "clicks_done": 0,
+        "target_message_id": None,
+        "guild_id": None
+    }
 
     def click_button(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": "a", "data": {"component_type": 2, "custom_id": custom_id}})
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={
+                "type": 3,
+                "guild_id": guild_id,
+                "channel_id": channel_id,
+                "message_id": message_id,
+                "application_id": application_id,
+                "session_id": "a",
+                "data": {"component_type": 2, "custom_id": custom_id}
+            })
+            print(f"[KVI] Click {state['clicks_done']+1}: Status {r.status_code}")
             return r.ok
         except Exception as e:
             print(f"[KVI] Lỗi khi nhấn nút: {e}")
@@ -408,64 +427,54 @@ def run_kvi_bot(token):
 
     @bot.gateway.command
     def on_message(resp):
-        event_type = resp.event.message and "message" or resp.event.message_update and "update"
-        if not event_type: return
-
         m = resp.parsed.auto()
         author_id = str(m.get('author', {}).get('id', ''))
+        msg_id = m.get("id")
+        channel_id = str(m.get("channel_id"))
 
-        # Chỉ xử lý tin nhắn từ Karuta và trong đúng kênh KVI
-        if str(m.get('channel_id')) != kvi_channel_id or author_id != karuta_id: return
-        
-        # Kiểm tra xem đã đủ số lần click chưa
-        if state["clicks_done"] >= kvi_click_count:
-            bot.gateway.close()
+        if channel_id != kvi_channel_id or author_id != karuta_id:
             return
-        
-        # Chỉ xử lý tin nhắn có button
-        if 'components' not in m or not m['components']: return
-        
-        # Lần đầu tiên (sự kiện 'message') hoặc các lần sau (sự kiện 'update')
-        # Phải đảm bảo đang xử lý đúng tin nhắn mục tiêu
-        if event_type == "message" or m.get('id') == state["target_message_id"]:
+
+        if 'components' not in m or not m['components']:
+            return
+
+        # Tin nhắn gốc
+        if resp.event.message and state["clicks_done"] == 0:
             btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
-            
-            # Lấy guild_id lần đầu tiên và lưu lại
-            if state["guild_id"] is None:
-                state["guild_id"] = m.get('guild_id')
-
-            if btn and state["guild_id"]:
-                print(f"[KVI] Đang nhấn nút lần thứ {state['clicks_done'] + 1}/{kvi_click_count}...")
-                if click_button(kvi_channel_id, m['id'], btn['custom_id'], karuta_id, state["guild_id"]):
+            if btn:
+                state["target_message_id"] = msg_id
+                state["guild_id"] = m.get("guild_id")
+                if click_button(kvi_channel_id, msg_id, btn['custom_id'], karuta_id, state["guild_id"]):
                     state["clicks_done"] += 1
-                    state["target_message_id"] = m['id'] # Luôn cập nhật target_message_id
-                    
-                    # Nếu chưa đủ số lần click, chờ 1 khoảng trước khi lắng nghe tiếp
-                    if state["clicks_done"] < kvi_click_count:
-                        time.sleep(kvi_click_delay)
-                    else:
-                        print("[KVI] Đã nhấn đủ số lần.")
-                        bot.gateway.close()
-            
-    # Khởi động bot
-    print("[KVI] Worker KVI đang khởi động...")
-    threading.Thread(target=bot.gateway.run, daemon=True).start()
-    time.sleep(3)
-    bot.sendMessage(kvi_channel_id, "kvi")
-    
-    # Đặt thời gian chờ tối đa cho toàn bộ quá trình
-    # (Tổng thời gian chờ giữa các lần click + 30s dự phòng)
-    timeout_duration = (kvi_click_count * kvi_click_delay) + 30
-    timeout = time.time() + timeout_duration
+                    print(f"[KVI] Click 1 thành công.")
 
+        # Mỗi lần update sẽ click tiếp
+        elif resp.event.message_update and msg_id == state["target_message_id"]:
+            if state["clicks_done"] >= kvi_click_count:
+                bot.gateway.close()
+                return
+            btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
+            if btn and state["guild_id"]:
+                time.sleep(kvi_click_delay)
+                if click_button(kvi_channel_id, msg_id, btn['custom_id'], karuta_id, state["guild_id"]):
+                    state["clicks_done"] += 1
+                    print(f"[KVI] Click {state['clicks_done']} thành công.")
+                if state["clicks_done"] >= kvi_click_count:
+                    print("[KVI] Đã nhấn đủ số lần.")
+                    bot.gateway.close()
+
+    print("[KVI] Bắt đầu worker...")
+    threading.Thread(target=bot.gateway.run, daemon=True).start()
+    time.sleep(1)
+    bot.sendMessage(kvi_channel_id, "kvi")
+
+    timeout = time.time() + (kvi_click_count * kvi_click_delay) + 30
     while state["clicks_done"] < kvi_click_count and time.time() < timeout:
         time.sleep(1)
 
     bot.gateway.close()
-    if state["clicks_done"] >= kvi_click_count:
-        print("[KVI] Worker KVI đã hoàn thành nhiệm vụ.")
-    else:
-        print(f"[KVI] Worker KVI hết thời gian chờ. Hoàn thành {state['clicks_done']}/{kvi_click_count} lần nhấn.")
+    if state["clicks_done"] < kvi_click_count:
+        print(f"[KVI] Hết giờ. Chỉ click được {state['clicks_done']}/{kvi_click_count}")
 
 def auto_reboot_loop():
     global auto_reboot_stop_event, last_reboot_cycle_time
