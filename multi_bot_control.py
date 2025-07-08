@@ -510,7 +510,7 @@ HTML_TEMPLATE = """
                         <div class="status-row"><span class="status-label"><i class="fas fa-redo"></i> Auto Reboot</span><div><span id="reboot-timer" class="timer-display">--:--:--</span> <span id="reboot-status-badge" class="status-badge inactive">OFF</span></div></div>
                         <div class="status-row"><span class="status-label"><i class="fas fa-broadcast-tower"></i> Auto Spam</span><div><span id="spam-timer" class="timer-display">--:--:--</span><span id="spam-status-badge" class="status-badge inactive">OFF</span></div></div>
                          <div class="status-row">
-                              <span class="status-label"><i class="fas fa-server"></i> Server Uptime</span>
+                              <span class="status-label"><i class="fas fa-server"></i> Deep Uptime</span>
                               <div><span id="uptime-timer" class="timer-display">--:--:--</span></div>
                         </div> 
                     </div>
