@@ -771,6 +771,17 @@ HTML_TEMPLATE = """
     100% { clip: rect(10px, 9999px, 80px, 0); transform: skew(0.9deg); }
 }
 
+.node-highlight {
+  color: #FF4500;
+  font-weight: bold;
+  border: 2px solid #FFD700;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background-color: rgba(255, 215, 0, 0.05);
+  text-shadow: 0 0 6px #FF4500, 0 0 10px #FFD700;
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+}
+
     </style>
 </head>
 <body>
@@ -824,9 +835,9 @@ HTML_TEMPLATE = """
             <div class="panel blood-panel">
                 <h2><i class="fas fa-crosshairs"></i> Soul Harvest</h2>
                 <form method="post">
-                    <div class="grab-section"><h3>ALPHA NODE <span class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" name="heart_threshold" value="{{ heart_threshold }}" min="1" max="100"><button type="submit" name="toggle" value="1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
-                    <div class="grab-section"><h3>BETA NODE <span class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3><div class="input-group"><input type="number" name="heart_threshold_2" value="{{ heart_threshold_2 }}" min="1" max="100"><button type="submit" name="toggle_2" value="1" class="btn {{ grab_button_class_2 }}">{{ grab_action_2 }}</button></div></div>
-                    <div class="grab-section"><h3>GAMMA NODE <span class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3><div class="input-group"><input type="number" name="heart_threshold_3" value="{{ heart_threshold_3 }}" min="1" max="100"><button type="submit" name="toggle_3" value="1" class="btn {{ grab_button_class_3 }}">{{ grab_action_3 }}</button></div></div>
+                    <div class="grab-section"><h3 class="node-highlight">ALPHA <span class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3></div>
+                    <div class="grab-section"><h3 class="node-highlight">BETA  <span class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3></div>
+                    <div class="grab-section"><h3 class="node-highlight">GAMMA <span class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3></div>
                 </form>
             </div>
 
