@@ -490,13 +490,13 @@ def index():
             msg_status = f"Sent to slaves: {msg}"
             with bots_lock:
                 for idx, bot in enumerate(bots): 
-                    threading.Timer(0.5 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
+                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
         elif 'quickmsg' in request.form:
             msg = request.form['quickmsg']
             msg_status = f"Sent to slaves: {msg}"
             with bots_lock:
                 for idx, bot in enumerate(bots): 
-                    threading.Timer(0.5 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
+                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
 
         # === AUTO GRAB LOGIC ===
         elif 'toggle' in request.form:
