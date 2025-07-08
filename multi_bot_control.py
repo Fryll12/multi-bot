@@ -226,16 +226,28 @@ def auto_work_loop():
     global auto_work_enabled, last_work_cycle_time
     while True:
         if auto_work_enabled:
+            # B1: Tạo một danh sách làm việc tạm thời
+            work_items = []
+            
+            # B2: Thêm acc chính 2 và 3 vào danh sách nếu có token
+            if main_token_2: 
+                work_items.append({"name": "BETA NODE", "token": main_token_2})
+            if main_token_3: 
+                work_items.append({"name": "GAMMA NODE", "token": main_token_3})
+            
+            # B3: Thêm tất cả các acc phụ vào danh sách
             with bots_lock:
-                current_tokens = tokens.copy()
-            for i, token in enumerate(current_tokens):
+                sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip()]
+                work_items.extend(sub_account_items)
+
+            # B4: Lặp qua danh sách tổng hợp để làm việc
+            for item in work_items:
                 if not auto_work_enabled: break
-                if token.strip():
-                    acc_name = acc_names[i] if i < len(acc_names) else f"Sub {i+1}"
-                    print(f"[Work] Đang chạy acc '{acc_name}'...")
-                    run_work_bot(token.strip(), acc_name)
-                    print(f"[Work] Acc '{acc_name}' xong, chờ {work_delay_between_acc} giây...")
-                    time.sleep(work_delay_between_acc)
+                print(f"[Work] Đang chạy acc '{item['name']}'...")
+                run_work_bot(item['token'].strip(), item['name'])
+                print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc} giây...")
+                time.sleep(work_delay_between_acc)
+
             if auto_work_enabled:
                 print(f"[Work] Hoàn thành chu kỳ, chờ {work_delay_after_all / 3600:.2f} giờ...")
                 last_work_cycle_time = time.time()
