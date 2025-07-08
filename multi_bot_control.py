@@ -39,6 +39,13 @@ spam_thread, auto_reboot_thread, auto_reboot_stop_event = None, None, None
 bots_lock = threading.Lock()
 server_start_time = time.time()
 
+# --- BIẾN CHO AUTO DAILY ---
+auto_daily_enabled = False
+# 1 ngày (86400s) + 10 phút (600s) = 87000s
+daily_delay_after_all = 87000 
+daily_delay_between_acc = 3
+last_daily_cycle_time = 0
+
 # --- CÁC HÀM LOGIC BOT ---
 
 def reboot_bot(target_id):
@@ -258,7 +265,104 @@ def auto_work_loop():
                     time.sleep(1)
         else:
             time.sleep(1)
+# ... (sau hàm auto_work_loop) ...
 
+def run_daily_bot(token, acc_name):
+    """
+    Bot tạm thời để chạy kdaily, nhấn nút 1, chờ update và nhấn nút 1 lần nữa.
+    """
+    bot = discum.Client(token=token, log={"console": False, "file": False})
+    headers = {"Authorization": token, "Content-Type": "application/json"}
+    state = {"step": 0, "target_message_id": None} # step 0: chờ nút 1, step 1: chờ nút 2
+
+    def click_button(channel_id, message_id, custom_id, application_id, guild_id):
+        try:
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": "a", "data": {"component_type": 2, "custom_id": custom_id}})
+            print(f"[Daily][{acc_name}] Click button: Status {r.status_code}")
+            return r.ok
+        except Exception as e:
+            print(f"[Daily][{acc_name}] Lỗi click button: {e}")
+            return False
+
+    @bot.gateway.command
+    def on_message(resp):
+        # Xử lý cả tin nhắn mới và tin nhắn được cập nhật
+        event_type = resp.event.message and "message" or resp.event.message_update and "update"
+        if not event_type: return
+
+        m = resp.parsed.auto()
+        author_id = str(m.get('author', {}).get('id', ''))
+        
+        # Chỉ xử lý tin nhắn trong kênh work và từ Karuta
+        if str(m.get('channel_id')) != work_channel_id or author_id != karuta_id: return
+        if 'components' not in m or not m['components']: return
+
+        # BƯỚC 1: Nhấn nút lần đầu trên tin nhắn MỚI
+        if event_type == "message" and state["step"] == 0:
+            btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
+            if btn and click_button(work_channel_id, m['id'], btn['custom_id'], karuta_id, m.get('guild_id')):
+                print(f"[Daily][{acc_name}] Đã nhấn nút lần 1. Chờ tin nhắn được cập nhật.")
+                state["target_message_id"] = m['id']
+                state["step"] = 1 # Chuyển sang trạng thái chờ nút thứ 2
+
+        # BƯỚC 2: Nhấn nút lần hai trên tin nhắn ĐƯỢC CẬP NHẬT
+        elif event_type == "update" and state["step"] == 1 and m['id'] == state["target_message_id"]:
+            btn = next((b for row in m['components'] for b in row['components'] if b['type'] == 2), None)
+            if btn and click_button(work_channel_id, m['id'], btn['custom_id'], karuta_id, m.get('guild_id')):
+                print(f"[Daily][{acc_name}] Đã nhấn nút lần 2. Hoàn thành.")
+                state["step"] = 2
+                bot.gateway.close()
+    
+    print(f"[Daily][{acc_name}] Bắt đầu hoạt động...")
+    threading.Thread(target=bot.gateway.run, daemon=True).start()
+    time.sleep(3) # Chờ bot kết nối
+    bot.sendMessage(work_channel_id, "kdaily")
+    
+    # Đặt thời gian chờ tối đa 60 giây cho mỗi tài khoản
+    timeout = time.time() + 60
+    while state["step"] != 2 and time.time() < timeout:
+        time.sleep(1)
+
+    bot.gateway.close()
+    if state["step"] == 2:
+        print(f"[Daily][{acc_name}] Đã hoàn thành chu trình daily.")
+    else:
+        print(f"[Daily][{acc_name}] Hết thời gian chờ. Không thể hoàn thành daily.")
+
+
+def auto_daily_loop():
+    global auto_daily_enabled, last_daily_cycle_time
+    while True:
+        if auto_daily_enabled:
+            # Tạo danh sách các tài khoản cần chạy daily
+            daily_items = []
+            if main_token_2:
+                daily_items.append({"name": "BETA NODE", "token": main_token_2})
+            if main_token_3:
+                daily_items.append({"name": "GAMMA NODE", "token": main_token_3})
+            
+            with bots_lock:
+                sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip()]
+                daily_items.extend(sub_account_items)
+            
+            # Lặp qua danh sách để chạy
+            for item in daily_items:
+                if not auto_daily_enabled: break # Dừng ngay nếu bị tắt
+                print(f"[Daily] Đang chạy acc '{item['name']}'...")
+                run_daily_bot(item['token'].strip(), item['name'])
+                print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...")
+                time.sleep(daily_delay_between_acc)
+            
+            if auto_daily_enabled:
+                print(f"[Daily] Hoàn thành chu kỳ, chờ {daily_delay_after_all / 3600:.2f} giờ...")
+                last_daily_cycle_time = time.time()
+                # Vòng lặp chờ có thể bị ngắt
+                start_wait = time.time()
+                while time.time() - start_wait < daily_delay_after_all:
+                    if not auto_daily_enabled: break
+                    time.sleep(1)
+        else:
+            time.sleep(1)
 def auto_reboot_loop():
     global auto_reboot_stop_event, last_reboot_cycle_time
     print("[Reboot] Luồng tự động reboot đã bắt đầu.")
@@ -563,9 +667,17 @@ HTML_TEMPLATE = """
             <div class="panel void-panel">
                 <h2><i class="fas fa-cogs"></i> Shadow Labor</h2>
                 <form method="post">
+                    <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">AUTO WORK</h3>
                     <div class="input-group"><label>Node Delay</label><input type="number" name="work_delay_between_acc" value="{{ work_delay_between_acc }}"></div>
                     <div class="input-group"><label>Cycle Delay</label><input type="number" name="work_delay_after_all" value="{{ work_delay_after_all }}"></div>
-                    <button type="submit" name="auto_work_toggle" class="btn {{ work_button_class }}" style="width:100%; margin-top: 10px;">{{ work_action }} WORK</button>
+                    <button type="submit" name="auto_work_toggle" class="btn {{ work_button_class }}" style="width:100%;">{{ work_action }} WORK</button>
+
+                    <hr style="border-color: var(--border-color); margin: 25px 0;">
+
+                    <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">DAILY RITUAL</h3>
+                    <div class="input-group"><label>Node Delay</label><input type="number" name="daily_delay_between_acc" value="{{ daily_delay_between_acc }}"></div>
+                    <div class="input-group"><label>Cycle Delay</label><input type="number" name="daily_delay_after_all" value="{{ daily_delay_after_all }}"></div>
+                    <button type="submit" name="auto_daily_toggle" class="btn {{ daily_button_class }}" style="width:100%;">{{ daily_action }} DAILY</button>
                 </form>
             </div>
 
@@ -677,6 +789,7 @@ def index():
     global spam_enabled, spam_message, spam_delay, spam_thread, last_spam_time
     global heart_threshold, heart_threshold_2, heart_threshold_3
     global auto_work_enabled, work_delay_between_acc, work_delay_after_all, last_work_cycle_time
+    global auto_daily_enabled, daily_delay_between_acc, daily_delay_after_all, last_daily_cycle_time # <-- DÒNG MỚI
     global auto_reboot_enabled, auto_reboot_delay, auto_reboot_thread, auto_reboot_stop_event, last_reboot_cycle_time
     
     msg_status = ""
@@ -727,6 +840,15 @@ def index():
             work_delay_between_acc = int(request.form.get('work_delay_between_acc', 10))
             work_delay_after_all = int(request.form.get('work_delay_after_all', 44100))
             msg_status = f"Auto Work {'ENABLED' if auto_work_enabled else 'DISABLED'}."
+
+         # ----- KHỐI LOGIC MỚI CHO AUTO DAILY -----
+        elif 'auto_daily_toggle' in request.form:
+            auto_daily_enabled = not auto_daily_enabled
+            if auto_daily_enabled: last_daily_cycle_time = time.time()
+            daily_delay_between_acc = int(request.form.get('daily_delay_between_acc', 3))
+            daily_delay_after_all = int(request.form.get('daily_delay_after_all', 87000))
+            msg_status = f"Auto Daily {'ENABLED' if auto_daily_enabled else 'DISABLED'}."
+        # ----- KẾT THÚC KHỐI LOGIC MỚI -----
 
         elif 'send_codes' in request.form:
             try:
@@ -794,6 +916,7 @@ def index():
     grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     spam_action, spam_button_class = ("DISABLE", "btn-blood") if spam_enabled else ("ENABLE", "btn-necro")
     work_action, work_button_class = ("DISABLE", "btn-blood") if auto_work_enabled else ("ENABLE", "btn-necro")
+    daily_action, daily_button_class = ("DISABLE", "btn-blood") if auto_daily_enabled else ("ENABLE", "btn-necro") # <-- DÒNG MỚI
     reboot_action, reboot_button_class = ("DISABLE", "btn-blood") if auto_reboot_enabled else ("ENABLE", "btn-necro")
     
     acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
@@ -813,6 +936,7 @@ def index():
         grab_status_3=grab_status_3, grab_text_3=grab_text_3, grab_action_3=grab_action_3, grab_button_class_3=grab_button_class_3, heart_threshold_3=heart_threshold_3,
         spam_message=spam_message, spam_delay=spam_delay, spam_action=spam_action, spam_button_class=spam_button_class,
         work_delay_between_acc=work_delay_between_acc, work_delay_after_all=work_delay_after_all, work_action=work_action, work_button_class=work_button_class,
+        daily_delay_between_acc=daily_delay_between_acc, daily_delay_after_all=daily_delay_after_all, daily_action=daily_action, daily_button_class=daily_button_class,
         auto_reboot_delay=auto_reboot_delay, reboot_action=reboot_action, reboot_button_class=reboot_button_class,
         acc_options=acc_options, num_bots=len(bots), sub_account_buttons=sub_account_buttons
     )
@@ -856,6 +980,7 @@ if __name__ == "__main__":
     print("Đang khởi tạo các luồng nền...")
     threading.Thread(target=spam_loop, daemon=True).start()
     threading.Thread(target=auto_work_loop, daemon=True).start()
+    threading.Thread(target=auto_daily_loop, daemon=True).start()
     
     port = int(os.environ.get("PORT", 8080))
     print(f"Khởi động Web Server tại http://0.0.0.0:{port}")
