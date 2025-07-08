@@ -840,7 +840,7 @@ def status():
         'reboot_enabled': auto_reboot_enabled, 'reboot_countdown': reboot_countdown,
         'spam_enabled': spam_enabled, 'spam_countdown': spam_countdown,
         'bot_statuses': bot_statuses,
-        'server_start_time':
+        'server_start_time': server_start_time
     })
 
 # --- MAIN EXECUTION ---
