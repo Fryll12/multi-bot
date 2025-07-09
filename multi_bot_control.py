@@ -1239,7 +1239,7 @@ def status():
     }
     with bots_lock:
         bot_statuses["sub_accounts"] = [
-            {"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "status": bot is not None, "reboot_id": f"sub_{i}", "is_active": bot_active_states.get(f'sub_{i}', False), "type": "main"}
+            {"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "status": bot is not None, "reboot_id": f"sub_{i}", "is_active": bot_active_states.get(f'sub_{i}', False), "type": "sub"}
             for i, bot in enumerate(bots)
         ]
 
