@@ -852,9 +852,9 @@ HTML_TEMPLATE = """
             <div class="panel blood-panel">
                 <h2><i class="fas fa-crosshairs"></i> Soul Harvest</h2>
                 <form method="post">
-                    <div class="grab-section"><h3>ALPHA NODE <span class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" name="heart_threshold" value="{{ heart_threshold }}" min="1" max="100"><button type="submit" name="toggle" value="1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
-                    <div class="grab-section"><h3>BETA NODE <span class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3><div class="input-group"><input type="number" name="heart_threshold_2" value="{{ heart_threshold_2 }}" min="1" max="100"><button type="submit" name="toggle_2" value="1" class="btn {{ grab_button_class_2 }}">{{ grab_action_2 }}</button></div></div>
-                    <div class="grab-section"><h3>GAMMA NODE <span class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3><div class="input-group"><input type="number" name="heart_threshold_3" value="{{ heart_threshold_3 }}" min="1" max="100"><button type="submit" name="toggle_3" value="1" class="btn {{ grab_button_class_3 }}">{{ grab_action_3 }}</button></div></div>
+                    <div class="grab-section"><h3>ALPHA NODE <span class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" name="heart_threshold" value="{{ heart_threshold }}" min="0"><button type="submit" name="toggle" value="1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
+                    <div class="grab-section"><h3>BETA NODE <span class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3><div class="input-group"><input type="number" name="heart_threshold_2" value="{{ heart_threshold_2 }}" min="0"><button type="submit" name="toggle_2" value="1" class="btn {{ grab_button_class_2 }}">{{ grab_action_2 }}</button></div></div>
+                    <div class="grab-section"><h3>GAMMA NODE <span class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3><div class="input-group"><input type="number" name="heart_threshold_3" value="{{ heart_threshold_3 }}" min="0"><button type="submit" name="toggle_3" value="1" class="btn {{ grab_button_class_3 }}">{{ grab_action_3 }}</button></div></div>
                 </form>
             </div>
 
