@@ -29,7 +29,7 @@ karibbit_id = "1274445226064220273"
 # --- BIẾN TRẠNG THÁI ---
 bots, acc_names = [], [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
-    "Ylang", "Nina", "Nathan", "Ofer", "White", "UN the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Silent",
+    "Ylang", "Nina", "Nathan", "Ofer", "White", "the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Token",
 ]
 main_bot, main_bot_2, main_bot_3 = None, None, None
 auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3 = False, False, False
@@ -182,7 +182,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                     max_num = max(heart_numbers)
                                     if sum(heart_numbers) > 0 and max_num >= heart_threshold_3:
                                         max_index = heart_numbers.index(max_num)
-                                        emoji, delay = [("1️⃣", 1.1), ("2️⃣", 2.1), ("3️⃣", 2.8)][max_index]
+                                        emoji, delay = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)][max_index]
                                         print(f"[Bot 3] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s")
                                         def grab_3():
                                             bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
@@ -853,21 +853,17 @@ HTML_TEMPLATE = """
                 </form>
             </div>
             
-            <div class="panel dark-panel">
-                <h2><i class="fas fa-broadcast-tower"></i> Shadow Broadcast</h2>
+            <div class="panel code-panel">
+                <h2><i class="fas fa-code"></i> Code Injection</h2>
                 <form method="post">
-                    <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">AUTO SPAM</h3>
-                    <div class="input-group"><label>Message</label><textarea name="spammsg" rows="2">{{ spam_message }}</textarea></div>
-                    <div class="input-group"><label>Delay (s)</label><input type="number" name="spam_delay" value="{{ spam_delay }}"></div>
-                    <button type="submit" name="spamtoggle" class="btn {{ spam_button_class }}" style="width:100%;">{{ spam_action }} SPAM</button>
-                    
-                    <hr style="border-color: var(--border-color); margin: 25px 0;">
-
-                    <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">AUTO KVI (MAIN ACC 1)</h3>
-                    <div class="input-group"><label>Clicks</label><input type="number" name="kvi_click_count" value="{{ kvi_click_count }}"></div>
-                    <div class="input-group"><label>Click Delay</label><input type="number" name="kvi_click_delay" value="{{ kvi_click_delay }}"></div>
-                    <div class="input-group"><label>Cycle Delay</label><input type="number" name="kvi_loop_delay" value="{{ kvi_loop_delay }}"></div>
-                    <button type="submit" name="auto_kvi_toggle" class="btn {{ kvi_button_class }}" style="width:100%;">{{ kvi_action }} KVI</button>
+                    <div class="input-group"><label>Target</label><select name="acc_index">{{ acc_options|safe }}</select></div>
+                    <div class="input-group"><label>Prefix</label><input type="text" name="prefix" placeholder="e.g. kt n"></div>
+                    <div class="input-group"><label>Delay</label><input type="number" name="delay" value="1.0" step="0.1"></div>
+                    <div class="input-group" style="flex-direction: column; align-items: stretch;">
+                        <label style="border-radius: 5px 5px 0 0; border-bottom: none;">Code List (comma-separated)</label>
+                        <textarea name="codes" placeholder="paste codes here, separated by commas" rows="3" style="border-radius: 0 0 5px 5px;"></textarea>
+                    </div>
+                    <button type="submit" name="send_codes" value="1" class="btn btn-primary" style="width: 100%; margin-top:10px;">Inject Codes</button>
                 </form>
             </div>
 
@@ -911,19 +907,24 @@ HTML_TEMPLATE = """
                  </form>
             </div>
             
-            <div class="panel code-panel">
-                <h2><i class="fas fa-code"></i> Code Injection</h2>
+             <div class="panel dark-panel">
+                <h2><i class="fas fa-broadcast-tower"></i> Shadow Broadcast</h2>
                 <form method="post">
-                    <div class="input-group"><label>Target</label><select name="acc_index">{{ acc_options|safe }}</select></div>
-                    <div class="input-group"><label>Prefix</label><input type="text" name="prefix" placeholder="e.g. kt n"></div>
-                    <div class="input-group"><label>Delay</label><input type="number" name="delay" value="1.0" step="0.1"></div>
-                    <div class="input-group" style="flex-direction: column; align-items: stretch;">
-                        <label style="border-radius: 5px 5px 0 0; border-bottom: none;">Code List (comma-separated)</label>
-                        <textarea name="codes" placeholder="paste codes here, separated by commas" rows="3" style="border-radius: 0 0 5px 5px;"></textarea>
-                    </div>
-                    <button type="submit" name="send_codes" value="1" class="btn btn-primary" style="width: 100%; margin-top:10px;">Inject Codes</button>
+                    <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">AUTO SPAM</h3>
+                    <div class="input-group"><label>Message</label><textarea name="spammsg" rows="2">{{ spam_message }}</textarea></div>
+                    <div class="input-group"><label>Delay (s)</label><input type="number" name="spam_delay" value="{{ spam_delay }}"></div>
+                    <button type="submit" name="spamtoggle" class="btn {{ spam_button_class }}" style="width:100%;">{{ spam_action }} SPAM</button>
+                    
+                    <hr style="border-color: var(--border-color); margin: 25px 0;">
+
+                    <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">AUTO KVI (MAIN ACC 1)</h3>
+                    <div class="input-group"><label>Clicks</label><input type="number" name="kvi_click_count" value="{{ kvi_click_count }}"></div>
+                    <div class="input-group"><label>Click Delay</label><input type="number" name="kvi_click_delay" value="{{ kvi_click_delay }}"></div>
+                    <div class="input-group"><label>Cycle Delay</label><input type="number" name="kvi_loop_delay" value="{{ kvi_loop_delay }}"></div>
+                    <button type="submit" name="auto_kvi_toggle" class="btn {{ kvi_button_class }}" style="width:100%;">{{ kvi_action }} KVI</button>
                 </form>
             </div>
+
         </div>
     </div>
 <script>
