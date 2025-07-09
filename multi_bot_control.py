@@ -411,7 +411,7 @@ def auto_daily_loop():
             daily_items = []
             if main_token_2 and bot_active_states.get('main_2', False):
                 daily_items.append({"name": "BETA NODE", "token": main_token_2})
-            if main_token_3 and bot_active_states.get('main_3', False)::
+            if main_token_3 and bot_active_states.get('main_3', False):
                 daily_items.append({"name": "GAMMA NODE", "token": main_token_3})
             
             with bots_lock:
@@ -1051,14 +1051,14 @@ def index():
             msg_status = f"Sent to slaves: {msg}"
             with bots_lock:
                 for idx, bot in enumerate(bots): 
-                    if bot and bot_active_states.get(f'sub_{i}', False):
+                    if bot and bot_active_states.get(f'sub_{idx}', False):
                         threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
         elif 'quickmsg' in request.form:
             msg = request.form['quickmsg']
             msg_status = f"Sent to slaves: {msg}"
             with bots_lock:
                 for idx, bot in enumerate(bots): 
-                    if bot and bot_active_states.get(f'sub_{i}', False):
+                    if bot and bot_active_states.get(f'sub_{idx}', False):
                         threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
 
         elif 'toggle' in request.form:
@@ -1171,7 +1171,7 @@ def index():
             else:
                 reboot_bot(target)
 
-         elif 'toggle_state_target' in request.form:
+        elif 'toggle_state_target' in request.form:
              target = request.form.get('toggle_state_target')
              if target in bot_active_states:
                  bot_active_states[target] = not bot_active_states[target]
@@ -1254,7 +1254,15 @@ if __name__ == "__main__":
         if main_token_3: main_bot_3 = create_bot(main_token_3, is_main_3=True)
         for token in tokens:
             if token.strip(): bots.append(create_bot(token.strip()))
-    
+
+    print("Thiết lập trạng thái hoạt động ban đầu cho các bot...")
+    bot_active_states = {} # Khởi tạo dictionary
+    if main_token: bot_active_states['main_1'] = True
+    if main_token_2: bot_active_states['main_2'] = True
+    if main_token_3: bot_active_states['main_3'] = True
+    for i in range(len(tokens)):
+    bot_active_states[f'sub_{i}'] = True
+
     print("Đang khởi tạo các luồng nền...")
     threading.Thread(target=spam_loop, daemon=True).start()
     threading.Thread(target=auto_work_loop, daemon=True).start()
