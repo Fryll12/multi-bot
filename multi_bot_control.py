@@ -697,11 +697,9 @@ HTML_TEMPLATE = """
         }
         .btn-rise {
             color: var(--necro-green); /* Chỉ đổi màu chữ */
-            border: 1px solid var(--necro-green);
         }
         .btn-rest {
             color: var(--blood-red); /* Chỉ đổi màu chữ */
-            border: 1px solid var(--blood-red);
         }
 
         /* --- HIỆU ỨNG GLITCH MỚI (TỐC ĐỘ) --- */
