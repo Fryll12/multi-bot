@@ -1261,7 +1261,7 @@ if __name__ == "__main__":
     if main_token_2: bot_active_states['main_2'] = True
     if main_token_3: bot_active_states['main_3'] = True
     for i in range(len(tokens)):
-    bot_active_states[f'sub_{i}'] = True
+        bot_active_states[f'sub_{i}'] = True
 
     print("Đang khởi tạo các luồng nền...")
     threading.Thread(target=spam_loop, daemon=True).start()
