@@ -40,6 +40,7 @@ last_work_cycle_time, last_reboot_cycle_time, last_spam_time = 0, 0, 0
 spam_thread, auto_reboot_thread, auto_reboot_stop_event = None, None, None
 bots_lock = threading.Lock()
 server_start_time = time.time()
+bot_active_states = {}
 
 # --- BIẾN CHO AUTO DAILY ---
 auto_daily_enabled = False
@@ -684,28 +685,24 @@ HTML_TEMPLATE = """
         .status-indicator.online { color: var(--necro-green); }
         .status-indicator.offline { color: var(--blood-red); }
 
-         .btn-toggle-state {
-            padding: 3px 8px;
-            font-size: 0.75em;
-            font-family: 'Orbitron', monospace;
+        .btn-toggle-state {
+            padding: 3px 5px; /* Giảm padding cho gọn hơn */
+            font-size: 0.9em; /* Chỉnh lại size chữ cho giống ONLINE cũ */
+            font-family: 'Courier Prime', monospace;
             border-radius: 4px;
             cursor: pointer;
             text-transform: uppercase;
-            width: 80px; /* Điều chỉnh lại độ rộng cho chữ ngắn hơn */
-            text-align: center;
+            background: transparent; /* Làm nền trong suốt */
+            font-weight: 700;
         }
         .btn-rise {
-            background: var(--necro-green);
-            color: var(--primary-bg);
-            border: 1px solid #5dff5d;
-            box-shadow: var(--shadow-green);
+            color: var(--necro-green); /* Chỉ đổi màu chữ */
+            border: 1px solid var(--necro-green);
         }
         .btn-rest {
-            background: var(--dark-red);
-            color: var(--text-secondary);
+            color: var(--blood-red); /* Chỉ đổi màu chữ */
             border: 1px solid var(--blood-red);
         }
-
 
         /* --- HIỆU ỨNG GLITCH MỚI (TỐC ĐỘ) --- */
 .panel h2 {
@@ -792,6 +789,16 @@ HTML_TEMPLATE = """
     90% { clip: rect(30px, 9999px, 70px, 0); transform: skew(0.1deg); }
     95% { clip: rect(70px, 9999px, 10px, 0); transform: skew(0.4deg); }
     100% { clip: rect(10px, 9999px, 80px, 0); transform: skew(0.9deg); }
+}
+
+.bot-main {
+    border-color: var(--neon-yellow) !important; /* Viền vàng */
+    box-shadow: 0 0 10px rgba(255, 240, 0, 0.6); /* Viền phát sáng */
+}
+.bot-main span:first-child {
+    color: #FF4500; /* Màu cam đỏ */
+    text-shadow: 0 0 8px #FF4500; /* Hiệu ứng glow */
+    font-weight: 700;
 }
 
     </style>
@@ -1006,9 +1013,11 @@ HTML_TEMPLATE = """
         allBots.forEach(bot => {
             const item = document.createElement('div');
             item.className = 'bot-status-item';
+            if (bot.type === 'main') {
+                item.classList.add('bot-main');
+            }
             
-            // THAY ĐỔI TÊN NÚT Ở ĐÂY
-            const buttonText = bot.is_active ? 'RISE' : 'REST';
+            const buttonText = bot.is_active ? 'ONLINE' : 'OFFLINE';
             const buttonClass = bot.is_active ? 'btn-rise' : 'btn-rest';
 
             const statusHtml = `
@@ -1222,15 +1231,15 @@ def status():
 
     bot_statuses = {
         "main_bots": [
-            {"name": "ALPHA ", "status": main_bot is not None, "reboot_id": "main_1", "is_active": bot_active_states.get('main_1', False)},
-            {"name": "BETA ", "status": main_bot_2 is not None, "reboot_id": "main_2", "is_active": bot_active_states.get('main_2', False)},
-            {"name": "GAMMA ", "status": main_bot_3 is not None, "reboot_id": "main_3", "is_active": bot_active_states.get('main_3', False)}
+            {"name": "ALPHA", "status": main_bot is not None, "reboot_id": "main_1", "is_active": bot_active_states.get('main_1', False), "type": "main"}
+            {"name": "BETA", "status": main_bot_2 is not None, "reboot_id": "main_2", "is_active": bot_active_states.get('main_2', False), "type": "main"}
+            {"name": "GAMMA", "status": main_bot_3 is not None, "reboot_id": "main_3", "is_active": bot_active_states.get('main_3', False), "type": "main"}
         ],
         "sub_accounts": []
     }
     with bots_lock:
         bot_statuses["sub_accounts"] = [
-            {"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "status": bot is not None, "reboot_id": f"sub_{i}", "is_active": bot_active_states.get(f'sub_{i}', False)} 
+            {"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "status": bot is not None, "reboot_id": f"sub_{i}", "is_active": bot_active_states.get(f'sub_{i}', False), "type": "main"}
             for i, bot in enumerate(bots)
         ]
 
@@ -1256,7 +1265,6 @@ if __name__ == "__main__":
             if token.strip(): bots.append(create_bot(token.strip()))
 
     print("Thiết lập trạng thái hoạt động ban đầu cho các bot...")
-    bot_active_states = {} # Khởi tạo dictionary
     if main_token: bot_active_states['main_1'] = True
     if main_token_2: bot_active_states['main_2'] = True
     if main_token_3: bot_active_states['main_3'] = True
