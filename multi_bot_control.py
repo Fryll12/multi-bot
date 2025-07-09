@@ -744,11 +744,11 @@ HTML_TEMPLATE = """
         document.getElementById('harvest-toggle-3').addEventListener('click', () => postData('/api/harvest_toggle', { node: 3, threshold: document.getElementById('heart-threshold-3').value }));
         
         // Manual Operations
-        document.getElementById('send-manual-message-btn').addEventListener('click', () => postData('/api/manual_ops', { message: document.getElementById('manual-message-input').value }));
-        document.getElementById('quick-cmd-container').addEventListener('click', (e) => {
-            if (e.target.matches('button[data-cmd]')) {
-                postData('/api/manual_ops', { quickmsg: e.target.dataset.cmd });
-            }
+        document.getElementById('send-manual-message-btn').addEventListener('click', () => {
+            postData('/api/manual_ops', { message: document.getElementById('manual-message-input').value })
+                .then(() => {
+                    document.getElementById('manual-message-input').value = ''; // Thêm dòng này
+                });
         });
 
         // Code Injection
@@ -758,6 +758,9 @@ HTML_TEMPLATE = """
                 prefix: document.getElementById('inject-prefix').value,
                 delay: document.getElementById('inject-delay').value,
                 codes: document.getElementById('inject-codes').value,
+            });.then(() => {
+                 document.getElementById('inject-prefix').value = ''; // Thêm dòng này
+                 document.getElementById('inject-codes').value = '';  // Thêm dòng này
             });
         });
 
@@ -778,8 +781,12 @@ HTML_TEMPLATE = """
         });
 
         // Shadow Resurrection
-        document.getElementById('auto-reboot-toggle-btn').addEventListener('click', () => postData('/api/reboot', { delay: document.getElementById('auto-reboot-delay').value }));
-        document.getElementById('reboot-all-btn').addEventListener('click', () => postData('/api/reboot', { target: 'all' }));
+        document.getElementById('auto-reboot-toggle-btn').addEventListener('click', () => {
+            postData('/api/reboot_toggle_auto', { delay: document.getElementById('auto-reboot-delay').value });
+        });
+        document.getElementById('reboot-all-btn').addEventListener('click', () => {
+            postData('/api/reboot_manual', { target: 'all' });
+        });
         document.getElementById('reboot-grid-container').addEventListener('click', e => {
             if(e.target.matches('button[data-reboot-target]')) {
                 postData('/api/reboot', { target: e.target.dataset.reboot_target });
@@ -928,13 +935,14 @@ def api_labor_toggle():
         msg = f"Auto Daily {'ENABLED' if auto_daily_enabled else 'DISABLED'}."
     return jsonify({'status': 'success', 'message': msg})
 
-@app.route("/api/reboot", methods=['POST'])
-def api_reboot():
-    global auto_reboot_enabled, auto_reboot_delay, auto_reboot_thread, auto_reboot_stop_event
+# DÁN 2 HÀM MỚI NÀY VÀO CHỖ HÀM CŨ
+# API MỚI CHỈ DÀNH CHO REBOOT THỦ CÔNG
+@app.route("/api/reboot_manual", methods=['POST'])
+def api_reboot_manual():
     data = request.get_json()
+    target = data.get('target')
     msg = ""
-    if 'target' in data:
-        target = data.get('target')
+    if target:
         msg = f"Rebooting target: {target.upper()}"
         if target == "all":
             if main_bot: reboot_bot('main_1'); time.sleep(1)
@@ -942,19 +950,32 @@ def api_reboot():
             if main_bot_3: reboot_bot('main_3'); time.sleep(1)
             with bots_lock:
                 for i in range(len(bots)): reboot_bot(f'sub_{i}'); time.sleep(1)
-        else: reboot_bot(target)
-    else: # Toggle auto reboot
-        auto_reboot_enabled = not auto_reboot_enabled
-        auto_reboot_delay = int(data.get("delay", 3600))
-        if auto_reboot_enabled and (auto_reboot_thread is None or not auto_reboot_thread.is_alive()):
+        else:
+            reboot_bot(target)
+    return jsonify({'status': 'success', 'message': msg})
+
+# API MỚI CHỈ DÀNH CHO BẬT/TẮT AUTO REBOOT
+@app.route("/api/reboot_toggle_auto", methods=['POST'])
+def api_reboot_toggle_auto():
+    global auto_reboot_enabled, auto_reboot_delay, auto_reboot_thread, auto_reboot_stop_event
+    data = request.get_json()
+
+    auto_reboot_enabled = not auto_reboot_enabled
+    auto_reboot_delay = int(data.get("delay", 3600))
+    msg = ""
+
+    if auto_reboot_enabled:
+        if auto_reboot_thread is None or not auto_reboot_thread.is_alive():
             auto_reboot_stop_event = threading.Event()
             auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True)
             auto_reboot_thread.start()
-            msg = "Auto Reboot ENABLED."
-        elif not auto_reboot_enabled and auto_reboot_stop_event:
+        msg = "Auto Reboot ENABLED."
+    else:
+        if auto_reboot_stop_event:
             auto_reboot_stop_event.set()
-            auto_reboot_thread = None
-            msg = "Auto Reboot DISABLED."
+        auto_reboot_thread = None
+        msg = "Auto Reboot DISABLED."
+
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/broadcast_toggle", methods=['POST'])
