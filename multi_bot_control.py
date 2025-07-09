@@ -790,8 +790,8 @@ HTML_TEMPLATE = """
 }
 
 .bot-main {
-    border-color: var(--neon-yellow) !important; /* Viền vàng */
-    box-shadow: 0 0 10px rgba(255, 240, 0, 0.6); /* Viền phát sáng */
+    border-color: var(--blood-red) !important;
+    box-shadow: var(--shadow-red);
 }
 .bot-main span:first-child {
     color: #FF4500; /* Màu cam đỏ */
