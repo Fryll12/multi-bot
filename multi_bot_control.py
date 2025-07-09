@@ -662,6 +662,7 @@ HTML_TEMPLATE = """
                 const result = await response.json();
                 showStatusMessage(result.message);
                 fetchStatus(); // Refresh UI after action
+                return result; // Trả về kết quả để có thể dùng .then()
             } catch (error) {
                 console.error('Error posting data:', error);
                 showStatusMessage('Error communicating with server.');
@@ -691,7 +692,6 @@ HTML_TEMPLATE = """
                 const response = await fetch('/status');
                 const data = await response.json();
                 
-                // Update timers and badges
                 updateElement('work-timer', { textContent: formatTime(data.work_countdown) });
                 updateElement('work-status-badge', { textContent: data.work_enabled ? 'ON' : 'OFF', className: `status-badge ${data.work_enabled ? 'active' : 'inactive'}` });
                 updateElement('daily-timer', { textContent: formatTime(data.daily_countdown) });
@@ -705,7 +705,6 @@ HTML_TEMPLATE = """
                 const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
                 updateElement('uptime-timer', { textContent: formatTime(serverUptimeSeconds) });
 
-                // Update dynamic button text/styles
                 updateElement('harvest-toggle-1', { textContent: data.ui_states.grab_action, className: `btn ${data.ui_states.grab_button_class}` });
                 updateElement('harvest-status-1', { textContent: data.ui_states.grab_text, className: `status-badge ${data.ui_states.grab_status}` });
                 updateElement('harvest-toggle-2', { textContent: data.ui_states.grab_action_2, className: `btn ${data.ui_states.grab_button_class_2}` });
@@ -717,7 +716,6 @@ HTML_TEMPLATE = """
                 updateElement('auto-reboot-toggle-btn', { textContent: `${data.ui_states.reboot_action} AUTO REBOOT`, className: `btn ${data.ui_states.reboot_button_class}` });
                 updateElement('spam-toggle-btn', { textContent: `${data.ui_states.spam_action} SPAM`, className: `btn ${data.ui_states.spam_button_class}` });
                 updateElement('auto-kvi-toggle-btn', { textContent: `${data.ui_states.kvi_action} KVI`, className: `btn ${data.ui_states.kvi_button_class}` });
-
 
                 const listContainer = document.getElementById('bot-status-list');
                 listContainer.innerHTML = ''; 
@@ -747,8 +745,13 @@ HTML_TEMPLATE = """
         document.getElementById('send-manual-message-btn').addEventListener('click', () => {
             postData('/api/manual_ops', { message: document.getElementById('manual-message-input').value })
                 .then(() => {
-                    document.getElementById('manual-message-input').value = ''; // Thêm dòng này
+                    document.getElementById('manual-message-input').value = '';
                 });
+        });
+        document.getElementById('quick-cmd-container').addEventListener('click', (e) => {
+            if (e.target.matches('button[data-cmd]')) {
+                postData('/api/manual_ops', { quickmsg: e.target.dataset.cmd });
+            }
         });
 
         // Code Injection
@@ -758,9 +761,9 @@ HTML_TEMPLATE = """
                 prefix: document.getElementById('inject-prefix').value,
                 delay: document.getElementById('inject-delay').value,
                 codes: document.getElementById('inject-codes').value,
-            });.then(() => {
-                 document.getElementById('inject-prefix').value = ''; // Thêm dòng này
-                 document.getElementById('inject-codes').value = '';  // Thêm dòng này
+            }).then(() => {
+                 document.getElementById('inject-prefix').value = '';
+                 document.getElementById('inject-codes').value = '';
             });
         });
 
@@ -780,7 +783,7 @@ HTML_TEMPLATE = """
             });
         });
 
-        // Shadow Resurrection
+        // Shadow Resurrection (FIXED)
         document.getElementById('auto-reboot-toggle-btn').addEventListener('click', () => {
             postData('/api/reboot_toggle_auto', { delay: document.getElementById('auto-reboot-delay').value });
         });
@@ -789,7 +792,7 @@ HTML_TEMPLATE = """
         });
         document.getElementById('reboot-grid-container').addEventListener('click', e => {
             if(e.target.matches('button[data-reboot-target]')) {
-                postData('/api/reboot', { target: e.target.dataset.reboot_target });
+                postData('/api/reboot_manual', { target: e.target.dataset.reboot_target });
             }
         });
         
