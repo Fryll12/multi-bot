@@ -299,7 +299,7 @@ def auto_work_loop():
             # B2: Thêm acc chính 2 và 3 vào danh sách nếu có token
             if main_token_2 and bot_active_states.get('main_2', False): 
                 work_items.append({"name": "BETA NODE", "token": main_token_2})
-           if main_token_3 and bot_active_states.get('main_3', False): 
+            if main_token_3 and bot_active_states.get('main_3', False): 
                 work_items.append({"name": "GAMMA NODE", "token": main_token_3})
             
             # B3: Thêm tất cả các acc phụ vào danh sách
