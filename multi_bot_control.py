@@ -297,14 +297,14 @@ def auto_work_loop():
             work_items = []
             
             # B2: Thêm acc chính 2 và 3 vào danh sách nếu có token
-            if main_token_2: 
+            if main_token_2 and bot_active_states.get('main_2', False): 
                 work_items.append({"name": "BETA NODE", "token": main_token_2})
-            if main_token_3: 
+           if main_token_3 and bot_active_states.get('main_3', False): 
                 work_items.append({"name": "GAMMA NODE", "token": main_token_3})
             
             # B3: Thêm tất cả các acc phụ vào danh sách
             with bots_lock:
-                sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip()]
+                sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)]
                 work_items.extend(sub_account_items)
 
             # B4: Lặp qua danh sách tổng hợp để làm việc
@@ -409,13 +409,13 @@ def auto_daily_loop():
         if auto_daily_enabled:
             # Tạo danh sách các tài khoản cần chạy daily
             daily_items = []
-            if main_token_2:
+            if main_token_2 and bot_active_states.get('main_2', False):
                 daily_items.append({"name": "BETA NODE", "token": main_token_2})
-            if main_token_3:
+            if main_token_3 and bot_active_states.get('main_3', False)::
                 daily_items.append({"name": "GAMMA NODE", "token": main_token_3})
             
             with bots_lock:
-                sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip()]
+                sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)]
                 daily_items.extend(sub_account_items)
             
             # Lặp qua danh sách để chạy
@@ -446,7 +446,7 @@ def auto_kvi_loop():
             run_kvi_bot(main_token)
             
             # Chờ cho chu kỳ tiếp theo
-            if auto_kvi_enabled:
+            if auto_kvi_enabled and main_token and bot_active_states.get('main_1', False):
                 last_kvi_cycle_time = time.time()
                 print(f"[KVI] Hoàn thành. Chờ {kvi_loop_delay / 3600:.2f} giờ cho lần chạy tiếp theo.")
                 start_wait = time.time()
@@ -563,7 +563,7 @@ def spam_loop():
         if spam_enabled and spam_message:
             last_spam_time = time.time()
             with bots_lock:
-                bots_to_spam = bots.copy()
+                bots_to_spam = [bot for i, bot in enumerate(bots) if bot and bot_active_states.get(f'sub_{i}', False)]
             for idx, bot in enumerate(bots_to_spam):
                 if not spam_enabled: break
                 try:
@@ -683,6 +683,29 @@ HTML_TEMPLATE = """
         }
         .status-indicator.online { color: var(--necro-green); }
         .status-indicator.offline { color: var(--blood-red); }
+
+         .btn-toggle-state {
+            padding: 3px 8px;
+            font-size: 0.75em;
+            font-family: 'Orbitron', monospace;
+            border-radius: 4px;
+            cursor: pointer;
+            text-transform: uppercase;
+            width: 80px; /* Điều chỉnh lại độ rộng cho chữ ngắn hơn */
+            text-align: center;
+        }
+        .btn-rise {
+            background: var(--necro-green);
+            color: var(--primary-bg);
+            border: 1px solid #5dff5d;
+            box-shadow: var(--shadow-green);
+        }
+        .btn-rest {
+            background: var(--dark-red);
+            color: var(--text-secondary);
+            border: 1px solid var(--blood-red);
+        }
+
 
         /* --- HIỆU ỨNG GLITCH MỚI (TỐC ĐỘ) --- */
 .panel h2 {
@@ -957,47 +980,51 @@ HTML_TEMPLATE = """
             badge.className = `status-badge ${isActive ? 'active' : 'inactive'}`;
         }
         async function fetchStatus() {
-            try {
-                const response = await fetch('/status');
-                const data = await response.json();
+    try {
+        const response = await fetch('/status');
+        const data = await response.json();
 
-                // Cập nhật các timer cũ
-                document.getElementById('work-timer').textContent = formatTime(data.work_countdown);
-                updateStatusBadge('work-status-badge', data.work_enabled);
-                
-                document.getElementById('reboot-timer').textContent = formatTime(data.reboot_countdown);
-                updateStatusBadge('reboot-status-badge', data.reboot_enabled);
-                
-                document.getElementById('spam-timer').textContent = formatTime(data.spam_countdown);
-                updateStatusBadge('spam-status-badge', data.spam_enabled);
-                
-                // --- CÁC DÒNG MỚI ĐƯỢC THÊM VÀO ---
-                document.getElementById('daily-timer').textContent = formatTime(data.daily_countdown);
-                updateStatusBadge('daily-status-badge', data.daily_enabled);
+        // Cập nhật các timer (giữ nguyên)
+        document.getElementById('work-timer').textContent = formatTime(data.work_countdown);
+        updateStatusBadge('work-status-badge', data.work_enabled);
+        document.getElementById('daily-timer').textContent = formatTime(data.daily_countdown);
+        updateStatusBadge('daily-status-badge', data.daily_enabled);
+        document.getElementById('kvi-timer').textContent = formatTime(data.kvi_countdown);
+        updateStatusBadge('kvi-status-badge', data.kvi_enabled);
+        document.getElementById('reboot-timer').textContent = formatTime(data.reboot_countdown);
+        updateStatusBadge('reboot-status-badge', data.reboot_enabled);
+        document.getElementById('spam-timer').textContent = formatTime(data.spam_countdown);
+        updateStatusBadge('spam-status-badge', data.spam_enabled);
+        const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
+        document.getElementById('uptime-timer').textContent = formatTime(serverUptimeSeconds);
 
-                document.getElementById('kvi-timer').textContent = formatTime(data.kvi_countdown);
-                updateStatusBadge('kvi-status-badge', data.kvi_enabled);
-                // --- KẾT THÚC PHẦN THÊM MỚI ---
+        const listContainer = document.getElementById('bot-status-list');
+        listContainer.innerHTML = ''; 
 
-                const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
-                document.getElementById('uptime-timer').textContent = formatTime(serverUptimeSeconds);
+        const allBots = [...data.bot_statuses.main_bots, ...data.bot_statuses.sub_accounts];
+        
+        allBots.forEach(bot => {
+            const item = document.createElement('div');
+            item.className = 'bot-status-item';
+            
+            // THAY ĐỔI TÊN NÚT Ở ĐÂY
+            const buttonText = bot.is_active ? 'RISE' : 'REST';
+            const buttonClass = bot.is_active ? 'btn-rise' : 'btn-rest';
 
-                const listContainer = document.getElementById('bot-status-list');
-                listContainer.innerHTML = ''; 
+            const statusHtml = `
+                <form method="post" style="margin: 0; display: flex; justify-content: flex-end;">
+                    <button type="submit" name="toggle_state_target" value="${bot.reboot_id}" class="btn-toggle-state ${buttonClass}">
+                        ${buttonText}
+                    </button>
+                </form>
+            `;
+            
+            item.innerHTML = `<span>${bot.name}</span>${statusHtml}`;
+            listContainer.appendChild(item);
+        });
 
-                const allBots = [...data.bot_statuses.main_bots, ...data.bot_statuses.sub_accounts];
-
-                allBots.forEach(bot => {
-                    const statusClass = bot.status ? 'online' : 'offline';
-                    const statusText = bot.status ? 'ONLINE' : 'OFFLINE';
-                    const item = document.createElement('div');
-                    item.className = 'bot-status-item';
-                    item.innerHTML = `<span>${bot.name}</span><span class="status-indicator ${statusClass}">${statusText}</span>`;
-                    listContainer.appendChild(item);
-                });
-
-            } catch (error) { console.error('Error fetching status:', error); }
-        }
+    } catch (error) { console.error('Error fetching status:', error); }
+}
         setInterval(fetchStatus, 1000);
     });
 </script>
@@ -1024,13 +1051,15 @@ def index():
             msg_status = f"Sent to slaves: {msg}"
             with bots_lock:
                 for idx, bot in enumerate(bots): 
-                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
+                    if bot and bot_active_states.get(f'sub_{i}', False):
+                        threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
         elif 'quickmsg' in request.form:
             msg = request.form['quickmsg']
             msg_status = f"Sent to slaves: {msg}"
             with bots_lock:
                 for idx, bot in enumerate(bots): 
-                    threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
+                    if bot and bot_active_states.get(f'sub_{i}', False):
+                        threading.Timer(2 * idx, bot.sendMessage, args=(other_channel_id, msg)).start()
 
         elif 'toggle' in request.form:
             auto_grab_enabled = not auto_grab_enabled
@@ -1141,7 +1170,14 @@ def index():
                     for i in range(len(bots)): reboot_bot(f'sub_{i}'); time.sleep(1)
             else:
                 reboot_bot(target)
-    
+
+         elif 'toggle_state_target' in request.form:
+             target = request.form.get('toggle_state_target')
+             if target in bot_active_states:
+                 bot_active_states[target] = not bot_active_states[target]
+                 state_text = "AWAKENED" if bot_active_states[target] else "DORMANT"
+                 msg_status = f"Target {target.upper()} has been set to {state_text}."
+
     grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
@@ -1186,14 +1222,17 @@ def status():
 
     bot_statuses = {
         "main_bots": [
-            {"name": "ALPHA NODE", "status": main_bot is not None},
-            {"name": "BETA NODE", "status": main_bot_2 is not None},
-            {"name": "GAMMA NODE", "status": main_bot_3 is not None}
+            {"name": "ALPHA ", "status": main_bot is not None, "reboot_id": "main_1", "is_active": bot_active_states.get('main_1', False)},
+            {"name": "BETA ", "status": main_bot_2 is not None, "reboot_id": "main_2", "is_active": bot_active_states.get('main_2', False)},
+            {"name": "GAMMA ", "status": main_bot_3 is not None, "reboot_id": "main_3", "is_active": bot_active_states.get('main_3', False)}
         ],
         "sub_accounts": []
     }
-    with bots_lock:
-        bot_statuses["sub_accounts"] = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "status": bot is not None} for i, bot in enumerate(bots)]
+   with bots_lock:
+        bot_statuses["sub_accounts"] = [
+            {"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "status": bot is not None, "reboot_id": f"sub_{i}", "is_active": bot_active_states.get(f'sub_{i}', False)} 
+            for i, bot in enumerate(bots)
+        ]
 
     return jsonify({
         'work_enabled': auto_work_enabled, 'work_countdown': work_countdown,
