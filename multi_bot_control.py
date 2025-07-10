@@ -1034,13 +1034,27 @@ if __name__ == "__main__":
     load_settings()
     print("Đang khởi tạo các bot...", flush=True)
     with bots_lock:
-        if main_token: main_bot = create_bot(main_token, is_main=True)
-        if main_token_2: main_bot_2 = create_bot(main_token_2, is_main_2=True)
-        if main_token_3: main_bot_3 = create_bot(main_token_3, is_main_3=True)
+        if main_token: 
+            main_bot = create_bot(main_token, is_main=True)
+            # THÊM KHỐI NÀY
+            if 'main_1' not in bot_active_states:
+                bot_active_states['main_1'] = True
+                
+        if main_token_2: 
+            main_bot_2 = create_bot(main_token_2, is_main_2=True)
+            # THÊM KHỐI NÀY
+            if 'main_2' not in bot_active_states:
+                bot_active_states['main_2'] = True
+                
+        if main_token_3: 
+            main_bot_3 = create_bot(main_token_3, is_main_3=True)
+            # THÊM KHỐI NÀY
+            if 'main_3' not in bot_active_states:
+                bot_active_states['main_3'] = True
+                
         for i, token in enumerate(tokens):
             if token.strip():
                 bots.append(create_bot(token.strip()))
-                # Đảm bảo bot_active_states có đủ key cho các bot mới
                 if f'sub_{i}' not in bot_active_states:
                     bot_active_states[f'sub_{i}'] = True
 
