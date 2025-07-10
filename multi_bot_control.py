@@ -345,16 +345,13 @@ def auto_work_loop():
                     if not auto_work_enabled: break
                     print(f"[Work] Đang chạy acc '{item['name']}'...", flush=True)
                     run_work_bot(item['token'].strip(), item['name'])
-                    print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc} giây...", flush=True)
-                    time.sleep(work_delay_between_acc)
+                    print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc} giây...", flush=True); time.sleep(work_delay_between_acc)
                 if auto_work_enabled:
                     print(f"[Work] Hoàn thành chu kỳ.", flush=True)
-                    last_work_cycle_time = time.time()
-                    save_settings()
+                    last_work_cycle_time = time.time(); save_settings()
             time.sleep(60)
         except Exception as e:
-            print(f"[ERROR in auto_work_loop] {e}", flush=True)
-            time.sleep(60)
+            print(f"[ERROR in auto_work_loop] {e}", flush=True); time.sleep(60)
 
 def auto_daily_loop():
     global last_daily_cycle_time
@@ -369,18 +366,13 @@ def auto_daily_loop():
                     daily_items.extend([{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)])
                 for item in daily_items:
                     if not auto_daily_enabled: break
-                    print(f"[Daily] Đang chạy acc '{item['name']}'...", flush=True)
-                    run_daily_bot(item['token'].strip(), item['name'])
-                    print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...", flush=True)
-                    time.sleep(daily_delay_between_acc)
+                    print(f"[Daily] Đang chạy acc '{item['name']}'...", flush=True); run_daily_bot(item['token'].strip(), item['name']); print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...", flush=True); time.sleep(daily_delay_between_acc)
                 if auto_daily_enabled:
                     print(f"[Daily] Hoàn thành chu kỳ.", flush=True)
-                    last_daily_cycle_time = time.time()
-                    save_settings()
+                    last_daily_cycle_time = time.time(); save_settings()
             time.sleep(60)
         except Exception as e:
-            print(f"[ERROR in auto_daily_loop] {e}", flush=True)
-            time.sleep(60)
+            print(f"[ERROR in auto_daily_loop] {e}", flush=True); time.sleep(60)
 
 def auto_kvi_loop():
     global last_kvi_cycle_time
@@ -390,12 +382,10 @@ def auto_kvi_loop():
                 print("[KVI] Bắt đầu chu trình KVI cho Acc Chính 1...", flush=True)
                 run_kvi_bot(main_token)
                 if auto_kvi_enabled:
-                    last_kvi_cycle_time = time.time()
-                    save_settings()
+                    last_kvi_cycle_time = time.time(); save_settings()
             time.sleep(60)
         except Exception as e:
-            print(f"[ERROR in auto_kvi_loop] {e}", flush=True)
-            time.sleep(60)
+            print(f"[ERROR in auto_kvi_loop] {e}", flush=True); time.sleep(60)
 
 def auto_reboot_loop():
     global auto_reboot_enabled, last_reboot_cycle_time, auto_reboot_stop_event
@@ -406,13 +396,11 @@ def auto_reboot_loop():
                 if main_bot: reboot_bot('main_1'); time.sleep(5)
                 if main_bot_2: reboot_bot('main_2'); time.sleep(5)
                 if main_bot_3: reboot_bot('main_3')
-                last_reboot_cycle_time = time.time()
-                save_settings()
+                last_reboot_cycle_time = time.time(); save_settings()
             interrupted = auto_reboot_stop_event.wait(timeout=60)
             if interrupted: break
         except Exception as e:
-            print(f"[ERROR in auto_reboot_loop] {e}", flush=True)
-            time.sleep(60)
+            print(f"[ERROR in auto_reboot_loop] {e}", flush=True); time.sleep(60)
     print("[Reboot] Luồng tự động reboot đã dừng.", flush=True)
 
 def spam_loop():
@@ -825,6 +813,7 @@ HTML_TEMPLATE = """
 # --- FLASK ROUTES ---
 @app.route("/")
 def index():
+    # This function is now very simple. It just prepares the data for the initial render.
     grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
@@ -869,6 +858,7 @@ def api_harvest_toggle():
 @app.route("/api/manual_ops", methods=['POST'])
 def api_manual_ops():
     data = request.get_json()
+    msg = ""
     msg_to_send = data.get('message') or data.get('quickmsg')
     if msg_to_send:
         msg = f"Sent to slaves: {msg_to_send}"
@@ -950,11 +940,14 @@ def api_reboot_toggle_auto():
     msg = ""
     if auto_reboot_enabled:
         if auto_reboot_thread is None or not auto_reboot_thread.is_alive():
-            auto_reboot_stop_event = threading.Event(); auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True); auto_reboot_thread.start()
+            auto_reboot_stop_event = threading.Event()
+            auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True)
+            auto_reboot_thread.start()
         msg = "Auto Reboot ENABLED."
     else:
         if auto_reboot_stop_event: auto_reboot_stop_event.set()
-        auto_reboot_thread = None; msg = "Auto Reboot DISABLED."
+        auto_reboot_thread = None
+        msg = "Auto Reboot DISABLED."
     save_settings()
     return jsonify({'status': 'success', 'message': msg})
 
@@ -1027,7 +1020,7 @@ def status():
 
     return jsonify({
         'work_enabled': auto_work_enabled, 'work_countdown': work_countdown,
-        'daily_enabled': daily_enabled, 'daily_countdown': daily_countdown,
+        'daily_enabled': auto_daily_enabled, 'daily_countdown': daily_countdown,
         'kvi_enabled': auto_kvi_enabled, 'kvi_countdown': kvi_countdown,
         'reboot_enabled': auto_reboot_enabled, 'reboot_countdown': reboot_countdown,
         'spam_enabled': spam_enabled, 'spam_countdown': spam_countdown,
