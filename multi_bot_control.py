@@ -58,7 +58,13 @@ bot_active_states = {}
 
 # --- HÀM LƯU VÀ TẢI CÀI ĐẶT ---
 def save_settings():
-    """Lưu các biến trạng thái hiện tại vào file settings.json"""
+    """Lưu cài đặt lên JSONBin.io"""
+    api_key = os.getenv("JSONBIN_API_KEY")
+    bin_id = os.getenv("JSONBIN_BIN_ID")
+    if not api_key or not bin_id:
+        # print("[Settings] Thiếu API Key hoặc Bin ID của JSONBin.", flush=True)
+        return
+
     settings = {
         'auto_grab_enabled': auto_grab_enabled, 'heart_threshold': heart_threshold,
         'auto_grab_enabled_2': auto_grab_enabled_2, 'heart_threshold_2': heart_threshold_2,
@@ -75,21 +81,50 @@ def save_settings():
         'last_reboot_cycle_time': last_reboot_cycle_time,
         'last_spam_time': last_spam_time,
     }
-    with open('settings.json', 'w') as f:
-        json.dump(settings, f, indent=4)
+    
+    headers = {
+        'Content-Type': 'application/json',
+        'X-Master-Key': api_key
+    }
+    url = f"https://api.jsonbin.io/v3/b/{bin_id}"
+    
+    try:
+        req = requests.put(url, json=settings, headers=headers, timeout=10)
+        if req.status_code == 200:
+            print("[Settings] Đã lưu cài đặt lên JSONBin.io thành công.", flush=True)
+        else:
+            print(f"[Settings] Lỗi khi lưu cài đặt lên JSONBin.io: {req.status_code} - {req.text}", flush=True)
+    except Exception as e:
+        print(f"[Settings] Exception khi lưu cài đặt: {e}", flush=True)
+
 
 def load_settings():
-    """Tải cài đặt từ file settings.json nếu tồn tại"""
-    try:
-        with open('settings.json', 'r') as f:
-            settings = json.load(f)
-            globals().update(settings)
-            print("[Settings] Đã tải cài đặt từ file.", flush=True)
-    except FileNotFoundError:
-        print("[Settings] Không tìm thấy file settings.json, sử dụng cài đặt mặc định.", flush=True)
-    except Exception as e:
-        print(f"[Settings] Lỗi khi tải cài đặt: {e}", flush=True)
+    """Tải cài đặt từ JSONBin.io"""
+    api_key = os.getenv("JSONBIN_API_KEY")
+    bin_id = os.getenv("JSONBIN_BIN_ID")
+    if not api_key or not bin_id:
+        print("[Settings] Thiếu API Key hoặc Bin ID của JSONBin. Sử dụng cài đặt mặc định.", flush=True)
+        return
 
+    headers = {
+        'X-Master-Key': api_key
+    }
+    url = f"https://api.jsonbin.io/v3/b/{bin_id}/latest"
+
+    try:
+        req = requests.get(url, headers=headers, timeout=10)
+        if req.status_code == 200:
+            settings = req.json().get("record", {})
+            if settings: # Chỉ load nếu bin không rỗng
+                globals().update(settings)
+                print("[Settings] Đã tải cài đặt từ JSONBin.io.", flush=True)
+            else:
+                print("[Settings] JSONBin rỗng, bắt đầu với cài đặt mặc định và lưu lại.", flush=True)
+                save_settings() # Lưu cài đặt mặc định lên bin lần đầu
+        else:
+            print(f"[Settings] Lỗi khi tải cài đặt từ JSONBin.io: {req.status_code} - {req.text}", flush=True)
+    except Exception as e:
+        print(f"[Settings] Exception khi tải cài đặt: {e}", flush=True)
 
 # --- CÁC HÀM LOGIC BOT ---
 def reboot_bot(target_id):
