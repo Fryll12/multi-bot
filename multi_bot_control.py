@@ -23,7 +23,7 @@ ktb_channel_id = "1376777071279214662"
 spam_channel_id = "1388802151723302912"
 work_channel_id = "1389250541590413363"
 daily_channel_id = "1392189578533671093"
-kvi_channel_id = "1312300543326031915"
+kvi_channel_id = "1393534105567625298"
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 
@@ -199,6 +199,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                         print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                         def grab():
                                             bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            time.sleep(2) 
                                             bot.sendMessage(ktb_channel_id, "kt b")
                                         threading.Timer(delay, grab).start()
                                     break
@@ -228,6 +229,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                         print(f"[Bot 2] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                         def grab_2():
                                             bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            time.sleep(2) 
                                             bot.sendMessage(ktb_channel_id, "kt b")
                                         threading.Timer(delay, grab_2).start()
                                     break
@@ -257,6 +259,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                         print(f"[Bot 3] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                         def grab_3():
                                             bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            time.sleep(2) 
                                             bot.sendMessage(ktb_channel_id, "kt b")
                                         threading.Timer(delay, grab_3).start()
                                     break
@@ -383,7 +386,7 @@ def auto_work_loop():
                     print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc} giây...", flush=True); time.sleep(work_delay_between_acc)
                 if auto_work_enabled:
                     print(f"[Work] Hoàn thành chu kỳ.", flush=True)
-                    last_work_cycle_time = time.time(); save_settings()
+                    last_work_cycle_time = time.time();
             time.sleep(60)
         except Exception as e:
             print(f"[ERROR in auto_work_loop] {e}", flush=True); time.sleep(60)
@@ -404,7 +407,7 @@ def auto_daily_loop():
                     print(f"[Daily] Đang chạy acc '{item['name']}'...", flush=True); run_daily_bot(item['token'].strip(), item['name']); print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...", flush=True); time.sleep(daily_delay_between_acc)
                 if auto_daily_enabled:
                     print(f"[Daily] Hoàn thành chu kỳ.", flush=True)
-                    last_daily_cycle_time = time.time(); save_settings()
+                    last_daily_cycle_time = time.time();
             time.sleep(60)
         except Exception as e:
             print(f"[ERROR in auto_daily_loop] {e}", flush=True); time.sleep(60)
@@ -431,7 +434,7 @@ def auto_reboot_loop():
                 if main_bot: reboot_bot('main_1'); time.sleep(5)
                 if main_bot_2: reboot_bot('main_2'); time.sleep(5)
                 if main_bot_3: reboot_bot('main_3')
-                last_reboot_cycle_time = time.time(); save_settings()
+                last_reboot_cycle_time = time.time();
             interrupted = auto_reboot_stop_event.wait(timeout=60)
             if interrupted: break
         except Exception as e:
@@ -456,13 +459,21 @@ def spam_loop():
                         print(f"Lỗi gửi spam từ [{acc_name}]: {e}", flush=True)
                 if spam_enabled:
                     last_spam_time = time.time()
-                    save_settings()
+
             time.sleep(1)
         except Exception as e:
             print(f"[ERROR in spam_loop] {e}", flush=True)
             time.sleep(1)
 
-
+def periodic_save_loop():
+    """Vòng lặp nền để tự động lưu cài đặt 5 phút một lần."""
+    while True:
+        # Chờ 300 giây (5 phút)
+        time.sleep(300)
+        
+        print("[Settings] Bắt đầu lưu định kỳ...", flush=True)
+        save_settings()
+        
 app = Flask(__name__)
 
 # --- GIAO DIỆN WEB ---
@@ -887,7 +898,6 @@ def api_harvest_toggle():
     if node == 1: auto_grab_enabled = not auto_grab_enabled; heart_threshold = threshold; msg = f"Auto Grab 1 was {'ENABLED' if auto_grab_enabled else 'DISABLED'}"
     elif node == 2: auto_grab_enabled_2 = not auto_grab_enabled_2; heart_threshold_2 = threshold; msg = f"Auto Grab 2 was {'ENABLED' if auto_grab_enabled_2 else 'DISABLED'}"
     elif node == 3: auto_grab_enabled_3 = not auto_grab_enabled_3; heart_threshold_3 = threshold; msg = f"Auto Grab 3 was {'ENABLED' if auto_grab_enabled_3 else 'DISABLED'}"
-    save_settings()
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/manual_ops", methods=['POST'])
@@ -941,7 +951,7 @@ def api_labor_toggle():
         if auto_daily_enabled and last_daily_cycle_time == 0: last_daily_cycle_time = time.time() - daily_delay_after_all - 1
         daily_delay_between_acc = int(data.get('delay_between', 3)); daily_delay_after_all = int(data.get('delay_after', 87000))
         msg = f"Auto Daily {'ENABLED' if auto_daily_enabled else 'DISABLED'}."
-    save_settings()
+
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/reboot_manual", methods=['POST'])
@@ -983,7 +993,7 @@ def api_reboot_toggle_auto():
         if auto_reboot_stop_event: auto_reboot_stop_event.set()
         auto_reboot_thread = None
         msg = "Auto Reboot DISABLED."
-    save_settings()
+
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/broadcast_toggle", methods=['POST'])
@@ -1004,7 +1014,7 @@ def api_broadcast_toggle():
         if auto_kvi_enabled and last_kvi_cycle_time == 0: last_kvi_cycle_time = time.time() - kvi_loop_delay - 1
         kvi_click_count, kvi_click_delay, kvi_loop_delay = int(data.get('clicks', 10)), int(data.get('click_delay', 3)), int(data.get('loop_delay', 7500))
         msg = f"Auto KVI {'ENABLED' if auto_kvi_enabled else 'DISABLED'}."
-    save_settings()
+
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/toggle_bot_state", methods=['POST'])
@@ -1016,7 +1026,7 @@ def api_toggle_bot_state():
         bot_active_states[target] = not bot_active_states[target]
         state_text = "AWAKENED" if bot_active_states[target] else "DORMANT"
         msg = f"Target {target.upper()} has been set to {state_text}."
-    save_settings()
+
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/status")
@@ -1097,7 +1107,8 @@ if __name__ == "__main__":
     if spam_thread is None or not spam_thread.is_alive():
         spam_thread = threading.Thread(target=spam_loop, daemon=True)
         spam_thread.start()
-    
+
+    threading.Thread(target=periodic_save_loop, daemon=True).start()
     threading.Thread(target=auto_work_loop, daemon=True).start()
     threading.Thread(target=auto_daily_loop, daemon=True).start()
     threading.Thread(target=auto_kvi_loop, daemon=True).start()
