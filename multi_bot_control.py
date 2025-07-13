@@ -468,8 +468,7 @@ def spam_loop():
 def periodic_save_loop():
     """Vòng lặp nền để tự động lưu cài đặt 5 phút một lần."""
     while True:
-        # Chờ 300 giây (5 phút)
-        time.sleep(300)
+        time.sleep(600)
         
         print("[Settings] Bắt đầu lưu định kỳ...", flush=True)
         save_settings()
