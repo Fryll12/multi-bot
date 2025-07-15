@@ -254,7 +254,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                     max_num = max(heart_numbers)
                                     if sum(heart_numbers) > 0 and max_num >= heart_threshold:
                                         max_index = heart_numbers.index(max_num)
-                                        emoji, delay = [("1️⃣", 0.25), ("2️⃣", 0.3), ("3️⃣", 0.35)][max_index]
+                                        emoji, delay = [("1️⃣", 0.4), ("2️⃣", 1.4), ("3️⃣", 2.1)][max_index]
                                         print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                         def grab():
                                             bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
