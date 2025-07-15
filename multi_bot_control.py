@@ -268,7 +268,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
             # --- Logic KVI thông minh (Tích hợp) ---
             if auto_kvi_enabled and (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 m = resp.parsed.auto()
-                if (m.get("channel_id") != kvi_channel_id or m.get("author", {}).get("id") != KARUTA_ID or not m.get("embeds")):
+                if (m.get("channel_id") != kvi_channel_id or m.get("author", {}).get("id") != karuta_id or not m.get("embeds")):
                     return
 
                 kvi_session_state.update({"message_id": m.get("id"), "guild_id": m.get("guild_id")})
