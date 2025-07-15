@@ -55,7 +55,9 @@ bots_lock = threading.Lock()
 server_start_time = time.time()
 bot_active_states = {}
 
-
+# Biến trạng thái cho KVI (Dán vào dưới các biến khác)
+visit_data = {} 
+kvi_session_state = {"last_attempt_num": None, "last_question": None, "last_character_name": None, "message_id": None, "guild_id": None}
 # --- HÀM LƯU VÀ TẢI CÀI ĐẶT ---
 def save_settings():
     """Lưu cài đặt lên JSONBin.io"""
@@ -125,6 +127,61 @@ def load_settings():
             print(f"[Settings] Lỗi khi tải cài đặt từ JSONBin.io: {req.status_code} - {req.text}", flush=True)
     except Exception as e:
         print(f"[Settings] Exception khi tải cài đặt: {e}", flush=True)
+def save_visit_data():
+    """Lưu dữ liệu học của KVI vào một Bin riêng"""
+    api_key = os.getenv("JSONBIN_API_KEY")
+    kvi_bin_id = os.getenv("KVI_JSONBIN_BIN_ID") # Dùng Bin ID riêng
+    if not api_key or not kvi_bin_id: return
+    headers = {'Content-Type': 'application/json', 'X-Master-Key': api_key}
+    url = f"https://api.jsonbin.io/v3/b/{kvi_bin_id}"
+    def do_save():
+        try:
+            req = requests.put(url, json=visit_data, headers=headers, timeout=10)
+            if req.status_code != 200: print(f"[KVI Settings] Lỗi khi lưu dữ liệu KVI: {req.status_code}", flush=True)
+        except Exception as e: print(f"[KVI Settings] Exception khi lưu dữ liệu KVI: {e}", flush=True)
+    threading.Thread(target=do_save, daemon=True).start()
+
+def load_visit_data():
+    """Tải dữ liệu học của KVI từ Bin riêng"""
+    global visit_data
+    api_key = os.getenv("JSONBIN_API_KEY")
+    kvi_bin_id = os.getenv("KVI_JSONBIN_BIN_ID")
+    if not api_key or not kvi_bin_id: return
+    headers = {'X-Master-Key': api_key, 'X-Bin-Meta': 'false'}
+    url = f"https://api.jsonbin.io/v3/b/{kvi_bin_id}/latest"
+    try:
+        req = requests.get(url, headers=headers, timeout=10)
+        if req.status_code == 200:
+            data = req.json()
+            if data: visit_data = data
+            print("[KVI Settings] Đã tải dữ liệu KVI.", flush=True)
+    except Exception: pass
+
+def kvi_click_button(token, channel_id, guild_id, message_id, application_id, button_data):
+    """Hàm click nút dành riêng cho KVI"""
+    custom_id = button_data.get("custom_id");
+    if not custom_id: return
+    headers = {"Authorization": token, "Content-Type": "application/json"}
+    session_id = 'a' + ''.join(random.choices('0123456789abcdef', k=31))
+    payload = { "type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": session_id, "data": {"component_type": 2, "custom_id": custom_id} }
+    try: requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+    except Exception as e: print(f"🔥 [KVI CLICK LỖI] {e}", flush=True)
+
+def start_kvi_session(bot_instance):
+    """Gửi lệnh kvi để bắt đầu"""
+    print("🚀 [KVI] Gửi lệnh 'kvi'...", flush=True)
+    if kvi_channel_id:
+        bot_instance.sendMessage(kvi_channel_id, "kvi")
+
+def parse_kvi_embed_data(embed):
+    """Phân tích embed để lấy tên nhân vật và câu hỏi"""
+    description = embed.get("description", "")
+    char_name_match = re.search(r"Character · \*\*([^\*]+)\*\*", description)
+    character_name = char_name_match.group(1).strip() if char_name_match else None
+    question_match = re.search(r'“([^”]*)”', description)
+    question = question_match.group(1).strip() if question_match else None
+    num_choices = len([line for line in description.split('\n') if re.match(r'^\d️⃣', line)])
+    return character_name, question, num_choices
 
 # --- CÁC HÀM LOGIC BOT ---
 def reboot_bot(target_id):
@@ -178,10 +235,12 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
     if is_main:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled, heart_threshold
-            if resp.event.message:
+            global auto_grab_enabled, heart_threshold, visit_data, kvi_session_state, main_token
+            
+            # --- Logic Auto Grab (Giữ nguyên) ---
+            if resp.event.message and auto_grab_enabled:
                 msg = resp.parsed.auto()
-                if msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []) and auto_grab_enabled:
+                if msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                     last_drop_msg_id = msg["id"]
                     def read_karibbit():
                         time.sleep(0.5)
@@ -195,16 +254,73 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                     max_num = max(heart_numbers)
                                     if sum(heart_numbers) > 0 and max_num >= heart_threshold:
                                         max_index = heart_numbers.index(max_num)
-                                        emoji, delay = [("1️⃣", 0.5), ("2️⃣", 1.5), ("3️⃣", 2.2)][max_index]
+                                        emoji, delay = [("1️⃣", 0.25), ("2️⃣", 0.3), ("3️⃣", 0.35)][max_index]
                                         print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                         def grab():
                                             bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                            time.sleep(2) 
+                                            time.sleep(1)
                                             bot.sendMessage(ktb_channel_id, "kt b")
                                         threading.Timer(delay, grab).start()
                                     break
                         except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 1): {e}", flush=True)
                     threading.Thread(target=read_karibbit).start()
+            
+            # --- Logic KVI thông minh (Tích hợp) ---
+            if auto_kvi_enabled and (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
+                m = resp.parsed.auto()
+                if (m.get("channel_id") != kvi_channel_id or m.get("author", {}).get("id") != KARUTA_ID or not m.get("embeds")):
+                    return
+
+                kvi_session_state.update({"message_id": m.get("id"), "guild_id": m.get("guild_id")})
+                embed, description, buttons = m["embeds"][0], m["embeds"][0].get("description", ""), m.get("components")
+
+                if "Your Affection Rating has" in description and kvi_session_state["last_attempt_num"]:
+                    char_name, question, attempted_num = kvi_session_state["last_character_name"], kvi_session_state["last_question"], kvi_session_state["last_attempt_num"]
+                    if char_name and question:
+                        if char_name not in visit_data: visit_data[char_name] = {}
+                        if question not in visit_data[char_name]: visit_data[char_name][question] = {"correct_answer": None, "incorrect_answers": []}
+                        db_entry = visit_data[char_name][question]
+                        if "increased" in description:
+                            if db_entry["correct_answer"] != attempted_num:
+                                print(f"✅ [KVI HỌC] ĐÚNG! Nút số {attempted_num}", flush=True)
+                                db_entry["correct_answer"] = attempted_num; save_visit_data()
+                        elif ("decreased" in description or "not changed" in description):
+                            if attempted_num not in db_entry["incorrect_answers"]:
+                                print(f"❌ [KVI HỌC] SAI! Loại trừ nút số {attempted_num}.", flush=True)
+                                db_entry["incorrect_answers"].append(attempted_num); save_visit_data()
+                    kvi_session_state["last_attempt_num"] = None
+                
+                if not buttons: return
+                time.sleep(random.uniform(1.8, 2.5))
+                
+                if "1️⃣" in description:
+                    character_name, question, num_choices = parse_kvi_embed_data(embed)
+                    if not all([character_name, question, num_choices > 0]): return
+                    if question == kvi_session_state["last_question"] and kvi_session_state["last_attempt_num"]: return
+                    print(f"\n[KVI] Nhân vật: {character_name}\n[KVI] Câu hỏi: {question}", flush=True)
+                    kvi_session_state.update({"last_question": question, "last_character_name": character_name})
+                    db_entry = visit_data.get(character_name, {}).get(question, {})
+                    correct_answer, incorrect_answers = db_entry.get("correct_answer"), db_entry.get("incorrect_answers", [])
+                    chosen_button_num = None
+                    if correct_answer:
+                        print(f"💡 [KVI BIẾT] Đáp án là {correct_answer}", flush=True); chosen_button_num = correct_answer
+                    else:
+                        all_button_nums = list(range(1, num_choices + 1))
+                        possible_button_nums = [num for num in all_button_nums if num not in incorrect_answers]
+                        if not possible_button_nums:
+                            print("⚠️ [KVI] Đã loại trừ hết. Thử lại từ đầu.", flush=True)
+                            if question in visit_data.get(character_name, {}): visit_data[character_name][question]["incorrect_answers"] = []
+                            possible_button_nums = all_button_nums
+                        chosen_button_num = random.choice(possible_button_nums); print(f"🤔 [KVI THỬ] Chọn nút số {chosen_button_num}", flush=True)
+                    try:
+                        button_to_click = buttons[0]['components'][chosen_button_num - 1]
+                        kvi_session_state["last_attempt_num"] = chosen_button_num
+                        kvi_click_button(main_token, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
+                    except (ValueError, IndexError) as e: print(f"🔥 [KVI LỖI] Không tìm thấy nút số {chosen_button_num}. Lỗi: {e}", flush=True)
+                else:
+                    print("\n▶️  [KVI] Bắt đầu/Tiếp tục...", flush=True)
+                    button_to_click = buttons[0]['components'][0]
+                    kvi_click_button(main_token, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
     if is_main_2:
         @bot.gateway.command
         def on_message(resp):
@@ -414,16 +530,15 @@ def auto_daily_loop():
 
 def auto_kvi_loop():
     global last_kvi_cycle_time
+    time.sleep(20) 
     while True:
         try:
-            if auto_kvi_enabled and main_token and bot_active_states.get('main_1', False) and (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
-                print("[KVI] Bắt đầu chu trình KVI cho Acc Chính 1...", flush=True)
-                run_kvi_bot(main_token)
-                if auto_kvi_enabled:
-                    last_kvi_cycle_time = time.time(); save_settings()
+            if auto_kvi_enabled and main_bot and bot_active_states.get('main_1', False):
+                if (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
+                    start_kvi_session(main_bot)
+                    last_kvi_cycle_time = time.time()
             time.sleep(60)
-        except Exception as e:
-            print(f"[ERROR in auto_kvi_loop] {e}", flush=True); time.sleep(60)
+        except Exception as e: print(f"[ERROR in auto_kvi_loop] {e}", flush=True); time.sleep(60)
 
 def auto_reboot_loop():
     global auto_reboot_enabled, last_reboot_cycle_time, auto_reboot_stop_event
@@ -1076,6 +1191,7 @@ def status():
 # --- MAIN EXECUTION ---
 if __name__ == "__main__":
     load_settings()
+    load_visit_data()
     print("Đang khởi tạo các bot...", flush=True)
     with bots_lock:
         if main_token: 
