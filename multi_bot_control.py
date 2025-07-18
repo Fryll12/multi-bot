@@ -930,7 +930,7 @@ HTML_TEMPLATE = """
     <div id="farm-grid" class="main-grid">
         
         {% for server in farm_servers %}
-        <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="border-color: #444; background: rgba(0,0,0,0.4);">
+        <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="border-color: var(--ghost-gray); background: rgba(0,0,0,0.4);">
             <button class="btn-delete-farm" title="Delete Farm" style="position: absolute; top: 10px; right: 10px; background: var(--dark-red); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; line-height: 30px; text-align: center; padding: 0;">
                 <i class="fas fa-times"></i>
             </button>
