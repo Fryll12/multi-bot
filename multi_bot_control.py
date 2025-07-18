@@ -921,16 +921,16 @@ HTML_TEMPLATE = """
         </div>
     </div>
     
-    <div class="panel" style="border-color: #FFD700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); margin-top: 20px;"> 
+    <div class="panel" style="border-color: #FF69B4; box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); margin-top: 20px;"> 
     
-    <h2 data-text="Multi-Farm Control" style="color: #FFD700; border-color: #FFD700; font-family: 'Nosifer', cursive; font-size: 1.4rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid; padding-bottom: 10px; position: relative;">
+    <h2 data-text="Multi-Farm Control" style="color: #FF69B4; border-color: #FFD700; font-family: 'Nosifer', cursive; font-size: 1.4rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid; padding-bottom: 10px; position: relative;">
         <i class="fas fa-network-wired"></i> Multi-Farm Control
     </h2>
 
     <div id="farm-grid" class="main-grid">
         
         {% for server in farm_servers %}
-        <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="border-color: #FF69B4; background: rgba(0,0,0,0.4);">
+        <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="background: rgba(0,0,0,0.4); box-shadow: 0 0 10px rgba(255, 105, 180, 0.6); border: none;">
             <button class="btn-delete-farm" title="Delete Farm" style="position: absolute; top: 10px; right: 10px; background: var(--dark-red); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; line-height: 30px; text-align: center; padding: 0;">
                 <i class="fas fa-times"></i>
             </button>
