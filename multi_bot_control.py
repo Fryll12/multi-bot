@@ -737,7 +737,7 @@ HTML_TEMPLATE = """
         .title-sub { color: var(--deep-purple); text-shadow: 0 0 30px var(--deep-purple); }
         .subtitle { font-size: 1.3rem; color: var(--text-secondary); letter-spacing: 2px; margin-bottom: 15px; font-family: 'Orbitron', monospace; }
         .main-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .panel { background: linear-gradient(135deg, var(--panel-bg), rgba(26, 26, 26, 0.9)); border: 1px solid var(--border-color); border-radius: 10px; padding: 25px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
+        .panel { position: relative; background: linear-gradient(135deg, var(--panel-bg), rgba(26, 26, 26, 0.9)); border: 1px solid var(--border-color); border-radius: 10px; padding: 25px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
         .panel h2 { font-family: 'Nosifer', cursive; font-size: 1.4rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid; padding-bottom: 10px; position: relative; animation: glitch-skew 1s infinite linear alternate-reverse; }
         .panel h2 i { margin-right: 10px; }
         .blood-panel { border-color: var(--blood-red); box-shadow: var(--shadow-red); }
@@ -905,7 +905,7 @@ HTML_TEMPLATE = """
             <button class="btn-delete-farm" title="Delete Farm" style="position: absolute; top: 10px; right: 10px; background: var(--dark-red); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; line-height: 30px; text-align: center; padding: 0;">
                 <i class="fas fa-times"></i>
             </button>
-            <h3 style="color: var(--bone-white); font-family: 'Orbitron'; margin-top: 0; padding-right: 30px;">{{ server.name }}</h3>
+            <h3 style="color: #FFD700; font-family: 'Orbitron'; margin-top: 0; padding-right: 30px;">{{ server.name }}</h3>
             
             <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
                 <div class="input-group"><label>Main CH</label><input type="text" class="farm-channel-input" data-field="main_channel_id" value="{{ server.main_channel_id or '' }}"></div>
