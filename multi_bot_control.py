@@ -818,49 +818,7 @@ HTML_TEMPLATE = """
                     <div id="bot-status-list" class="bot-status-grid"></div>
                 </div>
             </div>
-            
-        <div style="margin-top: 30px;">
-    <h2 data-text="Multi-Farm Control" style="color: #FFD700; border-color: #FFD700; font-family: 'Nosifer', cursive; font-size: 1.4rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid; padding-bottom: 10px; position: relative;">
-        <i class="fas fa-network-wired"></i> Multi-Farm Control
-    </h2>
-    <div id="farm-grid" class="main-grid">
-        {% for server in farm_servers %}
-        <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="border-color: #666;">
-            <button class="btn-delete-farm" title="Delete Farm" style="position: absolute; top: 10px; right: 10px; background: var(--dark-red); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; line-height: 30px; text-align: center; padding: 0;">
-                <i class="fas fa-times"></i>
-            </button>
-            <h3 style="color: var(--bone-white); font-family: 'Orbitron'; margin-top: 0; padding-right: 30px;">{{ server.name }}</h3>
-            <div style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
-                <div class="input-group"><label>Main CH</label><input type="text" class="farm-channel-input" data-field="main_channel_id" value="{{ server.main_channel_id or '' }}"></div>
-                <div class="input-group"><label>KTB CH</label><input type="text" class="farm-channel-input" data-field="ktb_channel_id" value="{{ server.ktb_channel_id or '' }}"></div>
-                <div class="input-group"><label>Spam CH</label><input type="text" class="farm-channel-input" data-field="spam_channel_id" value="{{ server.spam_channel_id or '' }}"></div>
-            </div>
-            <div style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
-                <div style="display: flex; flex-direction:column; gap: 10px;">
-                    {% for i in range(1, 4) %}
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <span style="font-family: 'Orbitron';">{{ ['ALPHA', 'BETA', 'GAMMA'][i-1] }}</span>
-                        <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
-                            <input type="number" class="farm-harvest-threshold" data-node="{{ i }}" value="{{ server['heart_threshold_' ~ i] or 50 }}" min="0">
-                            <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="{{ i }}">{{ 'TẮT' if server['auto_grab_enabled_' ~ i] else 'BẬT' }}</button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            <div style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
-                <textarea class="farm-spam-message" rows="2" placeholder="Nội dung spam cho farm..." style="width: calc(100% - 30px); margin-bottom: 10px;">{{ server.spam_message or '' }}</textarea>
-                <div class="input-group"><label>Delay</label><input type="number" class="farm-spam-delay" value="{{ server.spam_delay or 10 }}"><span class="timer-display farm-spam-timer">--:--:--</span></div>
-                <button type="button" class="btn farm-broadcast-toggle">{{ 'TẮT SPAM' if server.spam_enabled else 'BẬT SPAM' }}</button>
-            </div>
-        </div>
-        {% endfor %}
-        <div id="add-farm-btn" style="display: flex; align-items: center; justify-content: center; min-height: 200px; border: 2px dashed #888; cursor: pointer; border-radius: 10px;">
-            <i class="fas fa-plus" style="font-size: 3rem; color: #888;"></i>
-        </div>
-    </div>
-</div>
-        
+                
             <div class="panel blood-panel">
                 <h2 data-text="Soul Harvest"><i class="fas fa-crosshairs"></i> Soul Harvest</h2>
                 <div class="grab-section"><h3>ALPHA NODE <span id="harvest-status-1" class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-1" value="{{ heart_threshold }}" min="0"><button type="button" id="harvest-toggle-1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
@@ -933,6 +891,52 @@ HTML_TEMPLATE = """
             </div>
         </div>
     </div>
+    <div style="margin-top: 30px;"> 
+    
+    <h2 data-text="Multi-Farm Control" style="color: #FFD700; border-color: #FFD700; font-family: 'Nosifer', cursive; font-size: 1.4rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid; padding-bottom: 10px; position: relative;">
+        <i class="fas fa-network-wired"></i> Multi-Farm Control
+    </h2>
+
+    <div id="farm-grid" class="main-grid">
+        
+        {% for server in farm_servers %}
+        <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="border-color: #666;">
+            <button class="btn-delete-farm" title="Delete Farm" style="position: absolute; top: 10px; right: 10px; background: var(--dark-red); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; line-height: 30px; text-align: center; padding: 0;">
+                <i class="fas fa-times"></i>
+            </button>
+            <h3 style="color: var(--bone-white); font-family: 'Orbitron'; margin-top: 0; padding-right: 30px;">{{ server.name }}</h3>
+            <div style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+                <div class="input-group"><label>Main CH</label><input type="text" class="farm-channel-input" data-field="main_channel_id" value="{{ server.main_channel_id or '' }}"></div>
+                <div class="input-group"><label>KTB CH</label><input type="text" class="farm-channel-input" data-field="ktb_channel_id" value="{{ server.ktb_channel_id or '' }}"></div>
+                <div class="input-group"><label>Spam CH</label><input type="text" class="farm-channel-input" data-field="spam_channel_id" value="{{ server.spam_channel_id or '' }}"></div>
+            </div>
+            <div style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+                <div style="display: flex; flex-direction:column; gap: 10px;">
+                    {% for i in range(1, 4) %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <span style="font-family: 'Orbitron';">{{ ['ALPHA', 'BETA', 'GAMMA'][i-1] }}</span>
+                        <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
+                            <input type="number" class="farm-harvest-threshold" data-node="{{ i }}" value="{{ server['heart_threshold_' ~ i] or 50 }}" min="0">
+                            <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="{{ i }}">{{ 'TẮT' if server['auto_grab_enabled_' ~ i] else 'BẬT' }}</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+                <textarea class="farm-spam-message" rows="2" placeholder="Nội dung spam cho farm..." style="width: calc(100% - 30px); margin-bottom: 10px;">{{ server.spam_message or '' }}</textarea>
+                <div class="input-group"><label>Delay</label><input type="number" class="farm-spam-delay" value="{{ server.spam_delay or 10 }}"><span class="timer-display farm-spam-timer">--:--:--</span></div>
+                <button type="button" class="btn farm-broadcast-toggle">{{ 'TẮT SPAM' if server.spam_enabled else 'BẬT SPAM' }}</button>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div id="add-farm-btn" style="display: flex; align-items: center; justify-content: center; min-height: 200px; border: 2px dashed #888; cursor: pointer; border-radius: 10px;">
+            <i class="fas fa-plus" style="font-size: 3rem; color: #888;"></i>
+        </div>
+    </div>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         function initGlitches() {
