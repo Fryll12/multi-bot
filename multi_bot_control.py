@@ -26,6 +26,7 @@ daily_channel_id = os.getenv("DAILY_CHANNEL_ID")
 kvi_channel_id = os.getenv("KVI_CHANNEL_ID")
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
+yoru_bot_id = "1311684840462225440"
 
 # --- BIẾN TRẠNG THÁI (đây là các giá trị mặc định nếu không có file settings.json) ---
 bots, acc_names = [], [
@@ -54,6 +55,7 @@ spam_thread, auto_reboot_thread = None, None
 bots_lock = threading.Lock()
 server_start_time = time.time()
 bot_active_states = {}
+farm_servers = []
 
 # Biến trạng thái cho KVI (Dán vào dưới các biến khác)
 visit_data = {} 
@@ -156,7 +158,47 @@ def load_visit_data():
             if data: visit_data = data
             print("[KVI Settings] Đã tải dữ liệu KVI.", flush=True)
     except Exception: pass
+        
+def save_farm_settings():
+    """Lưu cài đặt của các server farm vào Bin riêng."""
+    api_key = os.getenv("JSONBIN_API_KEY")
+    farm_bin_id = os.getenv("FARM_JSONBIN_BIN_ID")
+    if not api_key or not farm_bin_id: return
 
+    headers = {'Content-Type': 'application/json', 'X-Master-Key': api_key}
+    url = f"https://api.jsonbin.io/v3/b/{farm_bin_id}"
+    
+    try:
+        req = requests.put(url, json=farm_servers, headers=headers, timeout=10)
+        if req.status_code == 200:
+            print("[Farm Settings] Đã lưu cài đặt farm thành công.", flush=True)
+        else:
+            print(f"[Farm Settings] Lỗi khi lưu cài đặt farm: {req.status_code} - {req.text}", flush=True)
+    except Exception as e:
+        print(f"[Farm Settings] Exception khi lưu cài đặt farm: {e}", flush=True)
+
+def load_farm_settings():
+    """Tải cài đặt của các server farm từ Bin riêng."""
+    global farm_servers
+    api_key = os.getenv("JSONBIN_API_KEY")
+    farm_bin_id = os.getenv("FARM_JSONBIN_BIN_ID")
+    if not api_key or not farm_bin_id: return
+
+    headers = {'X-Master-Key': api_key, 'X-Bin-Meta': 'false'}
+    url = f"https://api.jsonbin.io/v3/b/{farm_bin_id}/latest"
+
+    try:
+        req = requests.get(url, headers=headers, timeout=10)
+        if req.status_code == 200:
+            data = req.json()
+            if isinstance(data, list): farm_servers = data
+            else: farm_servers = []
+            print(f"[Farm Settings] Đã tải {len(farm_servers)} cấu hình farm.", flush=True)
+        else:
+            farm_servers = []
+    except Exception:
+        farm_servers = []
+        
 def kvi_click_button(token, channel_id, guild_id, message_id, application_id, button_data):
     """Hàm click nút dành riêng cho KVI"""
     custom_id = button_data.get("custom_id");
@@ -183,6 +225,61 @@ def parse_kvi_embed_data(embed):
     num_choices = len([line for line in description.split('\n') if re.match(r'^\d️⃣', line)])
     return character_name, question, num_choices
 
+def handle_farm_grab(bot, msg, bot_num):
+    """Xử lý logic grab dành RIÊNG cho các farm panel mới."""
+    channel_id = msg.get("channel_id")
+    target_server = next((s for s in farm_servers if s.get('main_channel_id') == channel_id), None)
+    if not target_server: return
+
+    grab_map = {1: 'auto_grab_enabled_1', 2: 'auto_grab_enabled_2', 3: 'auto_grab_enabled_3'}
+    thresh_map = {1: 'heart_threshold_1', 2: 'heart_threshold_2', 3: 'heart_threshold_3'}
+    
+    if not target_server.get(grab_map[bot_num], False): return
+    
+    heart_threshold = int(target_server.get(thresh_map[bot_num], 50))
+    ktb_channel_id = target_server.get('ktb_channel_id')
+    if not ktb_channel_id: return
+
+    if msg.get("author", {}).get("id") == karuta_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
+        last_drop_msg_id = msg["id"]
+        
+        def read_yoru_bot():
+            time.sleep(0.5)
+            try:
+                messages = bot.getMessages(channel_id, num=5).json()
+                for msg_item in messages:
+                    # ⭐ SỬA ĐỔI QUAN TRỌNG: Kiểm tra ID của bot Yoru thay vì Karibbit
+                    if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                        desc = msg_item["embeds"][0].get("description", "")
+                        lines = desc.split('\n')
+                        heart_numbers = []
+                        for line in lines[:3]:
+                            match = re.search(r'♡(\d+)', line)
+                            heart_numbers.append(int(match.group(1)) if match else 0)
+                        
+                        if not any(heart_numbers): break
+                        max_num = max(heart_numbers)
+                        if max_num >= heart_threshold:
+                            max_index = heart_numbers.index(max_num)
+                            delays = {1: [0.4, 1.4, 2.1], 2: [0.7, 1.8, 2.4], 3: [0.8, 1.9, 2.5]}
+                            emojis = ["1️⃣", "2️⃣", "3️⃣"]
+                            emoji = emojis[max_index]
+                            delay = delays[bot_num][max_index]
+
+                            print(f"[FARM: {target_server['name']} | Bot {bot_num}] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
+                            
+                            def grab_action():
+                                bot.addReaction(channel_id, last_drop_msg_id, emoji)
+                                time.sleep(1)
+                                bot.sendMessage(ktb_channel_id, "kt b")
+                            
+                            threading.Timer(delay, grab_action).start()
+                        break
+            except Exception as e:
+                print(f"Lỗi khi đọc Yoru Bot (FARM: {target_server['name']} | Bot {bot_num}): {e}", flush=True)
+
+        threading.Thread(target=read_yoru_bot).start()
+        
 # --- CÁC HÀM LOGIC BOT ---
 def reboot_bot(target_id):
     global main_bot, main_bot_2, main_bot_3, bots
@@ -264,7 +361,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                     break
                         except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 1): {e}", flush=True)
                     threading.Thread(target=read_karibbit).start()
-            
+                    handle_farm_grab(bot, msg, 1)
             # --- Logic KVI thông minh (Tích hợp) ---
             if auto_kvi_enabled and (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 m = resp.parsed.auto()
@@ -351,6 +448,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                     break
                         except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 2): {e}", flush=True)
                     threading.Thread(target=read_karibbit_2).start()
+                    handle_farm_grab(bot, msg, 2)
     if is_main_3:
         @bot.gateway.command
         def on_message(resp):
@@ -381,6 +479,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                     break
                         except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 3): {e}", flush=True)
                     threading.Thread(target=read_karibbit_3).start()
+                    handle_farm_grab(bot, msg, 3)
     
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
@@ -560,21 +659,40 @@ def spam_loop():
     global last_spam_time
     while True:
         try:
-            if spam_enabled and spam_message and (time.time() - last_spam_time) >= spam_delay:
-                with bots_lock:
-                    bots_to_spam = [bot for i, bot in enumerate(bots) if bot and bot_active_states.get(f'sub_{i}', False)]
+            with bots_lock:
+                bots_to_spam = [bot for i, bot in enumerate(bots) if bot and bot_active_states.get(f'sub_{i}', False)]
+            
+            # --- LOGIC SPAM TOÀN CỤC (GIỮ NGUYÊN) ---
+            if spam_enabled and spam_message and spam_channel_id and (time.time() - last_spam_time) >= spam_delay:
                 for idx, bot in enumerate(bots_to_spam):
                     if not spam_enabled: break
                     try:
                         acc_name = acc_names[idx] if idx < len(acc_names) else f"Sub {idx+1}"
                         bot.sendMessage(spam_channel_id, spam_message)
-                        print(f"[{acc_name}] đã gửi: {spam_message}", flush=True)
+                        print(f"[{acc_name}] đã gửi (Global): {spam_message}", flush=True)
                         time.sleep(2)
                     except Exception as e:
-                        print(f"Lỗi gửi spam từ [{acc_name}]: {e}", flush=True)
+                        print(f"Lỗi gửi spam (Global) từ [{acc_name}]: {e}", flush=True)
                 if spam_enabled:
                     last_spam_time = time.time()
 
+            # --- LOGIC SPAM MULTI-FARM (THÊM VÀO) ---
+            for server in farm_servers:
+                if server.get('spam_enabled') and server.get('spam_message') and server.get('spam_channel_id'):
+                    last_farm_spam_time = server.get('last_spam_time', 0)
+                    farm_spam_delay = server.get('spam_delay', 10)
+
+                    if (time.time() - last_farm_spam_time) >= farm_spam_delay:
+                        for bot in bots_to_spam:
+                            if not server.get('spam_enabled'): break
+                            try:
+                                bot.sendMessage(server['spam_channel_id'], server['spam_message'])
+                                time.sleep(2)
+                            except Exception as e: print(f"Lỗi gửi spam (Farm: {server['name']}): {e}", flush=True)
+                        
+                        if server.get('spam_enabled'):
+                            server['last_spam_time'] = time.time()
+            
             time.sleep(1)
         except Exception as e:
             print(f"[ERROR in spam_loop] {e}", flush=True)
@@ -700,7 +818,39 @@ HTML_TEMPLATE = """
                     <div id="bot-status-list" class="bot-status-grid"></div>
                 </div>
             </div>
-
+            
+        <div class="panel" style="border-color: #FFD700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); margin-top: 20px;">
+            <h2 data-text="Multi-Farm Control" style="color: #FFD700; border-color: #FFD700;"><i class="fas fa-network-wired"></i> Multi-Farm Control</h2>
+            <div id="farm-grid" class="main-grid">
+                {% for server in farm_servers %}
+                <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="background: rgba(40,40,40,0.5);">
+                    <button class="btn-delete-farm" title="Delete Farm" style="position: absolute; top: 10px; right: 10px; background: var(--dark-red); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer;"><i class="fas fa-times"></i></button>
+                    <h3 style="color: #FFD700; font-family: 'Orbitron'; margin-top: 0;">{{ server.name }}</h3>
+                    <div class="input-group"><label>Main CH</label><input type="text" class="farm-channel-input" data-field="main_channel_id" value="{{ server.main_channel_id or '' }}"></div>
+                    <div class="input-group"><label>KTB CH</label><input type="text" class="farm-channel-input" data-field="ktb_channel_id" value="{{ server.ktb_channel_id or '' }}"></div>
+                    <div class="input-group"><label>Spam CH</label><input type="text" class="farm-channel-input" data-field="spam_channel_id" value="{{ server.spam_channel_id or '' }}"></div>
+                    <hr style="border-color: #444; margin: 15px 0;">
+                    <div style="display: flex; flex-direction:column; gap: 5px;">
+                        {% for i in range(1, 4) %}
+                        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <span>{{ ['ALPHA', 'BETA', 'GAMMA'][i-1] }}</span>
+                            <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
+                                <input type="number" class="farm-harvest-threshold" data-node="{{ i }}" value="{{ server['heart_threshold_' ~ i] or 50 }}" min="0">
+                                <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="{{ i }}">{{ 'TẮT' if server['auto_grab_enabled_' ~ i] else 'BẬT' }}</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <hr style="border-color: #444; margin: 15px 0;">
+                    <textarea class="farm-spam-message" rows="2" placeholder="Nội dung spam cho farm..." style="width: calc(100% - 30px); margin-bottom: 10px;">{{ server.spam_message or '' }}</textarea>
+                    <div class="input-group"><label>Delay</label><input type="number" class="farm-spam-delay" value="{{ server.spam_delay or 10 }}"><span class="timer-display farm-spam-timer">--:--:--</span></div>
+                    <button type="button" class="btn farm-broadcast-toggle">{{ 'TẮT SPAM' if server.spam_enabled else 'BẬT SPAM' }}</button>
+                </div>
+                {% endfor %}
+                <div id="add-farm-btn" style="display: flex; align-items: center; justify-content: center; min-height: 200px; border: 2px dashed #FFD700; cursor: pointer; border-radius: 10px;"><i class="fas fa-plus" style="font-size: 3rem; color: #FFD700;"></i></div>
+            </div>
+        </div>
+        
             <div class="panel blood-panel">
                 <h2 data-text="Soul Harvest"><i class="fas fa-crosshairs"></i> Soul Harvest</h2>
                 <div class="grab-section"><h3>ALPHA NODE <span id="harvest-status-1" class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-1" value="{{ heart_threshold }}" min="0"><button type="button" id="harvest-toggle-1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
@@ -874,7 +1024,16 @@ HTML_TEMPLATE = """
                     item.innerHTML = `<span>${bot.name}</span><button type="button" data-target="${bot.reboot_id}" class="btn-toggle-state ${buttonClass}">${buttonText}</button>`;
                     listContainer.appendChild(item);
                 });
-
+                if (data.farm_servers) {
+                    data.farm_servers.forEach(s => {
+                        const p = document.querySelector(`.server-farm-panel[data-farm-id="${s.id}"]`);
+                        if (!p) return;
+                        for(let i=1; i<=3; i++) { p.querySelector(`.farm-harvest-toggle[data-node="${i}"]`).textContent = s[`auto_grab_enabled_${i}`] ? 'TẮT' : 'BẬT'; }
+                        p.querySelector('.farm-broadcast-toggle').textContent = s.spam_enabled ? 'TẮT SPAM' : 'BẬT SPAM';
+                        let countdown = s.spam_enabled ? (s.last_spam_time + s.spam_delay) - (Date.now()/1000) : 0;
+                        p.querySelector('.farm-spam-timer').textContent = formatTime(countdown);
+                    });
+                 }
             } catch (error) { console.error('Error fetching status:', error); }
         }
         setInterval(fetchStatus, 1000);
@@ -964,6 +1123,21 @@ HTML_TEMPLATE = """
                 postData('/api/toggle_bot_state', { target: e.target.dataset.target });
             }
         });
+        const farmGrid = document.getElementById('farm-grid');
+        if (farmGrid) {
+            document.getElementById('add-farm-btn').addEventListener('click', () => { const name = prompt("Nhập tên cho farm mới:", "Farm Mới"); if (name) postData('/api/farm/add', { name: name }); });
+            farmGrid.addEventListener('click', e => {
+                const p = e.target.closest('.server-farm-panel'); if (!p) return; const id = p.dataset.farmId;
+                if (e.target.closest('.btn-delete-farm')) { if (confirm('Xóa farm này?')) postData('/api/farm/delete', { farm_id: id }); }
+                if (e.target.classList.contains('farm-harvest-toggle')) { const n = e.target.dataset.node; const t = p.querySelector(`.farm-harvest-threshold[data-node="${n}"]`); postData('/api/farm/harvest_toggle', { farm_id: id, node: n, threshold: t.value });}
+                if (e.target.classList.contains('farm-broadcast-toggle')) { const m = p.querySelector('.farm-spam-message').value; const d = p.querySelector('.farm-spam-delay').value; postData('/api/farm/broadcast_toggle', { farm_id: id, message: m, delay: d }); }
+            });
+            farmGrid.addEventListener('change', e => {
+                const p = e.target.closest('.server-farm-panel'); if (!p) return; const id = p.dataset.farmId;
+                if(e.target.classList.contains('farm-channel-input')) { const d = {}; d[e.target.dataset.field] = e.target.value; postData('/api/farm/update_channels', {farm_id: id, ...d}); }
+            });
+        }
+        
     });
 </script>
 </body>
@@ -998,9 +1172,70 @@ def index():
         daily_delay_between_acc=daily_delay_between_acc, daily_delay_after_all=daily_delay_after_all, daily_action=daily_action, daily_button_class=daily_button_class,
         kvi_click_count=kvi_click_count, kvi_click_delay=kvi_click_delay, kvi_loop_delay=kvi_loop_delay, kvi_action=kvi_action, kvi_button_class=kvi_button_class,
         auto_reboot_delay=auto_reboot_delay, reboot_action=reboot_action, reboot_button_class=reboot_button_class,
-        acc_options=acc_options, sub_account_buttons=sub_account_buttons
+        acc_options=acc_options, sub_account_buttons=sub_account_buttons, farm_servers=farm_servers
     )
+@app.route("/api/farm/add", methods=['POST'])
+def api_farm_add():
+    data = request.get_json()
+    name = data.get('name')
+    if not name: return jsonify({'status': 'error', 'message': 'Tên farm là bắt buộc.'}), 400
+    new_server = {
+        "id": f"farm_{int(time.time())}", "name": name,
+        "main_channel_id": "", "ktb_channel_id": "", "spam_channel_id": "",
+        "auto_grab_enabled_1": False, "heart_threshold_1": 50,
+        "auto_grab_enabled_2": False, "heart_threshold_2": 50,
+        "auto_grab_enabled_3": False, "heart_threshold_3": 50,
+        "spam_enabled": False, "spam_message": "", "spam_delay": 10, "last_spam_time": 0
+    }
+    farm_servers.append(new_server)
+    save_farm_settings()
+    return jsonify({'status': 'success', 'message': f'Farm "{name}" đã được thêm.', 'reload': True})
 
+@app.route("/api/farm/delete", methods=['POST'])
+def api_farm_delete():
+    global farm_servers
+    data = request.get_json(); farm_id = data.get('farm_id')
+    initial_len = len(farm_servers)
+    farm_servers = [s for s in farm_servers if s.get('id') != farm_id]
+    if len(farm_servers) < initial_len:
+        save_farm_settings()
+        return jsonify({'status': 'success', 'message': 'Farm đã được xóa.', 'reload': True})
+    return jsonify({'status': 'error', 'message': 'Không tìm thấy farm.'}), 404
+
+@app.route("/api/farm/update_channels", methods=['POST'])
+def api_farm_update_channels():
+    data = request.get_json(); farm_id = data.get('farm_id')
+    server = next((s for s in farm_servers if s.get('id') == farm_id), None)
+    if not server: return jsonify({'status': 'error', 'message': 'Không tìm thấy farm.'}), 404
+    for key in ['main_channel_id', 'ktb_channel_id', 'spam_channel_id']:
+        if key in data: server[key] = data[key]
+    save_farm_settings()
+    return jsonify({'status': 'success', 'message': f'Đã cập nhật kênh cho farm {server["name"]}.'})
+
+@app.route("/api/farm/harvest_toggle", methods=['POST'])
+def api_farm_harvest_toggle():
+    data = request.get_json(); farm_id = data.get('farm_id'); node = int(data.get('node')); threshold = int(data.get('threshold', 50))
+    server = next((s for s in farm_servers if s.get('id') == farm_id), None)
+    if not server: return jsonify({'status': 'error', 'message': 'Yêu cầu không hợp lệ.'}), 400
+    grab_key = f'auto_grab_enabled_{node}'; thresh_key = f'heart_threshold_{node}'
+    server[grab_key] = not server.get(grab_key, False)
+    server[thresh_key] = threshold
+    save_farm_settings()
+    state = "BẬT" if server[grab_key] else "TẮT"
+    return jsonify({'status': 'success', 'message': f"Grab Node {node} đã được {state} cho farm {server['name']}."})
+
+@app.route("/api/farm/broadcast_toggle", methods=['POST'])
+def api_farm_broadcast_toggle():
+    data = request.get_json(); farm_id = data.get('farm_id')
+    server = next((s for s in farm_servers if s.get('id') == farm_id), None)
+    if not server: return jsonify({'status': 'error', 'message': 'Không tìm thấy farm.'}), 404
+    server['spam_message'] = data.get("message", "").strip()
+    server['spam_delay'] = int(data.get("delay", 10))
+    server['spam_enabled'] = not server.get('spam_enabled', False)
+    if server['spam_enabled']: server['last_spam_time'] = time.time()
+    save_farm_settings()
+    state = "BẬT" if server['spam_enabled'] else "TẮT"
+    return jsonify({'status': 'success', 'message': f"Spam đã {state} cho farm {server['name']}."})
 # --- API ENDPOINTS ---
 @app.route("/api/harvest_toggle", methods=['POST'])
 def api_harvest_toggle():
@@ -1185,13 +1420,15 @@ def status():
         'spam_enabled': spam_enabled, 'spam_countdown': spam_countdown,
         'bot_statuses': bot_statuses,
         'server_start_time': server_start_time,
-        'ui_states': ui_states
+        'ui_states': ui_states,
+        'farm_servers': farm_servers
     })
 
 # --- MAIN EXECUTION ---
 if __name__ == "__main__":
     load_settings()
     load_visit_data()
+    load_farm_settings()
     print("Đang khởi tạo các bot...", flush=True)
     with bots_lock:
         if main_token: 
