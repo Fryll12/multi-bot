@@ -819,6 +819,10 @@ HTML_TEMPLATE = """
         @keyframes glitch-anim2{0%{clip:rect(85px,9999px,140px,0);transform:skew(.8deg)}5%{clip:rect(20px,9999px,70px,0);transform:skew(.1deg)}10%{clip:rect(70px,9999px,10px,0);transform:skew(.4deg)}15%{clip:rect(30px,9999px,90px,0);transform:skew(.7deg)}20%{clip:rect(90px,9999px,20px,0);transform:skew(.2deg)}25%{clip:rect(40px,9999px,80px,0);transform:skew(.5deg)}30%{clip-path:inset(50% 0 30% 0);transform:skew(.3deg)}35%{clip:rect(80px,9999px,40px,0);transform:skew(.1deg)}40%{clip:rect(10px,9999px,70px,0);transform:skew(.9deg)}45%{clip:rect(70px,9999px,30px,0);transform:skew(.2deg)}50%{clip:rect(30px,9999px,90px,0);transform:skew(.6deg)}55%{clip:rect(90px,9999px,10px,0);transform:skew(.4deg)}60%{clip:rect(10px,9999px,60px,0);transform:skew(.1deg)}65%{clip:rect(60px,9999px,20px,0);transform:skew(.8deg)}70%{clip:rect(20px,9999px,80px,0);transform:skew(.2deg)}75%{clip:rect(80px,9999px,40px,0);transform:skew(.5deg)}80%{clip:rect(40px,9999px,60px,0);transform:skew(.3deg)}85%{clip:rect(60px,9999px,30px,0);transform:skew(.7deg)}90%{clip:rect(30px,9999px,70px,0);transform:skew(.1deg)}95%{clip:rect(70px,9999px,10px,0);transform:skew(.4deg)}100%{clip:rect(10px,9999px,80px,0);transform:skew(.9deg)}}
         .bot-main { border-color: var(--blood-red) !important; box-shadow: var(--shadow-red); }
         .bot-main span:first-child { color: #FF4500; text-shadow: 0 0 8px #FF4500; font-weight: 700; }
+        .panel h2.farm-title::before, .panel h2.farm-title::after {
+            content: none !important;
+            animation: none !important;
+        }
     </style>
 </head>
 <body>
@@ -934,7 +938,7 @@ HTML_TEMPLATE = """
             <button class="btn-delete-farm" title="Delete Farm" style="position: absolute; top: 10px; right: 10px; background: var(--dark-red); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; line-height: 30px; text-align: center; padding: 0;">
                 <i class="fas fa-times"></i>
             </button>
-            <h2 style="color: #FF1493; font-family: 'Nosifer', cursive; margin-top: 0; padding-right: 30px; font-size: 1.2rem; border-bottom: none; margin-bottom: 15px; animation: none;">{{ server.name }}</h2>
+            <h2 class="farm-title" style="color: #FF1493; font-family: 'Nosifer', cursive; margin-top: 0; padding-right: 30px; font-size: 1.2rem; border-bottom: none; margin-bottom: 15px; animation: none;">{{ server.name }}</h2>
             
             <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
                 <div class="input-group"><label>Main CH</label><input type="text" class="farm-channel-input" data-field="main_channel_id" value="{{ server.main_channel_id or '' }}"></div>
