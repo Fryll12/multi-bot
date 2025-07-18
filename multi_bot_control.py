@@ -934,7 +934,7 @@ HTML_TEMPLATE = """
             <button class="btn-delete-farm" title="Delete Farm" style="position: absolute; top: 10px; right: 10px; background: var(--dark-red); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; line-height: 30px; text-align: center; padding: 0;">
                 <i class="fas fa-times"></i>
             </button>
-            <h2 data-text="{{ server.name }}" style="color: #FF1493; font-family: 'Orbitron'; margin-top: 0; padding-right: 30px; font-size: 1.2rem; border-bottom: none; margin-bottom: 15px; animation: none;">{{ server.name }}</h2>
+            <h2 style="color: #FF1493; font-family: 'Nosifer', cursive; margin-top: 0; padding-right: 30px; font-size: 1.2rem; border-bottom: none; margin-bottom: 15px;">{{ server.name }}</h2>
             
             <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
                 <div class="input-group"><label>Main CH</label><input type="text" class="farm-channel-input" data-field="main_channel_id" value="{{ server.main_channel_id or '' }}"></div>
