@@ -682,43 +682,47 @@ def auto_reboot_loop():
 
 def spam_loop():
     global last_spam_time
+
+    # Hàm phụ để gửi tin nhắn trong một luồng riêng
+    def send_spam_in_thread(bot, channel_id, message, delay):
+        time.sleep(delay) # Delay trước khi gửi để dàn trải các tin nhắn
+        try:
+            bot.sendMessage(channel_id, message)
+        except Exception as e:
+            print(f"Lỗi gửi spam tới kênh {channel_id}: {e}", flush=True)
+
     while True:
         try:
             with bots_lock:
                 bots_to_spam = [bot for i, bot in enumerate(bots) if bot and bot_active_states.get(f'sub_{i}', False)]
             
-            # --- LOGIC SPAM TOÀN CỤC (GIỮ NGUYÊN) ---
+            # --- Xử lý Spam Toàn Cục (GLOBAL) ---
             if spam_enabled and spam_message and spam_channel_id and (time.time() - last_spam_time) >= spam_delay:
-                for idx, bot in enumerate(bots_to_spam):
-                    if not spam_enabled: break
-                    try:
-                        acc_name = acc_names[idx] if idx < len(acc_names) else f"Sub {idx+1}"
-                        bot.sendMessage(spam_channel_id, spam_message)
-                        print(f"[{acc_name}] đã gửi (Global): {spam_message}", flush=True)
-                        time.sleep(2)
-                    except Exception as e:
-                        print(f"Lỗi gửi spam (Global) từ [{acc_name}]: {e}", flush=True)
-                if spam_enabled:
-                    last_spam_time = time.time()
+                print(f"[Spam] Bắt đầu chu kỳ spam Toàn cục...", flush=True)
+                # Gửi mỗi tin nhắn trong một luồng riêng để không bị chặn
+                for i, bot in enumerate(bots_to_spam):
+                    # Delay 0.1s giữa mỗi lần tạo luồng để tránh gửi ồ ạt
+                    threading.Thread(target=send_spam_in_thread, args=(bot, spam_channel_id, spam_message, i * 0.1)).start()
+                
+                # Reset đồng hồ ngay lập tức mà không cần chờ
+                last_spam_time = time.time()
 
-            # --- LOGIC SPAM MULTI-FARM (THÊM VÀO) ---
+            # --- Xử lý Spam Multi-Farm ---
             for server in farm_servers:
                 if server.get('spam_enabled') and server.get('spam_message') and server.get('spam_channel_id'):
                     last_farm_spam_time = server.get('last_spam_time', 0)
                     farm_spam_delay = server.get('spam_delay', 10)
 
                     if (time.time() - last_farm_spam_time) >= farm_spam_delay:
-                        for bot in bots_to_spam:
-                            if not server.get('spam_enabled'): break
-                            try:
-                                bot.sendMessage(server['spam_channel_id'], server['spam_message'])
-                                time.sleep(2)
-                            except Exception as e: print(f"Lỗi gửi spam (Farm: {server['name']}): {e}", flush=True)
+                        print(f"[Spam] Bắt đầu chu kỳ spam cho Farm '{server['name']}'...", flush=True)
+                        # Gửi mỗi tin nhắn trong một luồng riêng
+                        for i, bot in enumerate(bots_to_spam):
+                            threading.Thread(target=send_spam_in_thread, args=(bot, server['spam_channel_id'], server['spam_message'], i * 0.1)).start()
                         
-                        if server.get('spam_enabled'):
-                            server['last_spam_time'] = time.time()
+                        # Reset đồng hồ của farm này ngay lập tức
+                        server['last_spam_time'] = time.time()
             
-            time.sleep(1)
+            time.sleep(1) # Vòng lặp chính vẫn nghỉ 1 giây để giảm tải CPU
         except Exception as e:
             print(f"[ERROR in spam_loop] {e}", flush=True)
             time.sleep(1)
