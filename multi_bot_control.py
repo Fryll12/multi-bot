@@ -702,7 +702,7 @@ def spam_loop():
                 # Gửi mỗi tin nhắn trong một luồng riêng để không bị chặn
                 for i, bot in enumerate(bots_to_spam):
                     # Delay 0.1s giữa mỗi lần tạo luồng để tránh gửi ồ ạt
-                    threading.Thread(target=send_spam_in_thread, args=(bot, spam_channel_id, spam_message, i * 0.1)).start()
+                    threading.Thread(target=send_spam_in_thread, args=(bot, spam_channel_id, spam_message, i * 1)).start()
                 
                 # Reset đồng hồ ngay lập tức mà không cần chờ
                 last_spam_time = time.time()
@@ -717,7 +717,7 @@ def spam_loop():
                         print(f"[Spam] Bắt đầu chu kỳ spam cho Farm '{server['name']}'...", flush=True)
                         # Gửi mỗi tin nhắn trong một luồng riêng
                         for i, bot in enumerate(bots_to_spam):
-                            threading.Thread(target=send_spam_in_thread, args=(bot, server['spam_channel_id'], server['spam_message'], i * 0.1)).start()
+                            threading.Thread(target=send_spam_in_thread, args=(bot, server['spam_channel_id'], server['spam_message'], i * 1)).start()
                         
                         # Reset đồng hồ của farm này ngay lập tức
                         server['last_spam_time'] = time.time()
@@ -930,7 +930,7 @@ HTML_TEMPLATE = """
     <div id="farm-grid" class="main-grid">
         
         {% for server in farm_servers %}
-        <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="border-color: var(--ghost-gray); background: rgba(0,0,0,0.4);">
+        <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="border-color: var(--deep-purple); background: rgba(0,0,0,0.4);">
             <button class="btn-delete-farm" title="Delete Farm" style="position: absolute; top: 10px; right: 10px; background: var(--dark-red); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; line-height: 30px; text-align: center; padding: 0;">
                 <i class="fas fa-times"></i>
             </button>
