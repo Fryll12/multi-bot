@@ -891,7 +891,8 @@ HTML_TEMPLATE = """
             </div>
         </div>
     </div>
-    <div style="margin-top: 30px;"> 
+    
+    <div class="panel" style="border-color: #FFD700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); margin-top: 20px;"> 
     
     <h2 data-text="Multi-Farm Control" style="color: #FFD700; border-color: #FFD700; font-family: 'Nosifer', cursive; font-size: 1.4rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid; padding-bottom: 10px; position: relative;">
         <i class="fas fa-network-wired"></i> Multi-Farm Control
@@ -900,17 +901,19 @@ HTML_TEMPLATE = """
     <div id="farm-grid" class="main-grid">
         
         {% for server in farm_servers %}
-        <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="border-color: #666;">
+        <div class="panel server-farm-panel" data-farm-id="{{ server.id }}" style="border-color: #444; background: rgba(0,0,0,0.4);">
             <button class="btn-delete-farm" title="Delete Farm" style="position: absolute; top: 10px; right: 10px; background: var(--dark-red); border: none; color: white; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; line-height: 30px; text-align: center; padding: 0;">
                 <i class="fas fa-times"></i>
             </button>
             <h3 style="color: var(--bone-white); font-family: 'Orbitron'; margin-top: 0; padding-right: 30px;">{{ server.name }}</h3>
-            <div style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+            
+            <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
                 <div class="input-group"><label>Main CH</label><input type="text" class="farm-channel-input" data-field="main_channel_id" value="{{ server.main_channel_id or '' }}"></div>
                 <div class="input-group"><label>KTB CH</label><input type="text" class="farm-channel-input" data-field="ktb_channel_id" value="{{ server.ktb_channel_id or '' }}"></div>
                 <div class="input-group"><label>Spam CH</label><input type="text" class="farm-channel-input" data-field="spam_channel_id" value="{{ server.spam_channel_id or '' }}"></div>
             </div>
-            <div style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+            
+            <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
                 <div style="display: flex; flex-direction:column; gap: 10px;">
                     {% for i in range(1, 4) %}
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -923,7 +926,8 @@ HTML_TEMPLATE = """
                     {% endfor %}
                 </div>
             </div>
-            <div style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+
+            <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
                 <textarea class="farm-spam-message" rows="2" placeholder="Nội dung spam cho farm..." style="width: calc(100% - 30px); margin-bottom: 10px;">{{ server.spam_message or '' }}</textarea>
                 <div class="input-group"><label>Delay</label><input type="number" class="farm-spam-delay" value="{{ server.spam_delay or 10 }}"><span class="timer-display farm-spam-timer">--:--:--</span></div>
                 <button type="button" class="btn farm-broadcast-toggle">{{ 'TẮT SPAM' if server.spam_enabled else 'BẬT SPAM' }}</button>
@@ -931,7 +935,7 @@ HTML_TEMPLATE = """
         </div>
         {% endfor %}
 
-        <div id="add-farm-btn" style="display: flex; align-items: center; justify-content: center; min-height: 200px; border: 2px dashed #888; cursor: pointer; border-radius: 10px;">
+        <div id="add-farm-btn" class="panel" style="display: flex; align-items: center; justify-content: center; min-height: 200px; border-style: dashed; border-color: #888; cursor: pointer; background: rgba(0,0,0,0.2);">
             <i class="fas fa-plus" style="font-size: 3rem; color: #888;"></i>
         </div>
     </div>
