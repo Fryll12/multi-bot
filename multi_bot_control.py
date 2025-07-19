@@ -683,43 +683,45 @@ def auto_reboot_loop():
 def spam_loop():
     global last_spam_time
 
-    # Hàm này hoạt động giống hệt vòng lặp for trong code cũ của bạn: tuần tự và có trật tự.
-    def run_spam_cycle(channel_id, message, bots_to_use, inter_bot_delay):
-        print(f"[Spam Cycle] Bắt đầu gửi tới kênh {channel_id} với {len(bots_to_use)} bot.", flush=True)
-        for bot in bots_to_use:
-            try:
-                bot.sendMessage(channel_id, message)
-                # Chờ đợi tuần tự bên trong luồng này, giống code cũ của bạn
-                time.sleep(inter_bot_delay)
-            except Exception as e:
-                print(f"Lỗi khi bot gửi spam tới {channel_id}: {e}", flush=True)
-        print(f"[Spam Cycle] Hoàn thành chu kỳ cho kênh {channel_id}.", flush=True)
+    # Hàm phụ để một bot gửi tin nhắn sau một khoảng delay định sẵn
+    def send_spam_in_thread(bot, channel_id, message, delay):
+        try:
+            # Chờ đúng khoảng thời gian được giao TRƯỚC KHI gửi
+            time.sleep(delay)
+            bot.sendMessage(channel_id, message)
+        except Exception as e:
+            print(f"Lỗi gửi spam tới kênh {channel_id}: {e}", flush=True)
 
-    # Vòng lặp chính bây giờ chỉ làm nhiệm vụ điều phối
     while True:
         try:
             now = time.time()
             with bots_lock:
                 active_bots = [bot for i, bot in enumerate(bots) if bot and bot_active_states.get(f'sub_{i}', False)]
-
-            # --- Điều phối Spam Toàn Cục (GLOBAL) ---
+            
+            # --- Xử lý Spam Toàn Cục (GLOBAL) ---
             if spam_enabled and spam_message and spam_channel_id and (now - last_spam_time) >= spam_delay:
-                # Reset đồng hồ ngay lập tức để lên lịch cho lần tiếp theo
+                print(f"[Spam] Bắt đầu chu kỳ spam Toàn cục với {len(active_bots)} bot...", flush=True)
+                # Giao việc cho từng bot với thời gian chờ được tính toán trước
+                for i, bot in enumerate(active_bots):
+                    bot_delay = i * 2  # Bot 1 delay 0s, Bot 2 delay 2s, Bot 3 delay 4s...
+                    threading.Thread(target=send_spam_in_thread, args=(bot, spam_channel_id, spam_message, bot_delay)).start()
+                
                 last_spam_time = now
-                # "Giao việc" chạy chu kỳ spam cho một luồng nền để không làm tắc nghẽn
-                threading.Thread(target=run_spam_cycle, args=(spam_channel_id, spam_message, active_bots, 2)).start()
 
-            # --- Điều phối Spam Multi-Farm ---
+            # --- Xử lý Spam Multi-Farm ---
             for server in farm_servers:
                 if server.get('spam_enabled') and server.get('spam_message') and server.get('spam_channel_id'):
                     last_farm_spam_time = server.get('last_spam_time', 0)
                     farm_spam_delay = server.get('spam_delay', 10)
 
                     if (now - last_farm_spam_time) >= farm_spam_delay:
-                        # Reset đồng hồ của farm này ngay lập tức
+                        print(f"[Spam] Bắt đầu chu kỳ spam cho Farm '{server['name']}' với {len(active_bots)} bot...", flush=True)
+                        # Giao việc cho từng bot với thời gian chờ được tính toán trước
+                        for i, bot in enumerate(active_bots):
+                            bot_delay = i * 2 # Bot 1 delay 0s, Bot 2 delay 2s, Bot 3 delay 4s...
+                            threading.Thread(target=send_spam_in_thread, args=(bot, server['spam_channel_id'], server['spam_message'], bot_delay)).start()
+                        
                         server['last_spam_time'] = now
-                        # "Giao việc" cho một luồng nền khác
-                        threading.Thread(target=run_spam_cycle, args=(server['spam_channel_id'], server['spam_message'], active_bots, 2)).start()
             
             time.sleep(1)
         except Exception as e:
