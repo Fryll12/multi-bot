@@ -358,7 +358,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                 max_num = max(heart_numbers)
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold:
                                     max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 0.4), ("2️⃣", 1.4), ("3️⃣", 2.1)][max_index]
+                                    emoji, delay = [("1️⃣", 0.3), ("2️⃣", 1.3), ("3️⃣", 2)][max_index]
                                     print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                     def grab():
                                         bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
@@ -370,11 +370,9 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                 threading.Thread(target=read_karibbit).start()
             
             # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
-            # Hàm này sẽ tự kiểm tra kênh và điều kiện bật/tắt của riêng nó
             handle_farm_grab(bot, msg, 1)
 
             # --- KHỐI 3: XỬ LÝ KVI (ĐỘC LẬP) ---
-            # Khối này chỉ hoạt động khi auto_kvi_enabled=True
             if auto_kvi_enabled and (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 m = msg # Sử dụng lại msg đã parse
                 if (m.get("channel_id") != kvi_channel_id or m.get("author", {}).get("id") != karuta_id or not m.get("embeds")):
@@ -455,7 +453,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                 max_num = max(heart_numbers)
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_2:
                                     max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)][max_index]
+                                    emoji, delay = [("1️⃣", 0.6), ("2️⃣", 1.6), ("3️⃣", 2.2)][max_index]
                                     print(f"[Bot 2] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                     def grab_2():
                                         bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
@@ -493,7 +491,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                 max_num = max(heart_numbers)
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_3:
                                     max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 0.8), ("2️⃣", 1.8), ("3️⃣", 2.5)][max_index]
+                                    emoji, delay = [("1️⃣", 0.6), ("2️⃣", 1.6), ("3️⃣", 2.2)][max_index]
                                     print(f"[Bot 3] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                     def grab_3():
                                         bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
