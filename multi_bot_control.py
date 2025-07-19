@@ -31,7 +31,8 @@ yoru_bot_id = "1311684840462225440"
 # --- BIẾN TRẠNG THÁI (đây là các giá trị mặc định nếu không có file settings.json) ---
 bots, acc_names = [], [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
-    "Ylang", "Nina", "Nathan", "Ofer", "White", "the Wicker", "Leader", "Tess", "Wyatt", "Daisy", "CantStop", "Token",
+    "Ylang", "Nina", "Nathan", "Ofer", "White", "the Wicker", "Leader", "Hu Tao", "Wyatt", "Daisy", "CantStop", "Token", 
+    "Maik", "Molotov", "Jett", "Waifu", "CLown", "Angel",
 ]
 main_bot, main_bot_2, main_bot_3 = None, None, None
 auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3 = False, False, False
