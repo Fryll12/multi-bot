@@ -557,91 +557,47 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
 def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
-    
-    # ⭐ TỐI ƯU 1: Dùng threading.Event để quản lý trạng thái một cách an toàn và rõ ràng
-    completion_event = threading.Event()
-
-    # Tách riêng các hàm logic để code sạch sẽ hơn
-    def send_command(command):
-        bot.sendMessage(work_channel_id, command)
-
+    step = {"value": 0}
+    def send_karuta_command(): bot.sendMessage(work_channel_id, "kc o:ef")
+    def send_kn_command(): bot.sendMessage(work_channel_id, "kn")
+    def send_kw_command(): bot.sendMessage(work_channel_id, "kw"); step["value"] = 2
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
             r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3,"guild_id": guild_id,"channel_id": channel_id,"message_id": message_id,"application_id": application_id,"session_id": "a","data": {"component_type": 2,"custom_id": custom_id}})
             print(f"[Work][{acc_name}] Click tick: Status {r.status_code}", flush=True)
-            if r.status_code == 204: # 204 No Content là thành công cho interaction
-                completion_event.set() # Báo hiệu đã hoàn thành
-        except Exception as e: 
-            print(f"[Work][{acc_name}] Lỗi click tick: {e}", flush=True)
-            completion_event.set() # Cũng báo hiệu hoàn thành để không bị kẹt
-
+        except Exception as e: print(f"[Work][{acc_name}] Lỗi click tick: {e}", flush=True)
     @bot.gateway.command
     def on_message(resp):
-        # ⭐ SỬA LỖI CHÍNH: Thay thế resp.event.message_update bằng cách kiểm tra dữ liệu thô
-        if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')): 
-            return
-        
+        if not (resp.event.message or resp.event.message_update): return
         m = resp.parsed.auto()
-        if str(m.get("channel_id")) != work_channel_id or str(m.get("author", {}).get("id", "")) != karuta_id:
-            return
-
+        if str(m.get("channel_id")) != work_channel_id: return
+        author_id = str(m.get("author", {}).get("id", ""))
         guild_id = m.get("guild_id")
-        
-        # ⭐ TỐI ƯU 2: Cấu trúc lại logic theo từng bước rõ ràng, tránh dùng biến "step" phức tạp
-        
-        # Bước 1: Nhận danh sách card từ "kc o:ef"
-        if "embeds" in m and "You began working your shift" in m["embeds"][0].get("description", ""):
+        if step["value"] == 0 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
             desc = m["embeds"][0].get("description", "")
-            card_codes = re.findall(r"\b[a-zA-Z0-9]{6}\b", desc) # Sửa regex để bắt cả code ngắn
+            card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc)
             if len(card_codes) >= 10:
                 print(f"[Work][{acc_name}] Phát hiện {len(card_codes)} card, bắt đầu pick...", flush=True)
                 first_5 = card_codes[:5]; last_5 = card_codes[-5:]
-                # Chạy song song 2 luồng pick card để tăng tốc
-                def pick_cards(cards):
-                    for i, code in enumerate(cards):
-                        time.sleep(1.5)
-                        bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
-                threading.Thread(target=pick_cards, args=(last_5,)).start()
-                threading.Thread(target=pick_cards, args=(first_5,)).start()
-                time.sleep(10) # Chờ pick card xong
-                send_command("kn")
-        
-        # Bước 2: Nhận tài nguyên từ "kn"
-        elif "embeds" in m and "You took the resources" in m["embeds"][0].get("title", ""):
-            desc = m["embeds"][0].get("description", "")
-            match = re.search(r"\d+\.\s*`([^`]+)`", desc.split("\n")[1] if "\n" in desc else desc)
-            if match:
-                resource = match.group(1)
-                print(f"[Work][{acc_name}] Resource: {resource}", flush=True)
-                time.sleep(2)
-                bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
-                time.sleep(1)
-                send_command("kw")
-
-        # Bước 3: Click nút tick từ "kw"
-        elif "components" in m and "Your work is complete" in m.get("content", ""):
-            message_id = m["id"]
-            application_id = m.get("application_id", karuta_id)
+                for i, code in enumerate(last_5): time.sleep(2 if i == 0 else 1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+                for i, code in enumerate(first_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+                time.sleep(1); send_kn_command(); step["value"] = 1
+        elif step["value"] == 1 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
+            desc = m["embeds"][0].get("description", ""); lines = desc.split("\n")
+            if len(lines) >= 2:
+                match = re.search(r"\d+\.\s*`([^`]+)`", lines[1])
+                if match:
+                    resource = match.group(1); print(f"[Work][{acc_name}] Resource: {resource}", flush=True)
+                    time.sleep(2); bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e"); time.sleep(1); send_kw_command()
+        elif step["value"] == 2 and author_id == karuta_id and "components" in m:
+            message_id = m["id"]; application_id = m.get("application_id", karuta_id)
             for comp in m["components"]:
-                 if comp["type"] == 1 and len(comp["components"]) >= 2:    
-                    btn = comp["components"][1]
-                    print(f"[Work][{acc_name}] Click nút thứ 2: {btn['custom_id']}", flush=True)
-                    click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id)
-                    return # Thoát sau khi click
-
-    print(f"[Work][{acc_name}] Bắt đầu...", flush=True)
-    threading.Thread(target=bot.gateway.run, daemon=True).start()
-    time.sleep(3)
-    send_command("kc o:ef")
-    # ⭐ TỐI ƯU 3: Thay thế vòng lặp while bằng event.wait() cho hiệu quả và chính xác
-    # Chờ tối đa 90 giây cho đến khi sự kiện completion_event được set (tức là đã click xong)
-    completed = completion_event.wait(timeout=10) 
-    
-    bot.gateway.close()
-    if completed:
-        print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
-    else:
-        print(f"[Work][{acc_name}] KHÔNG hoàn thành (hết thời gian chờ).", flush=True)
+                 if comp["type"] == 1 and len(comp["components"]) >= 2:	
+                    btn = comp["components"][1]; print(f"[Work][{acc_name}] Click nút thứ 2: {btn['custom_id']}", flush=True); click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id); step["value"] = 3; bot.gateway.close(); return
+    print(f"[Work][{acc_name}] Bắt đầu...", flush=True); threading.Thread(target=bot.gateway.run, daemon=True).start(); time.sleep(3); send_karuta_command()
+    timeout = time.time() + 90
+    while step["value"] != 3 and time.time() < timeout: time.sleep(1)
+    bot.gateway.close(); print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
 
 def run_daily_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
