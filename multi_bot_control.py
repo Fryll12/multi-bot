@@ -571,7 +571,7 @@ def run_work_bot(token, acc_name):
         step["value"] = 3
     @bot.gateway.command
     def on_message(resp):
-        if not (resp.event.message or resp.event.message_update): return # Dòng này có thể bị lỗi AttributeError, nên sửa lại
+        if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')): return # Dòng này có thể bị lỗi AttributeError, nên sửa lại
         m = resp.parsed.auto()
         if str(m.get("channel_id")) != work_channel_id: return
         author_id = str(m.get("author", {}).get("id", ""))
@@ -672,7 +672,7 @@ def auto_work_loop():
                     if not auto_work_enabled: break
                     print(f"[Work] Đang chạy acc '{item['name']}'...", flush=True)
                     run_work_bot(item['token'].strip(), item['name'])
-                    print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc} giây...", flush=True); time.sleep(work_delay_between_acc)
+                    print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc or 10} giây...", flush=True); time.sleep(work_delay_between_acc or 10)
                 if auto_work_enabled:
                     print(f"[Work] Hoàn thành chu kỳ.", flush=True)
                     last_work_cycle_time = time.time();
