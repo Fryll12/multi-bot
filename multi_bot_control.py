@@ -558,12 +558,6 @@ def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
     step = {"value": 0}
-    ready_event = threading.Event()
-    @bot.gateway.command
-    def on_ready(resp):
-        if resp.event.ready:
-            print(f"[Work][{acc_name}] Gateway READY.", flush=True)
-            ready_event.set()
     def send_karuta_command(): bot.sendMessage(work_channel_id, "kc o:ef")
     def send_kn_command(): bot.sendMessage(work_channel_id, "kn")
     def send_kw_command(): bot.sendMessage(work_channel_id, "kw"); step["value"] = 2
@@ -602,23 +596,30 @@ def run_work_bot(token, acc_name):
                     btn = comp["components"][1]; print(f"[Work][{acc_name}] Click nút thứ 2: {btn['custom_id']}", flush=True); click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id); step["value"] = 3; bot.gateway.close(); return
     print(f"[Work][{acc_name}] Bắt đầu...", flush=True)
     threading.Thread(target=bot.gateway.run, daemon=True).start()
-    
-    is_ready = ready_event.wait(timeout=10) 
-    
-    if is_ready:
+
+    # Chờ bot kết nối gateway, tối đa 20 giây
+    wait_for_ready = time.time() + 20
+    while time.time() < wait_for_ready and not bot.gateway.ready.is_set():
+        time.sleep(0.5)
+
+    # Sau khi chờ, kiểm tra xem bot đã thực sự sẵn sàng chưa
+    if bot.gateway.ready.is_set():
         send_karuta_command()
-        timeout = time.time() + 15
+        
+        # Vòng lặp chờ timeout 90 giây gốc của bạn
+        timeout = time.time() + 90
         while step["value"] != 3 and time.time() < timeout:
             time.sleep(1)
         
-        bot.gateway.close()
+        # Ghi log kết quả
         if step["value"] == 3:
             print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
         else:
             print(f"[Work][{acc_name}] KHÔNG hoàn thành (hết thời gian chờ 90s).", flush=True)
     else:
-        print(f"[Work][{acc_name}] LỖI: Bot không thể kết nối gateway.", flush=True)
-        bot.gateway.close()
+        print(f"[Work][{acc_name}] LỖI: Bot không thể kết nối gateway trong 20 giây.", flush=True)
+
+    bot.gateway.close()
 
 def run_daily_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
