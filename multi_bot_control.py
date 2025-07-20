@@ -16,6 +16,7 @@ load_dotenv()
 main_token = os.getenv("MAIN_TOKEN")
 main_token_2 = os.getenv("MAIN_TOKEN_2")
 main_token_3 = os.getenv("MAIN_TOKEN_3")
+main_token_4 = os.getenv("MAIN_TOKEN_4")
 tokens = os.getenv("TOKENS").split(",") if os.getenv("TOKENS") else []
 main_channel_id = os.getenv("MAIN_CHANNEL_ID")
 other_channel_id = os.getenv("OTHER_CHANNEL_ID")
@@ -32,11 +33,11 @@ yoru_bot_id = "1311684840462225440"
 bots, acc_names = [], [
     "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
     "Ylang", "Nina", "Nathan", "Ofer", "White", "the Wicker", "Leader", "Hu Tao", "Wyatt", "Daisy", "CantStop", "Token", 
-    "Maik", "Molotov", "Jett", "Waifu", "CLown", "Angel",
+    "Kertz", "Molotov", "Jett", "Waifu", "CLown", "Angel",
 ]
-main_bot, main_bot_2, main_bot_3 = None, None, None
-auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3 = False, False, False
-heart_threshold, heart_threshold_2, heart_threshold_3 = 50, 50, 50
+main_bot, main_bot_2, main_bot_3, main_bot_4 = None, None, None, None
+auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3, auto_grab_enabled_4 = False, False, False, False
+heart_threshold, heart_threshold_2, heart_threshold_3, heart_threshold_4 = 15, 50, 75, 100
 spam_enabled, auto_work_enabled, auto_reboot_enabled = False, False, False
 spam_message, spam_delay, work_delay_between_acc, work_delay_after_all, auto_reboot_delay = "", 10, 10, 44100, 3600
 auto_daily_enabled = False
@@ -74,6 +75,7 @@ def save_settings():
         'auto_grab_enabled': auto_grab_enabled, 'heart_threshold': heart_threshold,
         'auto_grab_enabled_2': auto_grab_enabled_2, 'heart_threshold_2': heart_threshold_2,
         'auto_grab_enabled_3': auto_grab_enabled_3, 'heart_threshold_3': heart_threshold_3,
+        'auto_grab_enabled_4': auto_grab_enabled_4, 'heart_threshold_4': heart_threshold_4,
         'spam_enabled': spam_enabled, 'spam_message': spam_message, 'spam_delay': spam_delay,
         'auto_work_enabled': auto_work_enabled, 'work_delay_between_acc': work_delay_between_acc, 'work_delay_after_all': work_delay_after_all,
         'auto_daily_enabled': auto_daily_enabled, 'daily_delay_between_acc': daily_delay_between_acc, 'daily_delay_after_all': daily_delay_after_all,
@@ -262,7 +264,7 @@ def handle_farm_grab(bot, msg, bot_num):
                         max_num = max(heart_numbers)
                         if max_num >= heart_threshold:
                             max_index = heart_numbers.index(max_num)
-                            delays = {1: [0.4, 1.4, 2.1], 2: [0.7, 1.8, 2.4], 3: [0.8, 1.9, 2.5]}
+                            delays = {1: [0.3, 1.3, 2.1], 2: [0.6, 1.6, 2.3], 3: [0.6, 1.6, 2.3], 4: [0.6, 1.6, 2.3]}
                             emojis = ["1️⃣", "2️⃣", "3️⃣"]
                             emoji = emojis[max_index]
                             delay = delays[bot_num][max_index]
@@ -271,7 +273,7 @@ def handle_farm_grab(bot, msg, bot_num):
                             
                             def grab_action():
                                 bot.addReaction(channel_id, last_drop_msg_id, emoji)
-                                time.sleep(1)
+                                time.sleep(2)
                                 bot.sendMessage(ktb_channel_id, "kt b")
                             
                             threading.Timer(delay, grab_action).start()
@@ -304,6 +306,12 @@ def reboot_bot(target_id):
             except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 3: {e}", flush=True)
             main_bot_3 = create_bot(main_token_3, is_main_3=True)
             print("[Reboot] Acc Chính 3 đã được khởi động lại.", flush=True)
+        elif target_id == 'main_4' and main_token_4:
+            try: 
+                if main_bot_4: main_bot_4.gateway.close()
+            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 4: {e}", flush=True)
+            main_bot_4 = create_bot(main_token_4, is_main_4=True)
+            print("[Reboot] Acc Chính 4 đã được khởi động lại.", flush=True)
         elif target_id.startswith('sub_'):
             try:
                 index = int(target_id.split('_')[1])
@@ -327,6 +335,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                     if is_main: bot_type = "(ALPHA)"
                     elif is_main_2: bot_type = "(BETA)"
                     elif is_main_3: bot_type = "(GAMMA)"
+                    elif is_main_4: bot_type = "(DELTA)"
                     else: bot_type = ""
                     print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
 
@@ -501,9 +510,42 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                                 break
                     except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 3): {e}", flush=True)
                 threading.Thread(target=read_karibbit_3).start()
-
             # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
             handle_farm_grab(bot, msg, 3)
+            
+    if is_main_4:
+    @bot.gateway.command
+    def on_message(resp):
+        global auto_grab_enabled_4, heart_threshold_4
+        if not resp.event.message: return
+        msg = resp.parsed.auto()
+
+        if auto_grab_enabled_4 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
+            last_drop_msg_id = msg["id"]
+            def read_karibbit_4():
+                time.sleep(0.5)
+                try:
+                    messages = bot.getMessages(main_channel_id, num=5).json()
+                    for msg_item in messages:
+                        if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                            desc = msg_item["embeds"][0].get("description", "")
+                            lines = desc.split('\n')
+                            heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                            max_num = max(heart_numbers)
+                            if sum(heart_numbers) > 0 and max_num >= heart_threshold_4:
+                                max_index = heart_numbers.index(max_num)
+                                emoji, delay = [("1️⃣", 0.6), ("2️⃣", 1.6), ("3️⃣", 2.2)][max_index]
+                                print(f"[Bot 4] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
+                                def grab_4():
+                                    bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                    time.sleep(2) 
+                                    bot.sendMessage(ktb_channel_id, "kt b")
+                                threading.Timer(delay, grab_4).start()
+                            break
+                except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 4): {e}", flush=True)
+            threading.Thread(target=read_karibbit_4).start()
+
+        handle_farm_grab(bot, msg, 4)
     
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
@@ -615,6 +657,7 @@ def auto_work_loop():
                 work_items = []
                 if main_token_2 and bot_active_states.get('main_2', False): work_items.append({"name": "BETA NODE", "token": main_token_2})
                 if main_token_3 and bot_active_states.get('main_3', False): work_items.append({"name": "GAMMA NODE", "token": main_token_3})
+                if main_token_4 and bot_active_states.get('main_4', False): work_items.append({"name": "DELTA NODE", "token": main_token_4})
                 with bots_lock:
                     sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)]
                     work_items.extend(sub_account_items)
@@ -639,6 +682,7 @@ def auto_daily_loop():
                 daily_items = []
                 if main_token_2 and bot_active_states.get('main_2', False): daily_items.append({"name": "BETA NODE", "token": main_token_2})
                 if main_token_3 and bot_active_states.get('main_3', False): daily_items.append({"name": "GAMMA NODE", "token": main_token_3})
+                if main_token_4 and bot_active_states.get('main_4', False): work_items.append({"name": "DELTA NODE", "token": main_token_4})
                 with bots_lock:
                     daily_items.extend([{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)])
                 for item in daily_items:
@@ -671,7 +715,8 @@ def auto_reboot_loop():
                 print("[Reboot] Hết thời gian chờ, tiến hành reboot 3 tài khoản chính.", flush=True)
                 if main_bot: reboot_bot('main_1'); time.sleep(5)
                 if main_bot_2: reboot_bot('main_2'); time.sleep(5)
-                if main_bot_3: reboot_bot('main_3')
+                if main_bot_3: reboot_bot('main_3'); time.sleep(5)
+                if main_bot_4: reboot_bot('main_4')
                 last_reboot_cycle_time = time.time();
             interrupted = auto_reboot_stop_event.wait(timeout=60)
             if interrupted: break
@@ -814,7 +859,7 @@ HTML_TEMPLATE = """
         .status-badge.inactive { background: var(--dark-red); color: var(--text-secondary); }
         .quick-cmd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; }
         .bot-status-container { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px; }
-        .bot-status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .bot-status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .bot-status-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; background: rgba(0,0,0,0.3); border-radius: 4px; font-family: 'Courier Prime', monospace; border: 1px solid var(--blood-red); }
         .status-indicator { font-weight: 700; text-transform: uppercase; font-size: 0.9em; }
         .status-indicator.online { color: var(--necro-green); } .status-indicator.offline { color: var(--blood-red); }
@@ -867,6 +912,7 @@ HTML_TEMPLATE = """
                 <div class="grab-section"><h3>ALPHA NODE <span id="harvest-status-1" class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-1" value="{{ heart_threshold }}" min="0"><button type="button" id="harvest-toggle-1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
                 <div class="grab-section"><h3>BETA NODE <span id="harvest-status-2" class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-2" value="{{ heart_threshold_2 }}" min="0"><button type="button" id="harvest-toggle-2" class="btn {{ grab_button_class_2 }}">{{ grab_action_2 }}</button></div></div>
                 <div class="grab-section"><h3>GAMMA NODE <span id="harvest-status-3" class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-3" value="{{ heart_threshold_3 }}" min="0"><button type="button" id="harvest-toggle-3" class="btn {{ grab_button_class_3 }}">{{ grab_action_3 }}</button></div></div>
+                <div class="grab-section"><h3>DELTA NODE <span id="harvest-status-4" class="status-badge {{ grab_status_4 }}">{{ grab_text_4 }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-4" value="{{ heart_threshold_4 }}" min="0"><button type="button" id="harvest-toggle-4" class="btn {{ grab_button_class_4 }}">{{ grab_action_4 }}</button></div></div>
             </div>
 
             <div class="panel ops-panel">
@@ -958,9 +1004,9 @@ HTML_TEMPLATE = """
             
             <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
                 <div style="display: flex; flex-direction:column; gap: 10px;">
-                    {% for i in range(1, 4) %}
+                    {% for i in range(1, 5) %}
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <span style="font-family: 'Orbitron';">{{ ['ALPHA', 'BETA', 'GAMMA'][i-1] }}</span>
+                        <span style="font-family: 'Orbitron';">{{ ['ALPHA', 'BETA', 'GAMMA', 'DELTA'][i-1] }}</span>
                         <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
                             <input type="number" class="farm-harvest-threshold" data-node="{{ i }}" value="{{ server['heart_threshold_' ~ i] or 50 }}" min="0">
                             <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="{{ i }}">{{ 'TẮT' if server['auto_grab_enabled_' ~ i] else 'BẬT' }}</button>
@@ -1067,6 +1113,8 @@ HTML_TEMPLATE = """
                 updateElement('harvest-status-2', { textContent: data.ui_states.grab_text_2, className: `status-badge ${data.ui_states.grab_status_2}` });
                 updateElement('harvest-toggle-3', { textContent: data.ui_states.grab_action_3, className: `btn ${data.ui_states.grab_button_class_3}` });
                 updateElement('harvest-status-3', { textContent: data.ui_states.grab_text_3, className: `status-badge ${data.ui_states.grab_status_3}` });
+                updateElement('harvest-toggle-4', { textContent: data.ui_states.grab_action_4, className: `btn ${data.ui_states.grab_button_class_4}` });
+                updateElement('harvest-status-4', { textContent: data.ui_states.grab_text_4, className: `status-badge ${data.ui_states.grab_status_4}` });
                 updateElement('auto-work-toggle-btn', { textContent: `${data.ui_states.work_action} WORK`, className: `btn ${data.ui_states.work_button_class}` });
                 updateElement('auto-daily-toggle-btn', { textContent: `${data.ui_states.daily_action} DAILY`, className: `btn ${data.ui_states.daily_button_class}` });
                 updateElement('auto-reboot-toggle-btn', { textContent: `${data.ui_states.reboot_action} AUTO REBOOT`, className: `btn ${data.ui_states.reboot_button_class}` });
@@ -1089,7 +1137,7 @@ HTML_TEMPLATE = """
                     data.farm_servers.forEach(s => {
                         const p = document.querySelector(`.server-farm-panel[data-farm-id="${s.id}"]`);
                         if (!p) return;
-                        for(let i=1; i<=3; i++) { p.querySelector(`.farm-harvest-toggle[data-node="${i}"]`).textContent = s[`auto_grab_enabled_${i}`] ? 'TẮT' : 'BẬT'; }
+                        for(let i=1; i<=4; i++) { p.querySelector(`.farm-harvest-toggle[data-node="${i}"]`).textContent = s[`auto_grab_enabled_${i}`] ? 'TẮT' : 'BẬT'; }
                         p.querySelector('.farm-broadcast-toggle').textContent = s.spam_enabled ? 'TẮT SPAM' : 'BẬT SPAM';
                         let countdown = s.spam_enabled ? (s.last_spam_time + s.spam_delay) - (Date.now()/1000) : 0;
                         p.querySelector('.farm-spam-timer').textContent = formatTime(countdown);
@@ -1105,6 +1153,7 @@ HTML_TEMPLATE = """
         document.getElementById('harvest-toggle-1').addEventListener('click', () => postData('/api/harvest_toggle', { node: 1, threshold: document.getElementById('heart-threshold-1').value }));
         document.getElementById('harvest-toggle-2').addEventListener('click', () => postData('/api/harvest_toggle', { node: 2, threshold: document.getElementById('heart-threshold-2').value }));
         document.getElementById('harvest-toggle-3').addEventListener('click', () => postData('/api/harvest_toggle', { node: 3, threshold: document.getElementById('heart-threshold-3').value }));
+        document.getElementById('harvest-toggle-4').addEventListener('click', () => postData('/api/harvest_toggle', { node: 4, threshold: document.getElementById('heart-threshold-4').value }));
         
         // Manual Operations
         document.getElementById('send-manual-message-btn').addEventListener('click', () => {
@@ -1212,6 +1261,7 @@ def index():
     grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
+    grab_status_4, grab_text_4, grab_action_4, grab_button_class_4 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_4 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     spam_action, spam_button_class = ("DISABLE", "btn-blood") if spam_enabled else ("ENABLE", "btn-necro")
     work_action, work_button_class = ("DISABLE", "btn-blood") if auto_work_enabled else ("ENABLE", "btn-necro")
     daily_action, daily_button_class = ("DISABLE", "btn-blood") if auto_daily_enabled else ("ENABLE", "btn-necro")
@@ -1222,12 +1272,14 @@ def index():
     if main_bot: acc_options += '<option value="main_1">ALPHA NODE (Main)</option>'
     if main_bot_2: acc_options += '<option value="main_2">BETA NODE (Main)</option>'
     if main_bot_3: acc_options += '<option value="main_3">GAMMA NODE (Main)</option>'
+    if main_bot_4: acc_options += '<option value="main_3">DELTA NODE (Main)</option>'
     sub_account_buttons = "".join(f'<button type="button" data-reboot-target="sub_{i}" class="btn btn-necro btn-sm">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
 
-    return render_template_string(HTML_TEMPLATE, 
+    elif node == 3(HTML_TEMPLATE, 
         grab_status=grab_status, grab_text=grab_text, grab_action=grab_action, grab_button_class=grab_button_class, heart_threshold=heart_threshold,
         grab_status_2=grab_status_2, grab_text_2=grab_text_2, grab_action_2=grab_action_2, grab_button_class_2=grab_button_class_2, heart_threshold_2=heart_threshold_2,
         grab_status_3=grab_status_3, grab_text_3=grab_text_3, grab_action_3=grab_action_3, grab_button_class_3=grab_button_class_3, heart_threshold_3=heart_threshold_3,
+        grab_status_3=grab_status_4, grab_text_3=grab_text_4, grab_action_3=grab_action_4, grab_button_class_4=grab_button_class_4, heart_threshold_4=heart_threshold_4,
         spam_message=spam_message, spam_delay=spam_delay, spam_action=spam_action, spam_button_class=spam_button_class,
         work_delay_between_acc=work_delay_between_acc, work_delay_after_all=work_delay_after_all, work_action=work_action, work_button_class=work_button_class,
         daily_delay_between_acc=daily_delay_between_acc, daily_delay_after_all=daily_delay_after_all, daily_action=daily_action, daily_button_class=daily_button_class,
@@ -1243,9 +1295,10 @@ def api_farm_add():
     new_server = {
         "id": f"farm_{int(time.time())}", "name": name,
         "main_channel_id": "", "ktb_channel_id": "", "spam_channel_id": "",
-        "auto_grab_enabled_1": False, "heart_threshold_1": 50,
+        "auto_grab_enabled_1": False, "heart_threshold_1": 15,
         "auto_grab_enabled_2": False, "heart_threshold_2": 50,
-        "auto_grab_enabled_3": False, "heart_threshold_3": 50,
+        "auto_grab_enabled_3": False, "heart_threshold_3": 75,
+        "auto_grab_enabled_4": False, "heart_threshold_4": 100,
         "spam_enabled": False, "spam_message": "", "spam_delay": 10, "last_spam_time": 0
     }
     farm_servers.append(new_server)
@@ -1308,6 +1361,7 @@ def api_harvest_toggle():
     if node == 1: auto_grab_enabled = not auto_grab_enabled; heart_threshold = threshold; msg = f"Auto Grab 1 was {'ENABLED' if auto_grab_enabled else 'DISABLED'}"
     elif node == 2: auto_grab_enabled_2 = not auto_grab_enabled_2; heart_threshold_2 = threshold; msg = f"Auto Grab 2 was {'ENABLED' if auto_grab_enabled_2 else 'DISABLED'}"
     elif node == 3: auto_grab_enabled_3 = not auto_grab_enabled_3; heart_threshold_3 = threshold; msg = f"Auto Grab 3 was {'ENABLED' if auto_grab_enabled_3 else 'DISABLED'}"
+    elif node == 4: auto_grab_enabled_4 = not auto_grab_enabled_4; heart_threshold_4 = threshold; msg = f"Auto Grab 4 was {'ENABLED' if auto_grab_enabled_4 else 'DISABLED'}"
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/manual_ops", methods=['POST'])
@@ -1452,7 +1506,8 @@ def status():
         "main_bots": [
             {"name": "ALPHA", "status": main_bot is not None, "reboot_id": "main_1", "is_active": bot_active_states.get('main_1', False), "type": "main"},
             {"name": "BETA", "status": main_bot_2 is not None, "reboot_id": "main_2", "is_active": bot_active_states.get('main_2', False), "type": "main"},
-            {"name": "GAMMA", "status": main_bot_3 is not None, "reboot_id": "main_3", "is_active": bot_active_states.get('main_3', False), "type": "main"}
+            {"name": "GAMMA", "status": main_bot_3 is not None, "reboot_id": "main_3", "is_active": bot_active_states.get('main_3', False), "type": "main"},
+            {"name": "DELTA", "status": main_bot_4 is not None, "reboot_id": "main_4", "is_active": bot_active_states.get('main_4', True), "type": "main"}
         ],
         "sub_accounts": []
     }
@@ -1466,6 +1521,7 @@ def status():
         "grab_status": "active" if auto_grab_enabled else "inactive", "grab_text": "ON" if auto_grab_enabled else "OFF", "grab_action": "DISABLE" if auto_grab_enabled else "ENABLE", "grab_button_class": "btn-blood" if auto_grab_enabled else "btn-necro",
         "grab_status_2": "active" if auto_grab_enabled_2 else "inactive", "grab_text_2": "ON" if auto_grab_enabled_2 else "OFF", "grab_action_2": "DISABLE" if auto_grab_enabled_2 else "ENABLE", "grab_button_class_2": "btn-blood" if auto_grab_enabled_2 else "btn-necro",
         "grab_status_3": "active" if auto_grab_enabled_3 else "inactive", "grab_text_3": "ON" if auto_grab_enabled_3 else "OFF", "grab_action_3": "DISABLE" if auto_grab_enabled_3 else "ENABLE", "grab_button_class_3": "btn-blood" if auto_grab_enabled_3 else "btn-necro",
+        "grab_status_4": "active" if auto_grab_enabled_4 else "inactive", "grab_text_4": "ON" if auto_grab_enabled_4 else "OFF", "grab_action_4": "DISABLE" if auto_grab_enabled_4 else "ENABLE", "grab_button_class_4": "btn-blood" if auto_grab_enabled_4 else "btn-necro",
         "spam_action": "DISABLE" if spam_enabled else "ENABLE", "spam_button_class": "btn-blood" if spam_enabled else "btn-necro",
         "work_action": "DISABLE" if auto_work_enabled else "ENABLE", "work_button_class": "btn-blood" if auto_work_enabled else "btn-necro",
         "daily_action": "DISABLE" if auto_daily_enabled else "ENABLE", "daily_button_class": "btn-blood" if auto_daily_enabled else "btn-necro",
@@ -1509,6 +1565,11 @@ if __name__ == "__main__":
             # THÊM KHỐI NÀY
             if 'main_3' not in bot_active_states:
                 bot_active_states['main_3'] = True
+                
+        if main_token_4: 
+            main_bot_4 = create_bot(main_token_4, is_main_4=True)
+            if 'main_4' not in bot_active_states:
+                bot_active_states['main_4'] = True
                 
         for i, token in enumerate(tokens):
             if token.strip():
