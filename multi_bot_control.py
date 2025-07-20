@@ -1352,7 +1352,7 @@ def api_farm_broadcast_toggle():
 # --- API ENDPOINTS ---
 @app.route("/api/harvest_toggle", methods=['POST'])
 def api_harvest_toggle():
-    global auto_grab_enabled, heart_threshold, auto_grab_enabled_2, heart_threshold_2, auto_grab_enabled_3, heart_threshold_3
+    global auto_grab_enabled, heart_threshold, auto_grab_enabled_2, heart_threshold_2, auto_grab_enabled_3, heart_threshold_3, auto_grab_enabled_4, heart_threshold_4
     data = request.get_json()
     node = data.get('node')
     threshold = int(data.get('threshold', 50))
