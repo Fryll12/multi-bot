@@ -1274,11 +1274,11 @@ def index():
     if main_bot_4: acc_options += '<option value="main_3">DELTA NODE (Main)</option>'
     sub_account_buttons = "".join(f'<button type="button" data-reboot-target="sub_{i}" class="btn btn-necro btn-sm">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
 
-    elif node == 3(HTML_TEMPLATE, 
+    elif node == 4(HTML_TEMPLATE, 
         grab_status=grab_status, grab_text=grab_text, grab_action=grab_action, grab_button_class=grab_button_class, heart_threshold=heart_threshold,
         grab_status_2=grab_status_2, grab_text_2=grab_text_2, grab_action_2=grab_action_2, grab_button_class_2=grab_button_class_2, heart_threshold_2=heart_threshold_2,
         grab_status_3=grab_status_3, grab_text_3=grab_text_3, grab_action_3=grab_action_3, grab_button_class_3=grab_button_class_3, heart_threshold_3=heart_threshold_3,
-        grab_status_3=grab_status_4, grab_text_3=grab_text_4, grab_action_3=grab_action_4, grab_button_class_4=grab_button_class_4, heart_threshold_4=heart_threshold_4,
+        grab_status_4=grab_status_4, grab_text_4=grab_text_4, grab_action_4=grab_action_4, grab_button_class_4=grab_button_class_4, heart_threshold_4=heart_threshold_4,
         spam_message=spam_message, spam_delay=spam_delay, spam_action=spam_action, spam_button_class=spam_button_class,
         work_delay_between_acc=work_delay_between_acc, work_delay_after_all=work_delay_after_all, work_action=work_action, work_button_class=work_button_class,
         daily_delay_between_acc=daily_delay_between_acc, daily_delay_after_all=daily_delay_after_all, daily_action=daily_action, daily_button_class=daily_button_class,
