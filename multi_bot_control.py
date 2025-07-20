@@ -558,6 +558,12 @@ def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
     step = {"value": 0}
+    ready_event = threading.Event()
+    @bot.gateway.command
+    def on_ready(resp):
+        if resp.event.ready:
+            print(f"[Work][{acc_name}] Gateway READY.", flush=True)
+            ready_event.set()
     def send_karuta_command(): bot.sendMessage(work_channel_id, "kc o:ef")
     def send_kn_command(): bot.sendMessage(work_channel_id, "kn")
     def send_kw_command(): bot.sendMessage(work_channel_id, "kw"); step["value"] = 2
@@ -568,7 +574,7 @@ def run_work_bot(token, acc_name):
         except Exception as e: print(f"[Work][{acc_name}] Lỗi click tick: {e}", flush=True)
     @bot.gateway.command
     def on_message(resp):
-        if not (resp.event.message or resp.event.message_update): return
+        if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')): return
         m = resp.parsed.auto()
         if str(m.get("channel_id")) != work_channel_id: return
         author_id = str(m.get("author", {}).get("id", ""))
@@ -594,10 +600,32 @@ def run_work_bot(token, acc_name):
             for comp in m["components"]:
                  if comp["type"] == 1 and len(comp["components"]) >= 2:	
                     btn = comp["components"][1]; print(f"[Work][{acc_name}] Click nút thứ 2: {btn['custom_id']}", flush=True); click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id); step["value"] = 3; bot.gateway.close(); return
-    print(f"[Work][{acc_name}] Bắt đầu...", flush=True); threading.Thread(target=bot.gateway.run, daemon=True).start(); time.sleep(3); send_karuta_command()
-    timeout = time.time() + 90
-    while step["value"] != 3 and time.time() < timeout: time.sleep(1)
-    bot.gateway.close(); print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
+    print(f"[Work][{acc_name}] Bắt đầu...", flush=True)
+    threading.Thread(target=bot.gateway.run, daemon=True).start()
+    
+    # Chờ bot báo sẵn sàng, tối đa 10 giây
+    is_ready = ready_event.wait(timeout=10) 
+
+    if is_ready:
+        # Bot đã sẵn sàng, gửi lệnh đầu tiên
+        send_karuta_command()
+        
+        # Vòng lặp chờ timeout gốc của bạn được giữ lại
+        timeout = time.time() + 10
+        while step["value"] != 3 and time.time() < timeout:
+            time.sleep(1)
+        
+        bot.gateway.close()
+        # Log kết quả rõ ràng hơn
+        if step["value"] == 3:
+            print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
+        else:
+            print(f"[Work][{acc_name}] KHÔNG hoàn thành (hết thời gian chờ 90s).", flush=True)
+            
+    else:
+        # Nếu sau 10 giây mà bot không sẵn sàng, báo lỗi và thoát
+        print(f"[Work][{acc_name}] LỖI: Bot không thể kết nối gateway.", flush=True)
+        bot.gateway.close()
 
 def run_daily_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
