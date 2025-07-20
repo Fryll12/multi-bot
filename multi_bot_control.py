@@ -323,7 +323,7 @@ def reboot_bot(target_id):
                     print(f"[Reboot] Acc Phụ {index} đã được khởi động lại.", flush=True)
             except (ValueError, IndexError) as e: print(f"[Reboot] Lỗi xử lý target Acc Phụ: {e}", flush=True)
 
-def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
+def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4=False):
     bot = discum.Client(token=token, log=False)
     @bot.gateway.command
     def on_ready(resp):
