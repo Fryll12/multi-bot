@@ -603,27 +603,20 @@ def run_work_bot(token, acc_name):
     print(f"[Work][{acc_name}] Bắt đầu...", flush=True)
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     
-    # Chờ bot báo sẵn sàng, tối đa 10 giây
     is_ready = ready_event.wait(timeout=10) 
-
+    
     if is_ready:
-        # Bot đã sẵn sàng, gửi lệnh đầu tiên
         send_karuta_command()
-        
-        # Vòng lặp chờ timeout gốc của bạn được giữ lại
-        timeout = time.time() + 10
+        timeout = time.time() + 15
         while step["value"] != 3 and time.time() < timeout:
             time.sleep(1)
         
         bot.gateway.close()
-        # Log kết quả rõ ràng hơn
         if step["value"] == 3:
             print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
         else:
             print(f"[Work][{acc_name}] KHÔNG hoàn thành (hết thời gian chờ 90s).", flush=True)
-            
     else:
-        # Nếu sau 10 giây mà bot không sẵn sàng, báo lỗi và thoát
         print(f"[Work][{acc_name}] LỖI: Bot không thể kết nối gateway.", flush=True)
         bot.gateway.close()
 
