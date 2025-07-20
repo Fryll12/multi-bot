@@ -342,101 +342,106 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
     if is_main:
         @bot.gateway.command
         def on_message(resp):
+            # Khai báo global vẫn giữ nguyên
             global auto_grab_enabled, heart_threshold, visit_data, kvi_session_state, main_token
-            
-            # Kiểm tra xem có tin nhắn hợp lệ không, nếu không thì thoát sớm
+
+            # Thoát sớm nếu không phải là tin nhắn hợp lệ
             if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 return
             
-            # Parse tin nhắn một lần duy nhất để dùng cho tất cả các tính năng
+            # Phân tích cú pháp tin nhắn một lần duy nhất
             msg = resp.parsed.auto()
+            channel_id = msg.get("channel_id")
 
-            # --- KHỐI 1: XỬ LÝ GRAB TOÀN CỤC (SOUL HARVEST) ---
-            # Khối này chỉ hoạt động khi auto_grab_enabled=True VÀ tin nhắn nằm trong kênh main_channel_id
-            if auto_grab_enabled and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
-                last_drop_msg_id = msg["id"]
-                def read_karibbit():
-                    time.sleep(0.5)
-                    try:
-                        messages = bot.getMessages(main_channel_id, num=5).json()
-                        for msg_item in messages:
-                            if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                desc = msg_item["embeds"][0].get("description", "")
-                                lines = desc.split('\n')
-                                heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                                max_num = max(heart_numbers)
-                                if sum(heart_numbers) > 0 and max_num >= heart_threshold:
-                                    max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 0.3), ("2️⃣", 1.3), ("3️⃣", 2)][max_index]
-                                    print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
-                                    def grab():
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                        time.sleep(1)
-                                        bot.sendMessage(ktb_channel_id, "kt b")
-                                    threading.Timer(delay, grab).start()
-                                break
-                    except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 1): {e}", flush=True)
-                threading.Thread(target=read_karibbit).start()
+            # Cấu trúc if/elif mới để xử lý các kênh khác nhau một cách độc lập
             
-            # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
-            handle_farm_grab(bot, msg, 1)
+            # --- 1. XỬ LÝ KÊNH GRAB CHÍNH (SOUL HARVEST) ---
+            if auto_grab_enabled and channel_id == main_channel_id:
+                if msg.get("author", {}).get("id") == karuta_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
+                    last_drop_msg_id = msg["id"]
+                    def read_karibbit():
+                        time.sleep(0.5)
+                        try:
+                            messages = bot.getMessages(main_channel_id, num=5).json()
+                            for msg_item in messages:
+                                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                                    desc = msg_item["embeds"][0].get("description", "")
+                                    lines = desc.split('\n')
+                                    heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                                    max_num = max(heart_numbers)
+                                    if sum(heart_numbers) > 0 and max_num >= heart_threshold:
+                                        max_index = heart_numbers.index(max_num)
+                                        emoji, delay = [("1️⃣", 0.3), ("2️⃣", 1.3), ("3️⃣", 2)][max_index]
+                                        print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
+                                        def grab():
+                                            bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            time.sleep(1)
+                                            bot.sendMessage(ktb_channel_id, "kt b")
+                                        threading.Timer(delay, grab).start()
+                                    break
+                        except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 1): {e}", flush=True)
+                    threading.Thread(target=read_karibbit).start()
+            
+            # --- 2. XỬ LÝ KÊNH KVI ---
+            elif auto_kvi_enabled and channel_id == kvi_channel_id:
+                if msg.get("author", {}).get("id") == karuta_id and msg.get("embeds"):
+                    # Toàn bộ logic KVI của bạn sẽ nằm trong khối elif này
+                    kvi_session_state.update({"message_id": msg.get("id"), "guild_id": msg.get("guild_id")})
+                    embed, description, buttons = msg["embeds"][0], msg["embeds"][0].get("description", ""), msg.get("components")
 
-            # --- KHỐI 3: XỬ LÝ KVI (ĐỘC LẬP) ---
-            if auto_kvi_enabled and (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
-                m = msg # Sử dụng lại msg đã parse
-                if (m.get("channel_id") != kvi_channel_id or m.get("author", {}).get("id") != karuta_id or not m.get("embeds")):
-                    return
-
-                kvi_session_state.update({"message_id": m.get("id"), "guild_id": m.get("guild_id")})
-                embed, description, buttons = m["embeds"][0], m["embeds"][0].get("description", ""), m.get("components")
-
-                if "Your Affection Rating has" in description and kvi_session_state["last_attempt_num"]:
-                    char_name, question, attempted_num = kvi_session_state["last_character_name"], kvi_session_state["last_question"], kvi_session_state["last_attempt_num"]
-                    if char_name and question:
-                        if char_name not in visit_data: visit_data[char_name] = {}
-                        if question not in visit_data[char_name]: visit_data[char_name][question] = {"correct_answer": None, "incorrect_answers": []}
-                        db_entry = visit_data[char_name][question]
-                        if "increased" in description:
-                            if db_entry["correct_answer"] != attempted_num:
-                                print(f"✅ [KVI HỌC] ĐÚNG! Nút số {attempted_num}", flush=True)
-                                db_entry["correct_answer"] = attempted_num; save_visit_data()
-                        elif ("decreased" in description or "not changed" in description):
-                            if attempted_num not in db_entry["incorrect_answers"]:
-                                print(f"❌ [KVI HỌC] SAI! Loại trừ nút số {attempted_num}.", flush=True)
-                                db_entry["incorrect_answers"].append(attempted_num); save_visit_data()
-                    kvi_session_state["last_attempt_num"] = None
-                
-                if not buttons: return
-                time.sleep(random.uniform(1.8, 2.5))
-                
-                if "1️⃣" in description:
-                    character_name, question, num_choices = parse_kvi_embed_data(embed)
-                    if not all([character_name, question, num_choices > 0]): return
-                    if question == kvi_session_state["last_question"] and kvi_session_state["last_attempt_num"]: return
-                    print(f"\n[KVI] Nhân vật: {character_name}\n[KVI] Câu hỏi: {question}", flush=True)
-                    kvi_session_state.update({"last_question": question, "last_character_name": character_name})
-                    db_entry = visit_data.get(character_name, {}).get(question, {})
-                    correct_answer, incorrect_answers = db_entry.get("correct_answer"), db_entry.get("incorrect_answers", [])
-                    chosen_button_num = None
-                    if correct_answer:
-                        print(f"💡 [KVI BIẾT] Đáp án là {correct_answer}", flush=True); chosen_button_num = correct_answer
+                    if "Your Affection Rating has" in description and kvi_session_state["last_attempt_num"]:
+                        char_name, question, attempted_num = kvi_session_state["last_character_name"], kvi_session_state["last_question"], kvi_session_state["last_attempt_num"]
+                        if char_name and question:
+                            if char_name not in visit_data: visit_data[char_name] = {}
+                            if question not in visit_data[char_name]: visit_data[char_name][question] = {"correct_answer": None, "incorrect_answers": []}
+                            db_entry = visit_data[char_name][question]
+                            if "increased" in description:
+                                if db_entry["correct_answer"] != attempted_num:
+                                    print(f"✅ [KVI HỌC] ĐÚNG! Nút số {attempted_num}", flush=True)
+                                    db_entry["correct_answer"] = attempted_num; save_visit_data()
+                            elif ("decreased" in description or "not changed" in description):
+                                if attempted_num not in db_entry["incorrect_answers"]:
+                                    print(f"❌ [KVI HỌC] SAI! Loại trừ nút số {attempted_num}.", flush=True)
+                                    db_entry["incorrect_answers"].append(attempted_num); save_visit_data()
+                        kvi_session_state["last_attempt_num"] = None
+                    
+                    if not buttons: return
+                    time.sleep(random.uniform(1.8, 2.5))
+                    
+                    if "1️⃣" in description:
+                        character_name, question, num_choices = parse_kvi_embed_data(embed)
+                        if not all([character_name, question, num_choices > 0]): return
+                        if question == kvi_session_state["last_question"] and kvi_session_state["last_attempt_num"]: return
+                        print(f"\n[KVI] Nhân vật: {character_name}\n[KVI] Câu hỏi: {question}", flush=True)
+                        kvi_session_state.update({"last_question": question, "last_character_name": character_name})
+                        db_entry = visit_data.get(character_name, {}).get(question, {})
+                        correct_answer, incorrect_answers = db_entry.get("correct_answer"), db_entry.get("incorrect_answers", [])
+                        chosen_button_num = None
+                        if correct_answer:
+                            print(f"💡 [KVI BIẾT] Đáp án là {correct_answer}", flush=True); chosen_button_num = correct_answer
+                        else:
+                            all_button_nums = list(range(1, num_choices + 1))
+                            possible_button_nums = [num for num in all_button_nums if num not in incorrect_answers]
+                            if not possible_button_nums:
+                                print("⚠️ [KVI] Đã loại trừ hết. Thử lại từ đầu.", flush=True)
+                                if question in visit_data.get(character_name, {}): visit_data[character_name][question]["incorrect_answers"] = []
+                                possible_button_nums = all_button_nums
+                            chosen_button_num = random.choice(possible_button_nums); print(f"🤔 [KVI THỬ] Chọn nút số {chosen_button_num}", flush=True)
+                        try:
+                            button_to_click = buttons[0]['components'][chosen_button_num - 1]
+                            kvi_session_state["last_attempt_num"] = chosen_button_num
+                            kvi_click_button(main_token, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
+                        except (ValueError, IndexError) as e: print(f"🔥 [KVI LỖI] Không tìm thấy nút số {chosen_button_num}. Lỗi: {e}", flush=True)
                     else:
-                        all_button_nums = list(range(1, num_choices + 1))
-                        possible_button_nums = [num for num in all_button_nums if num not in incorrect_answers]
-                        if not possible_button_nums:
-                            print("⚠️ [KVI] Đã loại trừ hết. Thử lại từ đầu.", flush=True)
-                            if question in visit_data.get(character_name, {}): visit_data[character_name][question]["incorrect_answers"] = []
-                            possible_button_nums = all_button_nums
-                        chosen_button_num = random.choice(possible_button_nums); print(f"🤔 [KVI THỬ] Chọn nút số {chosen_button_num}", flush=True)
-                    try:
-                        button_to_click = buttons[0]['components'][chosen_button_num - 1]
-                        kvi_session_state["last_attempt_num"] = chosen_button_num
+                        print("\n▶️  [KVI] Bắt đầu/Tiếp tục...", flush=True)
+                        button_to_click = buttons[0]['components'][0]
                         kvi_click_button(main_token, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
-                    except (ValueError, IndexError) as e: print(f"🔥 [KVI LỖI] Không tìm thấy nút số {chosen_button_num}. Lỗi: {e}", flush=True)
-                else:
-                    print("\n▶️  [KVI] Bắt đầu/Tiếp tục...", flush=True)
-                    button_to_click = buttons[0]['components'][0]
-                    kvi_click_button(main_token, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
+
+            # --- 3. XỬ LÝ CÁC KÊNH FARM (LUÔN LẮNG NGHE) ---
+            # Dùng if riêng biệt để nó có thể chạy song song với grab/kvi nếu kênh farm trùng kênh chính
+            is_farm_channel = any(server.get('main_channel_id') == channel_id for server in farm_servers)
+            if is_farm_channel:
+                handle_farm_grab(bot, msg, 1)
                     
     if is_main_2:
         @bot.gateway.command
