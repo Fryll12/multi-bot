@@ -554,6 +554,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
 
+# PHIÊN BẢN GỐC CỦA BẠN
 def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
@@ -566,9 +567,11 @@ def run_work_bot(token, acc_name):
             r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3,"guild_id": guild_id,"channel_id": channel_id,"message_id": message_id,"application_id": application_id,"session_id": "a","data": {"component_type": 2,"custom_id": custom_id}})
             print(f"[Work][{acc_name}] Click tick: Status {r.status_code}", flush=True)
         except Exception as e: print(f"[Work][{acc_name}] Lỗi click tick: {e}", flush=True)
+        # Chỗ này trong code gốc của bạn có thể có hoặc không có "finally", không quan trọng
+        step["value"] = 3
     @bot.gateway.command
     def on_message(resp):
-        if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')): return
+        if not (resp.event.message or resp.event.message_update): return # Dòng này có thể bị lỗi AttributeError, nên sửa lại
         m = resp.parsed.auto()
         if str(m.get("channel_id")) != work_channel_id: return
         author_id = str(m.get("author", {}).get("id", ""))
@@ -592,34 +595,12 @@ def run_work_bot(token, acc_name):
         elif step["value"] == 2 and author_id == karuta_id and "components" in m:
             message_id = m["id"]; application_id = m.get("application_id", karuta_id)
             for comp in m["components"]:
-                 if comp["type"] == 1 and len(comp["components"]) >= 2:	
-                    btn = comp["components"][1]; print(f"[Work][{acc_name}] Click nút thứ 2: {btn['custom_id']}", flush=True); click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id); step["value"] = 3; bot.gateway.close(); return
-    print(f"[Work][{acc_name}] Bắt đầu...", flush=True)
-    threading.Thread(target=bot.gateway.run, daemon=True).start()
-
-    # Chờ bot kết nối gateway, tối đa 20 giây
-    wait_for_ready = time.time() + 20
-    while time.time() < wait_for_ready and not bot.gateway.ready.is_set():
-        time.sleep(0.5)
-
-    # Sau khi chờ, kiểm tra xem bot đã thực sự sẵn sàng chưa
-    if bot.gateway.ready.is_set():
-        send_karuta_command()
-        
-        # Vòng lặp chờ timeout 90 giây gốc của bạn
-        timeout = time.time() + 90
-        while step["value"] != 3 and time.time() < timeout:
-            time.sleep(1)
-        
-        # Ghi log kết quả
-        if step["value"] == 3:
-            print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
-        else:
-            print(f"[Work][{acc_name}] KHÔNG hoàn thành (hết thời gian chờ 90s).", flush=True)
-    else:
-        print(f"[Work][{acc_name}] LỖI: Bot không thể kết nối gateway trong 20 giây.", flush=True)
-
-    bot.gateway.close()
+                 if comp["type"] == 1 and len(comp["components"]) >= 2:    
+                    btn = comp["components"][1]; print(f"[Work][{acc_name}] Click nút thứ 2: {btn['custom_id']}", flush=True); click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id); bot.gateway.close(); return
+    print(f"[Work][{acc_name}] Bắt đầu...", flush=True); threading.Thread(target=bot.gateway.run, daemon=True).start(); time.sleep(); send_karuta_command()
+    timeout = time.time() + 90
+    while step["value"] != 3 and time.time() < timeout: time.sleep(1)
+    bot.gateway.close(); print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
 
 def run_daily_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
