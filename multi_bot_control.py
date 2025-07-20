@@ -234,8 +234,8 @@ def handle_farm_grab(bot, msg, bot_num):
     target_server = next((s for s in farm_servers if s.get('main_channel_id') == channel_id), None)
     if not target_server: return
 
-    grab_map = {1: 'auto_grab_enabled_1', 2: 'auto_grab_enabled_2', 3: 'auto_grab_enabled_3'}
-    thresh_map = {1: 'heart_threshold_1', 2: 'heart_threshold_2', 3: 'heart_threshold_3'}
+    grab_map = {1: 'auto_grab_enabled_1', 2: 'auto_grab_enabled_2', 3: 'auto_grab_enabled_3', 4: 'auto_grab_enabled_4'}
+    thresh_map = {1: 'heart_threshold_1', 2: 'heart_threshold_2', 3: 'heart_threshold_3', 4: 'heart_threshold_4'}
     
     if not target_server.get(grab_map[bot_num], False): return
     
