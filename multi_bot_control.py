@@ -512,41 +512,40 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False):
                 threading.Thread(target=read_karibbit_3).start()
             # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
             handle_farm_grab(bot, msg, 3)
-            
     if is_main_4:
-    @bot.gateway.command
-    def on_message(resp):
-        global auto_grab_enabled_4, heart_threshold_4
-        if not resp.event.message: return
-        msg = resp.parsed.auto()
+        @bot.gateway.command
+        def on_message(resp):
+            global auto_grab_enabled_4, heart_threshold_4
+            if not resp.event.message: return
+            msg = resp.parsed.auto()
 
-        if auto_grab_enabled_4 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
-            last_drop_msg_id = msg["id"]
-            def read_karibbit_4():
-                time.sleep(0.5)
-                try:
-                    messages = bot.getMessages(main_channel_id, num=5).json()
-                    for msg_item in messages:
-                        if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                            desc = msg_item["embeds"][0].get("description", "")
-                            lines = desc.split('\n')
-                            heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
-                            max_num = max(heart_numbers)
-                            if sum(heart_numbers) > 0 and max_num >= heart_threshold_4:
-                                max_index = heart_numbers.index(max_num)
-                                emoji, delay = [("1️⃣", 0.6), ("2️⃣", 1.6), ("3️⃣", 2.2)][max_index]
-                                print(f"[Bot 4] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
-                                def grab_4():
-                                    bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                    time.sleep(2) 
-                                    bot.sendMessage(ktb_channel_id, "kt b")
-                                threading.Timer(delay, grab_4).start()
-                            break
-                except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 4): {e}", flush=True)
-            threading.Thread(target=read_karibbit_4).start()
+            if auto_grab_enabled_4 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
+                last_drop_msg_id = msg["id"]
+                def read_karibbit_4():
+                    time.sleep(0.5)
+                    try:
+                        messages = bot.getMessages(main_channel_id, num=5).json()
+                        for msg_item in messages:
+                            if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                                desc = msg_item["embeds"][0].get("description", "")
+                                lines = desc.split('\n')
+                                heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                                max_num = max(heart_numbers)
+                                if sum(heart_numbers) > 0 and max_num >= heart_threshold_4:
+                                    max_index = heart_numbers.index(max_num)
+                                    emoji, delay = [("1️⃣", 0.6), ("2️⃣", 1.6), ("3️⃣", 2.2)][max_index]
+                                    print(f"[Bot 4] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
+                                    def grab_4():
+                                        bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                        time.sleep(2) 
+                                        bot.sendMessage(ktb_channel_id, "kt b")
+                                    threading.Timer(delay, grab_4).start()
+                                break
+                    except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 4): {e}", flush=True)
+                threading.Thread(target=read_karibbit_4).start()
 
-        handle_farm_grab(bot, msg, 4)
-    
+            handle_farm_grab(bot, msg, 4)
+            
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
 
