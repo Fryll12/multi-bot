@@ -688,7 +688,7 @@ def auto_daily_loop():
                 daily_items = []
                 if main_token_2 and bot_active_states.get('main_2', False): daily_items.append({"name": "BETA NODE", "token": main_token_2})
                 if main_token_3 and bot_active_states.get('main_3', False): daily_items.append({"name": "GAMMA NODE", "token": main_token_3})
-                if main_token_4 and bot_active_states.get('main_4', False): work_items.append({"name": "DELTA NODE", "token": main_token_4})
+                if main_token_4 and bot_active_states.get('main_4', False): daily_items.append({"name": "DELTA NODE", "token": main_token_4})
                 with bots_lock:
                     daily_items.extend([{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)])
                 for item in daily_items:
