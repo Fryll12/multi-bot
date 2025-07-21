@@ -475,15 +475,25 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                             print("⏳ [KVI] Không có đáp án đã học, bắt đầu tìm gợi ý từ Hatsune...", flush=True)
                             hatsune_suggestion = None
                             try:
-                                print("    -> Chờ Hatsune cập nhật trong 2 giây...", flush=True)
-                                time.sleep(2) 
-                                print("    -> quét 10 tin nhắn gần nhất trong kênh.", flush=True)
-                                recent_messages = bot.getMessages(kvi_channel_id, num=10).json()
+                            print("    -> Bắt đầu 'săn' tin nhắn của Hatsune trong 5 giây...", flush=True)
+                            hatsune_suggestion = None
+                            HATSUNE_ID = os.getenv("HATSUNE_ID")
+                            
+                            # Vòng lặp tìm kiếm trong 5 giây
+                            end_time = time.time() + 5
+                            while time.time() < end_time:
+                                recent_messages = bot.getMessages(kvi_channel_id, num=5).json()
                                 for msg_item in recent_messages:
                                     if msg_item.get("author", {}).get("id") == HATSUNE_ID and msg_item.get("embeds"):
                                         if "Talking Helper" in msg_item["embeds"][0].get("title", ""):
-                                            hatsune_suggestion = parse_hatsune_suggestion(msg_item["embeds"][0]); break
-                            except Exception as e: print(f"🔥 [HATSUNE] Lỗi khi tìm tin nhắn Hatsune: {e}", flush=True)
+                                            hatsune_suggestion = parse_hatsune_suggestion(msg_item["embeds"][0])
+                                            break # Thoát khỏi vòng lặp for
+                                if hatsune_suggestion:
+                                    break # Thoát khỏi vòng lặp while
+                                time.sleep(0.5) # Nghỉ 0.5 giây rồi quét lại
+                            
+                        except Exception as e: 
+                            print(f"🔥 [HATSUNE] Lỗi khi tìm tin nhắn Hatsune: {e}", flush=True)
 
                             if hatsune_suggestion:
                                 print(f"🎯 [KVI HATSUNE] QUYẾT ĐỊNH: Dùng gợi ý từ Hatsune -> Chọn nút số {hatsune_suggestion}", flush=True)
