@@ -28,6 +28,7 @@ kvi_channel_id = os.getenv("KVI_CHANNEL_ID")
 karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 yoru_bot_id = "1311684840462225440"
+HATSUNE_ID= "974973431252680714"
 
 # --- BIẾN TRẠNG THÁI (đây là các giá trị mặc định nếu không có file settings.json) ---
 bots, acc_names = [], [
@@ -58,7 +59,6 @@ bots_lock = threading.Lock()
 server_start_time = time.time()
 bot_active_states = {}
 farm_servers = []
-
 # Biến trạng thái cho KVI (Dán vào dưới các biến khác)
 visit_data = {} 
 kvi_session_state = {"last_attempt_num": None, "last_question": None, "last_character_name": None, "message_id": None, "guild_id": None}
@@ -158,9 +158,58 @@ def load_visit_data():
         req = requests.get(url, headers=headers, timeout=10)
         if req.status_code == 200:
             data = req.json()
-            if data: visit_data = data
-            print("[KVI Settings] Đã tải dữ liệu KVI.", flush=True)
+            if data: visit_data = data; print("[KVI Settings] Đã tải dữ liệu KVI.", flush=True)
     except Exception: pass
+        
+def kvi_click_button(token, channel_id, guild_id, message_id, application_id, button_data):
+    """Hàm click nút dành riêng cho KVI"""
+    custom_id = button_data.get("custom_id");
+    if not custom_id: return
+    headers = {"Authorization": token, "Content-Type": "application/json"}
+    session_id = 'a' + ''.join(random.choices('0123456789abcdef', k=31))
+    payload = { "type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": session_id, "data": {"component_type": 2, "custom_id": custom_id} }
+    try: requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+    except Exception as e: print(f"🔥 [KVI CLICK LỖI] {e}", flush=True)
+
+def start_kvi_session(bot_instance):
+    """Gửi lệnh kvi để bắt đầu"""
+    print("🚀 [KVI] Gửi lệnh 'kvi'...", flush=True)
+    if kvi_channel_id:
+        bot_instance.sendMessage(kvi_channel_id, "kvi")
+
+def parse_kvi_embed_data(embed):
+    """Phân tích embed để lấy tên nhân vật và câu hỏi"""
+    description = embed.get("description", "")
+    char_name_match = re.search(r"Character · \*\*([^\*]+)\*\*", description)
+    character_name = char_name_match.group(1).strip() if char_name_match else None
+    question_match = re.search(r'“([^”]*)”', description)
+    question = question_match.group(1).strip() if question_match else None
+    num_choices = len([line for line in description.split('\n') if re.match(r'^\d️⃣', line)])
+    return character_name, question, num_choices
+
+def parse_hatsune_suggestion(embed):
+    """Phân tích embed của Hatsune để lấy gợi ý tốt nhất."""
+    description = embed.get("description", "")
+    print("🔍 [HATSUNE PARSE] Bắt đầu phân tích nội dung embed:", flush=True)
+    print("------------------- NỘI DUNG EMBED -------------------")
+    print(description)
+    print("----------------------------------------------------")
+    lines = description.split('\n')
+    suggestions = []
+    pattern = re.compile(r"<:(\d).+?>\s+\*\*(\d+)%\*\*")
+    for line in lines:
+        match = pattern.search(line)
+        if match:
+            line_num = int(match.group(1))
+            percentage = int(match.group(2))
+            suggestions.append((percentage, line_num))
+    if not suggestions:
+        print("    -> ❌ Không tìm thấy dòng gợi ý hợp lệ nào.", flush=True)
+        return None
+    print(f"    -> ✅ Tìm thấy các gợi ý: {suggestions}", flush=True)
+    best_suggestion = max(suggestions, key=lambda item: item[0])
+    print(f"    -> ✨ Gợi ý tốt nhất là: Nút số {best_suggestion[1]} với {best_suggestion[0]}%", flush=True)
+    return best_suggestion[1]
         
 def save_farm_settings():
     """Lưu cài đặt của các server farm vào Bin riêng."""
@@ -384,8 +433,8 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             
             # --- 2. XỬ LÝ KÊNH KVI ---
             elif auto_kvi_enabled and channel_id == kvi_channel_id:
+                HATSUNE_ID = os.getenv("HATSUNE_ID") # Lấy HATSUNE_ID
                 if msg.get("author", {}).get("id") == karuta_id and msg.get("embeds"):
-                    # Toàn bộ logic KVI của bạn sẽ nằm trong khối elif này
                     kvi_session_state.update({"message_id": msg.get("id"), "guild_id": msg.get("guild_id")})
                     embed, description, buttons = msg["embeds"][0], msg["embeds"][0].get("description", ""), msg.get("components")
 
@@ -397,7 +446,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                             db_entry = visit_data[char_name][question]
                             if "increased" in description:
                                 if db_entry["correct_answer"] != attempted_num:
-                                    print(f"✅ [KVI HỌC] ĐÚNG! Nút số {attempted_num}", flush=True)
+                                    print(f"✅ [KVI HỌC] ĐÚNG! Đáp án cho '{question}' là nút số {attempted_num}", flush=True)
                                     db_entry["correct_answer"] = attempted_num; save_visit_data()
                             elif ("decreased" in description or "not changed" in description):
                                 if attempted_num not in db_entry["incorrect_answers"]:
@@ -412,30 +461,54 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                         character_name, question, num_choices = parse_kvi_embed_data(embed)
                         if not all([character_name, question, num_choices > 0]): return
                         if question == kvi_session_state["last_question"] and kvi_session_state["last_attempt_num"]: return
+
                         print(f"\n[KVI] Nhân vật: {character_name}\n[KVI] Câu hỏi: {question}", flush=True)
                         kvi_session_state.update({"last_question": question, "last_character_name": character_name})
+                        
                         db_entry = visit_data.get(character_name, {}).get(question, {})
                         correct_answer, incorrect_answers = db_entry.get("correct_answer"), db_entry.get("incorrect_answers", [])
                         chosen_button_num = None
                         if correct_answer:
-                            print(f"💡 [KVI BIẾT] Đáp án là {correct_answer}", flush=True); chosen_button_num = correct_answer
+                            print(f"💡 [KVI BIẾT] Dùng đáp án đã học từ JSON: Nút số {correct_answer}", flush=True)
+                            chosen_button_num = correct_answer
                         else:
-                            all_button_nums = list(range(1, num_choices + 1))
-                            possible_button_nums = [num for num in all_button_nums if num not in incorrect_answers]
-                            if not possible_button_nums:
-                                print("⚠️ [KVI] Đã loại trừ hết. Thử lại từ đầu.", flush=True)
-                                if question in visit_data.get(character_name, {}): visit_data[character_name][question]["incorrect_answers"] = []
-                                possible_button_nums = all_button_nums
-                            chosen_button_num = random.choice(possible_button_nums); print(f"🤔 [KVI THỬ] Chọn nút số {chosen_button_num}", flush=True)
+                            print("⏳ [KVI] Không có đáp án đã học, bắt đầu tìm gợi ý từ Hatsune...", flush=True)
+                            hatsune_suggestion = None
+                            try:
+                                print("    -> Chờ Hatsune cập nhật trong 2 giây...", flush=True)
+                                time.sleep(2) 
+                                print("    -> quét 10 tin nhắn gần nhất trong kênh.", flush=True)
+                                recent_messages = bot.getMessages(kvi_channel_id, num=10).json()
+                                for msg_item in recent_messages:
+                                    if msg_item.get("author", {}).get("id") == HATSUNE_ID and msg_item.get("embeds"):
+                                        if "Talking Helper" in msg_item["embeds"][0].get("title", ""):
+                                            hatsune_suggestion = parse_hatsune_suggestion(msg_item["embeds"][0]); break
+                            except Exception as e: print(f"🔥 [HATSUNE] Lỗi khi tìm tin nhắn Hatsune: {e}", flush=True)
+
+                            if hatsune_suggestion:
+                                print(f"🎯 [KVI HATSUNE] QUYẾT ĐỊNH: Dùng gợi ý từ Hatsune -> Chọn nút số {hatsune_suggestion}", flush=True)
+                                chosen_button_num = hatsune_suggestion
+                            else:
+                                print("🎲 [KVI THỬ] KHÔNG CÓ GỢI Ý. QUYẾT ĐỊNH: Chọn ngẫu nhiên.", flush=True)
+                                all_button_nums = list(range(1, num_choices + 1))
+                                possible_button_nums = [num for num in all_button_nums if num not in incorrect_answers]
+                                if not possible_button_nums:
+                                    print("⚠️ [KVI] Đã loại trừ hết. Thử lại từ đầu.", flush=True)
+                                    if question in visit_data.get(character_name, {}): visit_data[character_name][question]["incorrect_answers"] = []
+                                    possible_button_nums = all_button_nums
+                                chosen_button_num = random.choice(possible_button_nums)
+                        
                         try:
                             button_to_click = buttons[0]['components'][chosen_button_num - 1]
                             kvi_session_state["last_attempt_num"] = chosen_button_num
                             kvi_click_button(main_token, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
-                        except (ValueError, IndexError) as e: print(f"🔥 [KVI LỖI] Không tìm thấy nút số {chosen_button_num}. Lỗi: {e}", flush=True)
+                        except (ValueError, IndexError, TypeError) as e:
+                            print(f"🔥 [KVI LỖI] Không tìm thấy/chọn được nút. Lỗi: {e}", flush=True)
                     else:
                         print("\n▶️  [KVI] Bắt đầu/Tiếp tục...", flush=True)
                         button_to_click = buttons[0]['components'][0]
                         kvi_click_button(main_token, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
+            # ===== KẾT THÚC PHẦN CODE KVI =====
 
             # --- 3. XỬ LÝ CÁC KÊNH FARM (LUÔN LẮNG NGHE) ---
             # Dùng if riêng biệt để nó có thể chạy song song với grab/kvi nếu kênh farm trùng kênh chính
