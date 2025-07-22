@@ -48,6 +48,7 @@ auto_kvi_enabled = False
 kvi_click_count = 10
 kvi_click_delay = 3
 kvi_loop_delay = 7500 
+kvi_target_account = 'main_1'
 
 # Timestamps - sẽ được load từ file
 last_work_cycle_time, last_daily_cycle_time, last_kvi_cycle_time, last_reboot_cycle_time, last_spam_time = 0, 0, 0, 0, 0
@@ -80,6 +81,7 @@ def save_settings():
         'auto_work_enabled': auto_work_enabled, 'work_delay_between_acc': work_delay_between_acc, 'work_delay_after_all': work_delay_after_all,
         'auto_daily_enabled': auto_daily_enabled, 'daily_delay_between_acc': daily_delay_between_acc, 'daily_delay_after_all': daily_delay_after_all,
         'auto_kvi_enabled': auto_kvi_enabled, 'kvi_click_count': kvi_click_count, 'kvi_click_delay': kvi_click_delay, 'kvi_loop_delay': kvi_loop_delay,
+        'kvi_target_account': kvi_target_account,
         'auto_reboot_enabled': auto_reboot_enabled, 'auto_reboot_delay': auto_reboot_delay,
         'bot_active_states': bot_active_states,
         'last_work_cycle_time': last_work_cycle_time,
@@ -210,7 +212,97 @@ def parse_hatsune_suggestion(embed):
     best_suggestion = max(suggestions, key=lambda item: item[0])
     print(f"    -> ✨ Gợi ý tốt nhất là: Nút số {best_suggestion[1]} với {best_suggestion[0]}%", flush=True)
     return best_suggestion[1]
+    
+def handle_kvi_message(bot, msg, token_for_click):
+    """
+    Hàm xử lý logic KVI tập trung, có thể được gọi bởi bất kỳ bot nào.
+    bot: instance của bot đang lắng nghe.
+    msg: tin nhắn nhận được.
+    token_for_click: token của bot đó để thực hiện click.
+    """
+    global visit_data, kvi_session_state
+    
+    HATSUNE_ID = os.getenv("HATSUNE_ID")
+    if msg.get("author", {}).get("id") == karuta_id and msg.get("embeds"):
+        kvi_session_state.update({"message_id": msg.get("id"), "guild_id": msg.get("guild_id")})
+        embed, description, buttons = msg["embeds"][0], msg["embeds"][0].get("description", ""), msg.get("components")
+
+        if "Your Affection Rating has" in description and kvi_session_state["last_attempt_num"]:
+            char_name, question, attempted_num = kvi_session_state["last_character_name"], kvi_session_state["last_question"], kvi_session_state["last_attempt_num"]
+            if char_name and question:
+                if char_name not in visit_data: visit_data[char_name] = {}
+                if question not in visit_data[char_name]: visit_data[char_name][question] = {"correct_answer": None, "incorrect_answers": []}
+                db_entry = visit_data[char_name][question]
+                if "increased" in description:
+                    if db_entry["correct_answer"] != attempted_num:
+                        print(f"✅ [KVI HỌC] ĐÚNG! Đáp án cho '{question}' là nút số {attempted_num}", flush=True)
+                        db_entry["correct_answer"] = attempted_num; save_visit_data()
+                elif ("decreased" in description or "not changed" in description):
+                    if attempted_num not in db_entry["incorrect_answers"]:
+                        print(f"❌ [KVI HỌC] SAI! Loại trừ nút số {attempted_num}.", flush=True)
+                        db_entry["incorrect_answers"].append(attempted_num); save_visit_data()
+            kvi_session_state["last_attempt_num"] = None
         
+        if not buttons: return
+        time.sleep(random.uniform(1.8, 2.5))
+        
+        if "1️⃣" in description:
+            character_name, question, num_choices = parse_kvi_embed_data(embed)
+            if not all([character_name, question, num_choices > 0]): return
+            if question == kvi_session_state["last_question"] and kvi_session_state["last_attempt_num"]: return
+
+            print(f"\n[KVI] Nhân vật: {character_name}\n[KVI] Câu hỏi: {question}", flush=True)
+            kvi_session_state.update({"last_question": question, "last_character_name": character_name})
+            
+            db_entry = visit_data.get(character_name, {}).get(question, {})
+            correct_answer, incorrect_answers = db_entry.get("correct_answer"), db_entry.get("incorrect_answers", [])
+            chosen_button_num = None
+            if correct_answer:
+                print(f"💡 [KVI BIẾT] Dùng đáp án đã học từ JSON: Nút số {correct_answer}", flush=True)
+                chosen_button_num = correct_answer
+            else:
+                print("⏳ [KVI] Không có đáp án đã học, bắt đầu tìm gợi ý từ Hatsune...", flush=True)
+                hatsune_suggestion = None
+                try:
+                    print("    -> Bắt đầu 'săn' tin nhắn của Hatsune trong 5 giây...", flush=True)
+                    HATSUNE_ID = "974973431252680714"
+                    end_time = time.time() + 5
+                    while time.time() < end_time:
+                        recent_messages = bot.getMessages(kvi_channel_id, num=5).json()
+                        for msg_item in recent_messages:
+                            if msg_item.get("author", {}).get("id") == HATSUNE_ID and msg_item.get("embeds"):
+                                if "Talking Helper" in msg_item["embeds"][0].get("title", ""):
+                                    hatsune_suggestion = parse_hatsune_suggestion(msg_item["embeds"][0])
+                                    break
+                        if hatsune_suggestion: break
+                        time.sleep(0.5)
+                except Exception as e: 
+                    print(f"🔥 [HATSUNE] Lỗi khi tìm tin nhắn Hatsune: {e}", flush=True)
+
+                if hatsune_suggestion:
+                    print(f"🎯 [KVI HATSUNE] QUYẾT ĐỊNH: Dùng gợi ý từ Hatsune -> Chọn nút số {hatsune_suggestion}", flush=True)
+                    chosen_button_num = hatsune_suggestion
+                else:
+                    print("🎲 [KVI THỬ] KHÔNG CÓ GỢI Ý. QUYẾT ĐỊNH: Chọn ngẫu nhiên.", flush=True)
+                    all_button_nums = list(range(1, num_choices + 1))
+                    possible_button_nums = [num for num in all_button_nums if num not in incorrect_answers]
+                    if not possible_button_nums:
+                        print("⚠️ [KVI] Đã loại trừ hết. Thử lại từ đầu.", flush=True)
+                        if question in visit_data.get(character_name, {}): visit_data[character_name][question]["incorrect_answers"] = []
+                        possible_button_nums = all_button_nums
+                    chosen_button_num = random.choice(possible_button_nums)
+            
+            try:
+                button_to_click = buttons[0]['components'][chosen_button_num - 1]
+                kvi_session_state["last_attempt_num"] = chosen_button_num
+                kvi_click_button(token_for_click, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
+            except (ValueError, IndexError, TypeError) as e:
+                print(f"🔥 [KVI LỖI] Không tìm thấy/chọn được nút. Lỗi: {e}", flush=True)
+        else:
+            print("\n▶️  [KVI] Bắt đầu/Tiếp tục...", flush=True)
+            button_to_click = buttons[0]['components'][0]
+            kvi_click_button(token_for_click, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
+            
 def save_farm_settings():
     """Lưu cài đặt của các server farm vào Bin riêng."""
     api_key = os.getenv("JSONBIN_API_KEY")
@@ -432,95 +524,10 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                     threading.Thread(target=read_karibbit).start()
             
             # --- 2. XỬ LÝ KÊNH KVI ---
-            elif auto_kvi_enabled and channel_id == kvi_channel_id:
-                HATSUNE_ID = os.getenv("HATSUNE_ID") # Lấy HATSUNE_ID
-                if msg.get("author", {}).get("id") == karuta_id and msg.get("embeds"):
-                    kvi_session_state.update({"message_id": msg.get("id"), "guild_id": msg.get("guild_id")})
-                    embed, description, buttons = msg["embeds"][0], msg["embeds"][0].get("description", ""), msg.get("components")
-
-                    if "Your Affection Rating has" in description and kvi_session_state["last_attempt_num"]:
-                        char_name, question, attempted_num = kvi_session_state["last_character_name"], kvi_session_state["last_question"], kvi_session_state["last_attempt_num"]
-                        if char_name and question:
-                            if char_name not in visit_data: visit_data[char_name] = {}
-                            if question not in visit_data[char_name]: visit_data[char_name][question] = {"correct_answer": None, "incorrect_answers": []}
-                            db_entry = visit_data[char_name][question]
-                            if "increased" in description:
-                                if db_entry["correct_answer"] != attempted_num:
-                                    print(f"✅ [KVI HỌC] ĐÚNG! Đáp án cho '{question}' là nút số {attempted_num}", flush=True)
-                                    db_entry["correct_answer"] = attempted_num; save_visit_data()
-                            elif ("decreased" in description or "not changed" in description):
-                                if attempted_num not in db_entry["incorrect_answers"]:
-                                    print(f"❌ [KVI HỌC] SAI! Loại trừ nút số {attempted_num}.", flush=True)
-                                    db_entry["incorrect_answers"].append(attempted_num); save_visit_data()
-                        kvi_session_state["last_attempt_num"] = None
-                    
-                    if not buttons: return
-                    time.sleep(random.uniform(1.8, 2.5))
-                    
-                    if "1️⃣" in description:
-                        character_name, question, num_choices = parse_kvi_embed_data(embed)
-                        if not all([character_name, question, num_choices > 0]): return
-                        if question == kvi_session_state["last_question"] and kvi_session_state["last_attempt_num"]: return
-
-                        print(f"\n[KVI] Nhân vật: {character_name}\n[KVI] Câu hỏi: {question}", flush=True)
-                        kvi_session_state.update({"last_question": question, "last_character_name": character_name})
-                        
-                        db_entry = visit_data.get(character_name, {}).get(question, {})
-                        correct_answer, incorrect_answers = db_entry.get("correct_answer"), db_entry.get("incorrect_answers", [])
-                        chosen_button_num = None
-                        if correct_answer:
-                            print(f"💡 [KVI BIẾT] Dùng đáp án đã học từ JSON: Nút số {correct_answer}", flush=True)
-                            chosen_button_num = correct_answer
-                        else:
-                            print("⏳ [KVI] Không có đáp án đã học, bắt đầu tìm gợi ý từ Hatsune...", flush=True)
-                            hatsune_suggestion = None
-                            try:
-                                print("    -> Bắt đầu 'săn' tin nhắn của Hatsune trong 5 giây...", flush=True)
-                                hatsune_suggestion = None
-                                HATSUNE_ID = "974973431252680714"
-                                # Vòng lặp tìm kiếm trong 5 giây
-                                end_time = time.time() + 5
-                                while time.time() < end_time:
-                                    recent_messages = bot.getMessages(kvi_channel_id, num=5).json()
-                                    for msg_item in recent_messages:
-                                        if msg_item.get("author", {}).get("id") == HATSUNE_ID and msg_item.get("embeds"):
-                                            if "Talking Helper" in msg_item["embeds"][0].get("title", ""):
-                                                hatsune_suggestion = parse_hatsune_suggestion(msg_item["embeds"][0])
-                                                break # Thoát khỏi vòng lặp for
-                                    if hatsune_suggestion:
-                                        break # Thoát khỏi vòng lặp while
-                                    time.sleep(0.5) # Nghỉ 0.5 giây rồi quét lại
-                            
-                            except Exception as e: 
-                                print(f"🔥 [HATSUNE] Lỗi khi tìm tin nhắn Hatsune: {e}", flush=True)
-
-                            if hatsune_suggestion:
-                                print(f"🎯 [KVI HATSUNE] QUYẾT ĐỊNH: Dùng gợi ý từ Hatsune -> Chọn nút số {hatsune_suggestion}", flush=True)
-                                chosen_button_num = hatsune_suggestion
-                            else:
-                                print("🎲 [KVI THỬ] KHÔNG CÓ GỢI Ý. QUYẾT ĐỊNH: Chọn ngẫu nhiên.", flush=True)
-                                all_button_nums = list(range(1, num_choices + 1))
-                                possible_button_nums = [num for num in all_button_nums if num not in incorrect_answers]
-                                if not possible_button_nums:
-                                    print("⚠️ [KVI] Đã loại trừ hết. Thử lại từ đầu.", flush=True)
-                                    if question in visit_data.get(character_name, {}): visit_data[character_name][question]["incorrect_answers"] = []
-                                    possible_button_nums = all_button_nums
-                                chosen_button_num = random.choice(possible_button_nums)
-                        
-                        try:
-                            button_to_click = buttons[0]['components'][chosen_button_num - 1]
-                            kvi_session_state["last_attempt_num"] = chosen_button_num
-                            kvi_click_button(main_token, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
-                        except (ValueError, IndexError, TypeError) as e:
-                            print(f"🔥 [KVI LỖI] Không tìm thấy/chọn được nút. Lỗi: {e}", flush=True)
-                    else:
-                        print("\n▶️  [KVI] Bắt đầu/Tiếp tục...", flush=True)
-                        button_to_click = buttons[0]['components'][0]
-                        kvi_click_button(main_token, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
-            # ===== KẾT THÚC PHẦN CODE KVI =====
-
-            # --- 3. XỬ LÝ CÁC KÊNH FARM (LUÔN LẮNG NGHE) ---
-            # Dùng if riêng biệt để nó có thể chạy song song với grab/kvi nếu kênh farm trùng kênh chính
+            if auto_kvi_enabled and kvi_target_account == 'main_1' and channel_id == kvi_channel_id:
+                handle_kvi_message(bot, msg, main_token)
+                
+             #--- 3. XỬ LÝ FARM ---    
             is_farm_channel = any(server.get('main_channel_id') == channel_id for server in farm_servers)
             if is_farm_channel:
                 handle_farm_grab(bot, msg, 1)
@@ -562,6 +569,9 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             
             # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
             handle_farm_grab(bot, msg, 2)
+
+            if auto_kvi_enabled and kvi_target_account == 'main_2' and channel_id == kvi_channel_id:
+                handle_kvi_message(bot, msg, main_token_2)
             
     if is_main_3:
         @bot.gateway.command
@@ -599,6 +609,10 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                 threading.Thread(target=read_karibbit_3).start()
             # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
             handle_farm_grab(bot, msg, 3)
+
+            if auto_kvi_enabled and kvi_target_account == 'main_3' and channel_id == kvi_channel_id:
+                handle_kvi_message(bot, msg, main_token_3)
+                
     if is_main_4:
         @bot.gateway.command
         def on_message(resp):
@@ -632,7 +646,10 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                 threading.Thread(target=read_karibbit_4).start()
 
             handle_farm_grab(bot, msg, 4)
-            
+
+            if auto_kvi_enabled and kvi_target_account == 'main_4' and channel_id == kvi_channel_id:
+                handle_kvi_message(bot, msg, main_token_4)
+                
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
 
@@ -816,13 +833,19 @@ def auto_kvi_loop():
     time.sleep(20) 
     while True:
         try:
-            if auto_kvi_enabled and main_bot and bot_active_states.get('main_1', False):
+            target_bot = None
+            if kvi_target_account == 'main_1': target_bot = main_bot
+            elif kvi_target_account == 'main_2': target_bot = main_bot_2
+            elif kvi_target_account == 'main_3': target_bot = main_bot_3
+            elif kvi_target_account == 'main_4': target_bot = main_bot_4
+            
+            if auto_kvi_enabled and target_bot and bot_active_states.get(kvi_target_account, False):
                 if (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
-                    start_kvi_session(main_bot)
+                    start_kvi_session(target_bot)
                     last_kvi_cycle_time = time.time()
             time.sleep(60)
         except Exception as e: print(f"[ERROR in auto_kvi_loop] {e}", flush=True); time.sleep(60)
-
+            
 def auto_reboot_loop():
     global auto_reboot_enabled, last_reboot_cycle_time, auto_reboot_stop_event
     while not auto_reboot_stop_event.is_set():
@@ -1089,10 +1112,19 @@ HTML_TEMPLATE = """
                 <button type="button" id="spam-toggle-btn" class="btn {{ spam_button_class }}" style="width:100%;">{{ spam_action }} SPAM</button>
                 <hr style="border-color: var(--border-color); margin: 25px 0;">
                 <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">AUTO KVI (MAIN ACC 1)</h3>
+                <div class="input-group">
+                    <label>Account</label>
+                    <select id="kvi-target-account">
+                        <option value="main_1" {{ 'selected' if kvi_target_account == 'main_1' }}>ALPHA NODE (Main 1)</option>
+                        <option value="main_2" {{ 'selected' if kvi_target_account == 'main_2' }}>BETA NODE (Main 2)</option>
+                        <option value="main_3" {{ 'selected' if kvi_target_account == 'main_3' }}>GAMMA NODE (Main 3)</option>
+                        <option value="main_4" {{ 'selected' if kvi_target_account == 'main_4' }}>DELTA NODE (Main 4)</option>
+                    </select>
+                </div>
                 <div class="input-group"><label>Clicks</label><input type="number" id="kvi-click-count" value="{{ kvi_click_count }}"></div>
                 <div class="input-group"><label>Click Delay</label><input type="number" id="kvi-click-delay" value="{{ kvi_click_delay }}"></div>
                 <div class="input-group"><label>Cycle Delay</label><input type="number" id="kvi-loop-delay" value="{{ kvi_loop_delay }}"></div>
-                <button type="button" id="auto-kvi-toggle-btn" class="btn {{ kvi_button_class }}" style="width:100%;">{{ kvi_action }} KVI</button>
+                <button type="button" id="auto-kvi-toggle-btn" class="btn {{ kvi_button_class }}" style="width:100%;">{{ kvi_action }} KVI</button>    
             </div>
         </div>
     </div>
@@ -1399,7 +1431,7 @@ def index():
         spam_message=spam_message, spam_delay=spam_delay, spam_action=spam_action, spam_button_class=spam_button_class,
         work_delay_between_acc=work_delay_between_acc, work_delay_after_all=work_delay_after_all, work_action=work_action, work_button_class=work_button_class,
         daily_delay_between_acc=daily_delay_between_acc, daily_delay_after_all=daily_delay_after_all, daily_action=daily_action, daily_button_class=daily_button_class,
-        kvi_click_count=kvi_click_count, kvi_click_delay=kvi_click_delay, kvi_loop_delay=kvi_loop_delay, kvi_action=kvi_action, kvi_button_class=kvi_button_class,
+        kvi_click_count=kvi_click_count, kvi_click_delay=kvi_click_delay, kvi_loop_delay=kvi_loop_delay, kvi_action=kvi_action, kvi_button_class=kvi_button_class, kvi_target_account=kvi_target_account,
         auto_reboot_delay=auto_reboot_delay, reboot_action=reboot_action, reboot_button_class=reboot_button_class,
         acc_options=acc_options, sub_account_buttons=sub_account_buttons, farm_servers=farm_servers
     )
@@ -1579,7 +1611,7 @@ def api_reboot_toggle_auto():
 @app.route("/api/broadcast_toggle", methods=['POST'])
 def api_broadcast_toggle():
     global spam_enabled, spam_message, spam_delay, spam_thread, last_spam_time
-    global auto_kvi_enabled, kvi_click_count, kvi_click_delay, kvi_loop_delay, last_kvi_cycle_time
+    global auto_kvi_enabled, kvi_click_count, kvi_click_delay, kvi_loop_delay, last_kvi_cycle_time, kvi_target_account
     data = request.get_json()
     msg = ""
     if data.get('type') == 'spam':
@@ -1589,11 +1621,13 @@ def api_broadcast_toggle():
             if spam_thread is None or not spam_thread.is_alive():
                 spam_thread = threading.Thread(target=spam_loop, daemon=True); spam_thread.start()
         else: spam_enabled = False; msg = "Spam DISABLED."
+            
     elif data.get('type') == 'kvi':
+        kvi_target_account = data.get('target_account', 'main_1') # Lấy target account từ request
         auto_kvi_enabled = not auto_kvi_enabled
         if auto_kvi_enabled and last_kvi_cycle_time == 0: last_kvi_cycle_time = time.time() - kvi_loop_delay - 1
         kvi_click_count, kvi_click_delay, kvi_loop_delay = int(data.get('clicks', 10)), int(data.get('click_delay', 3)), int(data.get('loop_delay', 7500))
-        msg = f"Auto KVI {'ENABLED' if auto_kvi_enabled else 'DISABLED'}."
+        msg = f"Auto KVI {'ENABLED' if auto_kvi_enabled else 'DISABLED'} on {kvi_target_account.upper()}."
 
     return jsonify({'status': 'success', 'message': msg})
 
