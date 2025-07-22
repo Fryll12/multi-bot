@@ -638,118 +638,147 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
 
 # ===== THAY THẾ TOÀN BỘ HÀM run_work_bot BẰNG PHIÊN BẢN NÀY =====
 def run_work_bot(token, acc_name):
-    # Sử dụng queue để giao tiếp an toàn giữa luồng gateway và luồng chính
-    from queue import Queue
-    
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
     
-    # Các biến trạng thái mới
-    step = "START" 
-    last_command_time = 0 
-    message_queue = Queue() 
+    # --- CÁC HÀM HÀNH ĐỘNG VÀ KIỂM TRA ---
 
-    @bot.gateway.command
-    def on_message(resp):
-        if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')): 
-            return
-        m = resp.parsed.auto()
-        if str(m.get("channel_id")) == work_channel_id and str(m.get("author", {}).get("id", "")) == karuta_id:
-            message_queue.put(m)
-
-    # --- CÁC HÀM HÀNH ĐỘNG ---
     def send_command(command):
-        nonlocal last_command_time
         print(f"[Work][{acc_name}] Gửi lệnh: {command}", flush=True)
         bot.sendMessage(work_channel_id, command)
-        last_command_time = time.time()
 
-    def click_button(msg):
-        nonlocal last_command_time
-        message_id = msg["id"]
-        application_id = msg.get("application_id", karuta_id)
-        guild_id = msg.get("guild_id")
-        for comp in msg["components"]:
-             if comp["type"] == 1 and len(comp["components"]) >= 2:    
-                btn = comp["components"][1]
-                print(f"[Work][{acc_name}] Thực hiện click...", flush=True)
-                try:
-                    r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3,"guild_id": guild_id,"channel_id": work_channel_id,"message_id": message_id,"application_id": application_id,"session_id": "a","data": {"component_type": 2,"custom_id": btn['custom_id']}})
-                    last_command_time = time.time()
-                    return r.status_code == 204
-                except Exception as e:
-                    print(f"[Work][{acc_name}] Lỗi click: {e}", flush=True)
-                    return False
-        return False
+    # Hàm kiểm tra lịch sử tin nhắn
+    def check_recent_messages(check_function, num_messages=3):
+        try:
+            messages = bot.getMessages(work_channel_id, num=num_messages).json()
+            for msg in messages:
+                if str(msg.get("author", {}).get("id", "")) == karuta_id:
+                    if check_function(msg):
+                        return msg # Trả về tin nhắn nếu tìm thấy
+            return None # Trả về None nếu không tìm thấy
+        except Exception as e:
+            print(f"[Work][{acc_name}] Lỗi khi quét tin nhắn: {e}", flush=True)
+            return None
 
-    # --- VÒNG LẶP GIÁM SÁT CHỦ ĐỘNG ---
+    # Các hàm con để nhận diện từng loại tin nhắn của Karuta
+    def is_card_collection_embed(msg):
+        return "embeds" in msg and "title" in msg["embeds"][0] and "Card Collection" in msg["embeds"][0]["title"]
+
+    def is_resource_embed(msg):
+        return "embeds" in msg and "title" in msg["embeds"][0] and "You took the resources" in msg["embeds"][0]["title"]
+
+    def is_work_complete_message(msg):
+        return "components" in msg and "Your work is complete" in msg.get("content", "")
+
+    # --- VÒNG LẶP LOGIC CHÍNH ---
     print(f"[Work][{acc_name}] Bắt đầu...", flush=True)
     gateway_thread = threading.Thread(target=bot.gateway.run, daemon=True)
     gateway_thread.start()
-    time.sleep(7) 
+    time.sleep(7)
 
-    # GỬI LỆNH LẦN ĐẦU TIÊN
-    send_command("kc o:ef")
-    
-    overall_timeout = time.time() + 120
-    
-    while step not in ["DONE", "FAILED"]:
+    overall_timeout = time.time() + 120 # Timeout toàn bộ quá trình là 2 phút
+    step_completed = -1 # Bắt đầu từ -1 để thực hiện bước 0
+
+    while step_completed < 3:
         if time.time() > overall_timeout:
             print(f"[Work][{acc_name}] LỖI: Quá trình vượt quá thời gian cho phép.", flush=True)
-            step = "FAILED"
             break
 
-        if time.time() - last_command_time > 25: # Tăng thời gian chờ mỗi bước lên 25 giây
-            print(f"[Work][{acc_name}] Cảnh báo: Bước '{step}' bị kẹt, thử lại...", flush=True)
-            if step == "START": send_command("kc o:ef")
-            elif step == "PICKING": send_command("kn")
-            elif step == "GETTING_RESOURCE": send_command("kw")
-            elif step == "CLICKING": send_command("kw")
-        
-        try:
-            msg = message_queue.get(timeout=1)
-        except:
-            continue
-        
-        if step == "START" and "embeds" in msg and "title" in msg["embeds"][0] and "Card Collection" in msg["embeds"][0]["title"]:
-            desc = msg["embeds"][0].get("description", "")
+        # --- BƯỚC 0: GỬI LỆNH `kc o:ef` VÀ CHỜ PHẢN HỒI "Card Collection" ---
+        if step_completed == -1:
+            print(f"[Work][{acc_name}] Đang thực hiện Bước 0: Gửi lệnh `kc o:ef`", flush=True)
+            send_command("kc o:ef")
+            # Chờ phản hồi trong 15 giây
+            wait_end = time.time() + 15
+            while time.time() < wait_end:
+                if check_recent_messages(is_card_collection_embed):
+                    step_completed = 0
+                    break
+                time.sleep(2)
+            if step_completed != 0: 
+                print(f"[Work][{acc_name}] Lỗi: Không nhận được phản hồi cho `kc o:ef`. Thử lại...", flush=True)
+                continue # Quay lại đầu vòng lặp để thử lại Bước 0
+
+        # --- BƯỚC 1: PICK CARD, GỬI LỆNH `kn` VÀ CHỜ PHẢN HỒI "You took the resources" ---
+        if step_completed == 0:
+            print(f"[Work][{acc_name}] Đang thực hiện Bước 1: Pick card và gửi `kn`", flush=True)
+            card_list_msg = check_recent_messages(is_card_collection_embed)
+            if not card_list_msg: # Kiểm tra lại lần nữa cho chắc
+                step_completed = -1; continue
+
+            desc = card_list_msg["embeds"][0].get("description", "")
             card_codes = re.findall(r"\b[a-zA-Z0-9]{6}\b", desc)
             if len(card_codes) >= 10:
-                print(f"[Work][{acc_name}] Bước 1: Đã nhận danh sách card, bắt đầu pick...", flush=True)
                 first_5 = card_codes[:5]; last_5 = card_codes[-5:]
                 for i, code in enumerate(last_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
                 for i, code in enumerate(first_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
-                step = "PICKING"; send_command("kn")
+                send_command("kn")
+
+                wait_end = time.time() + 15
+                while time.time() < wait_end:
+                    if check_recent_messages(is_resource_embed):
+                        step_completed = 1
+                        break
+                    time.sleep(2)
+                if step_completed != 1:
+                    print(f"[Work][{acc_name}] Lỗi: Không nhận được phản hồi cho `kn`. Thử lại...", flush=True)
+                    step_completed = -1 # Quay về Bước 0 để bắt đầu lại
+                    continue
+            else:
+                print(f"[Work][{acc_name}] Lỗi: Không tìm đủ card để pick. Thử lại...", flush=True)
+                step_completed = -1; continue
         
-        elif step == "PICKING" and "embeds" in msg and "You took the resources" in msg["embeds"][0].get("title", ""):
-            desc = msg["embeds"][0].get("description", "")
+        # --- BƯỚC 2: LẤY TÀI NGUYÊN, GỬI LỆNH `kw` VÀ CHỜ PHẢN HỒI "Your work is complete" ---
+        if step_completed == 1:
+            print(f"[Work][{acc_name}] Đang thực hiện Bước 2: Lấy resource và gửi `kw`", flush=True)
+            resource_msg = check_recent_messages(is_resource_embed)
+            if not resource_msg:
+                step_completed = 0; continue
+
+            desc = resource_msg["embeds"][0].get("description", "")
             match = re.search(r"\d+\.\s*`([^`]+)`", desc)
             if match:
                 resource = match.group(1)
-                print(f"[Work][{acc_name}] Bước 2: Đã nhận resource '{resource}', đang xử lý...", flush=True)
                 bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
                 time.sleep(1)
-                step = "GETTING_RESOURCE"; send_command("kw")
-        
-        elif step == "GETTING_RESOURCE" and "components" in msg and "Your work is complete" in msg.get("content", ""):
-            print(f"[Work][{acc_name}] Bước 3: Đã nhận được nút, chuẩn bị click...", flush=True)
-            step = "CLICKING"
-            click_timeout = time.time() + 15
-            clicked_successfully = False
-            while time.time() < click_timeout:
-                if click_button(msg):
-                    clicked_successfully = True
-                    break
-                time.sleep(2)
-            
-            if clicked_successfully:
-                step = "DONE"
-            else:
-                print(f"[Work][{acc_name}] LỖI: Không thể click nút sau nhiều lần thử.", flush=True)
-                step = "FAILED"
+                send_command("kw")
 
+                wait_end = time.time() + 15
+                while time.time() < wait_end:
+                    if check_recent_messages(is_work_complete_message):
+                        step_completed = 2
+                        break
+                    time.sleep(2)
+                if step_completed != 2:
+                    print(f"[Work][{acc_name}] Lỗi: Không nhận được phản hồi cho `kw`. Thử lại...", flush=True)
+                    step_completed = 1; continue
+            else:
+                print(f"[Work][{acc_name}] Lỗi: Không đọc được resource. Thử lại...", flush=True)
+                step_completed = 0; continue
+
+        # --- BƯỚC 3: CLICK NÚT HOÀN THÀNH ---
+        if step_completed == 2:
+            print(f"[Work][{acc_name}] Đang thực hiện Bước 3: Click nút", flush=True)
+            work_complete_msg = check_recent_messages(is_work_complete_message)
+            if not work_complete_msg:
+                step_completed = 1; continue
+
+            btn = work_complete_msg["components"][0]["components"][1]
+            try:
+                r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3,"guild_id": work_complete_msg['guild_id'],"channel_id": work_channel_id,"message_id": work_complete_msg['id'],"application_id": karuta_id,"session_id": "a","data": {"component_type": 2,"custom_id": btn['custom_id']}})
+                if r.status_code == 204:
+                    print(f"[Work][{acc_name}] Click thành công!", flush=True)
+                    step_completed = 3 # HOÀN THÀNH
+                else:
+                    print(f"[Work][{acc_name}] Lỗi: Click thất bại (status {r.status_code}). Thử lại...", flush=True)
+                    step_completed = 2; continue
+            except Exception as e:
+                print(f"[Work][{acc_name}] Lỗi Exception khi click: {e}. Thử lại...", flush=True)
+                step_completed = 2; continue
+
+    # Dọn dẹp và kết thúc
     bot.gateway.close()
-    if step == "DONE":
+    if step_completed == 3:
         print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
     else:
         print(f"[Work][{acc_name}] KHÔNG hoàn thành.", flush=True)
