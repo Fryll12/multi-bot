@@ -645,17 +645,15 @@ def run_work_bot(token, acc_name):
     headers = {"Authorization": token, "Content-Type": "application/json"}
     
     # Các biến trạng thái mới
-    step = "START" # Dùng chuỗi để dễ đọc hơn: START, PICKING, GETTING_RESOURCE, CLICKING, DONE, FAILED
-    last_command_time = time.time()
-    message_queue = Queue() # Hàng đợi để nhận tin nhắn từ on_message
+    step = "START" 
+    last_command_time = 0 
+    message_queue = Queue() 
 
-    # on_message giờ chỉ làm nhiệm vụ đơn giản là lọc và đưa tin nhắn vào hàng đợi
     @bot.gateway.command
     def on_message(resp):
         if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')): 
             return
         m = resp.parsed.auto()
-        # Chỉ đưa tin nhắn từ Karuta và trong đúng kênh vào hàng đợi
         if str(m.get("channel_id")) == work_channel_id and str(m.get("author", {}).get("id", "")) == karuta_id:
             message_queue.put(m)
 
@@ -678,7 +676,7 @@ def run_work_bot(token, acc_name):
                 try:
                     r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3,"guild_id": guild_id,"channel_id": work_channel_id,"message_id": message_id,"application_id": application_id,"session_id": "a","data": {"component_type": 2,"custom_id": btn['custom_id']}})
                     last_command_time = time.time()
-                    return r.status_code == 204 # Trả về True nếu click thành công
+                    return r.status_code == 204
                 except Exception as e:
                     print(f"[Work][{acc_name}] Lỗi click: {e}", flush=True)
                     return False
@@ -688,9 +686,12 @@ def run_work_bot(token, acc_name):
     print(f"[Work][{acc_name}] Bắt đầu...", flush=True)
     gateway_thread = threading.Thread(target=bot.gateway.run, daemon=True)
     gateway_thread.start()
-    time.sleep(7) # Chờ bot kết nối
+    time.sleep(7) 
 
-    overall_timeout = time.time() + 120 # Timeout toàn bộ quá trình là 2 phút
+    # GỬI LỆNH LẦN ĐẦU TIÊN
+    send_command("kc o:ef")
+    
+    overall_timeout = time.time() + 120
     
     while step not in ["DONE", "FAILED"]:
         if time.time() > overall_timeout:
@@ -698,23 +699,18 @@ def run_work_bot(token, acc_name):
             step = "FAILED"
             break
 
-        # Nếu một bước bị kẹt quá 20 giây, hãy thử gửi lại lệnh
-        if time.time() - last_command_time > 20:
+        if time.time() - last_command_time > 25: # Tăng thời gian chờ mỗi bước lên 25 giây
             print(f"[Work][{acc_name}] Cảnh báo: Bước '{step}' bị kẹt, thử lại...", flush=True)
             if step == "START": send_command("kc o:ef")
             elif step == "PICKING": send_command("kn")
             elif step == "GETTING_RESOURCE": send_command("kw")
-            elif step == "CLICKING": 
-                 # Nếu click bị kẹt, thử gửi lại lệnh kw để lấy tin nhắn mới
-                 send_command("kw")
-
-        # Lấy tin nhắn từ hàng đợi (nếu có)
-        try:
-            msg = message_queue.get(timeout=1) # Chờ 1 giây để có tin nhắn mới
-        except:
-            continue # Nếu không có tin nhắn, lặp lại vòng giám sát
+            elif step == "CLICKING": send_command("kw")
         
-        # Xử lý tin nhắn tùy theo step hiện tại
+        try:
+            msg = message_queue.get(timeout=1)
+        except:
+            continue
+        
         if step == "START" and "embeds" in msg and "You began working your shift" in msg["embeds"][0].get("description", ""):
             desc = msg["embeds"][0].get("description", "")
             card_codes = re.findall(r"\b[a-zA-Z0-9]{6}\b", desc)
@@ -738,14 +734,13 @@ def run_work_bot(token, acc_name):
         elif step == "GETTING_RESOURCE" and "components" in msg and "Your work is complete" in msg.get("content", ""):
             print(f"[Work][{acc_name}] Bước 3: Đã nhận được nút, chuẩn bị click...", flush=True)
             step = "CLICKING"
-            # Vòng lặp con để đảm bảo click thành công
             click_timeout = time.time() + 15
             clicked_successfully = False
             while time.time() < click_timeout:
                 if click_button(msg):
                     clicked_successfully = True
                     break
-                time.sleep(2) # Nếu click lỗi, chờ 2 giây rồi thử lại
+                time.sleep(2)
             
             if clicked_successfully:
                 step = "DONE"
@@ -753,7 +748,6 @@ def run_work_bot(token, acc_name):
                 print(f"[Work][{acc_name}] LỖI: Không thể click nút sau nhiều lần thử.", flush=True)
                 step = "FAILED"
 
-    # Dọn dẹp và kết thúc
     bot.gateway.close()
     if step == "DONE":
         print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
