@@ -736,7 +736,6 @@ def run_work_bot(token, acc_name):
                     print(f"[Work][{acc_name}] Click nút cuối cùng: {custom_id_to_click}", flush=True)
                     click_tick(work_channel_id, message_id, custom_id_to_click, application_id, guild_id)
                     step["value"] = 3
-                    time.sleep(2) # Thêm độ trễ để đảm bảo lệnh click được gửi đi
                     bot.gateway.close()
                     return
 
