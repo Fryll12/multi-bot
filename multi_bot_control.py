@@ -674,14 +674,13 @@ def run_work_bot(token, acc_name):
                     for i, code in enumerate(first_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
                     time.sleep(1); send_kn_command(); step["value"] = 1
 
-        elif step["value"] == 1 and author_id == karuta_id and "embeds" in msg and len(msg["embeds"]) > 0:
-            desc = msg["embeds"][0].get("description", ""); lines = desc.split("\n")
-            if len(lines) >= 2:
-                match = re.search(r"\d+\.\s*`([^`]+)`", lines[1])
-                if match:
-                    resource = match.group(1); print(f"[Work][{acc_name}] Bước 2: Lấy resource '{resource}'...", flush=True)
-                    time.sleep(2); bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e"); time.sleep(1); send_kw_command()
-                    last_command_time = time.time() # Reset đồng hồ
+        elif step["value"] == 1 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
+                desc = m["embeds"][0].get("description", ""); lines = desc.split("\n")
+                if len(lines) >= 2:
+                    match = re.search(r"\d+\.\s*'([^']+)'", lines[1])
+                    if match:
+                        resource = match.group(1); print(f"[Work][{acc_name}] Resource: {resource}", flush=True)
+                        time.sleep(2); bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e"); time.sleep(1); send_kw_command()
                     
         elif step["value"] == 2 and author_id == karuta_id and "components" in m:
                 message_id = m["id"]; application_id = m.get("application_id", karuta_id)
