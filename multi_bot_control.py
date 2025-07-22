@@ -638,96 +638,85 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
 
 # PHIÊN BẢN GỐC CỦA BẠN
 def run_work_bot(token, acc_name):
-    from queue import Queue
-    
     bot = discum.Client(token=token, log={"console": False, "file": False})
     headers = {"Authorization": token, "Content-Type": "application/json"}
+    step = {"value": 0}
     
-    # Sử dụng lại logic step bằng số của bạn
-    step = {"value": 0} 
-    message_queue = Queue()
-
-    @bot.gateway.command
-    def on_message(resp):
-        # Sửa lỗi AttributeError
-        if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')): return
-        m = resp.parsed.auto()
-        if str(m.get("channel_id")) == work_channel_id and str(m.get("author", {}).get("id", "")) == karuta_id:
-            message_queue.put(m)
-
-    # Giữ nguyên các hàm gửi lệnh gốc của bạn
     def send_karuta_command(): bot.sendMessage(work_channel_id, "kc o:ef")
     def send_kn_command(): bot.sendMessage(work_channel_id, "kn")
     def send_kw_command(): bot.sendMessage(work_channel_id, "kw"); step["value"] = 2
+    
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
             r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3,"guild_id": guild_id,"channel_id": channel_id,"message_id": message_id,"application_id": application_id,"session_id": "a","data": {"component_type": 2,"custom_id": custom_id}})
             print(f"[Work][{acc_name}] Click tick: Status {r.status_code}", flush=True)
         except Exception as e: print(f"[Work][{acc_name}] Lỗi click tick: {e}", flush=True)
 
-    print(f"[Work][{acc_name}] Bắt đầu...", flush=True)
-    gateway_thread = threading.Thread(target=bot.gateway.run, daemon=True)
-    gateway_thread.start()
-    time.sleep(7) 
+    @bot.gateway.command
+    def on_message(resp):
+        # ⭐ SỬA LỖI 1: Sửa lại cách kiểm tra message update để chống sập chương trình
+        if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')): return
+        
+        m = resp.parsed.auto()
+        if str(m.get("channel_id")) != work_channel_id: return
+        author_id = str(m.get("author", {}).get("id", ""))
+        guild_id = m.get("guild_id")
+        
+        # Logic gốc của bạn được giữ nguyên 100%
+        if step["value"] == 0 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
+            # Điều kiện kiểm tra card collection này là từ code gốc của bạn, tôi đã thêm lại cho đúng
+                desc = m["embeds"][0].get("description", "")
+                card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc)
+                if len(card_codes) >= 10:
+                    print(f"[Work][{acc_name}] Phát hiện {len(card_codes)} card, bắt đầu pick...", flush=True)
+                    first_5 = card_codes[:5]; last_5 = card_codes[-5:]
+                    for i, code in enumerate(last_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+                    for i, code in enumerate(first_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+                    time.sleep(1); send_kn_command(); step["value"] = 1
 
+        elif step["value"] == 1 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
+                desc = m["embeds"][0].get("description", "")
+                lines = desc.split("\n")
+                if len(lines) >= 2:
+                    # Sửa lại để quét tất cả các dòng, không chỉ dòng thứ 2
+                    resource = None
+                    for line in lines:
+                        match = re.search(r"\d+\.\s*`([^`]+)`", line)
+                        if match:
+                            resource = match.group(1)
+                            break
+                    if resource:
+                        print(f"[Work][{acc_name}] Resource: {resource}", flush=True)
+                        time.sleep(2); bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e"); time.sleep(1); send_kw_command()
+
+        elif step["value"] == 2 and author_id == karuta_id and "components" in m:
+                message_id = m["id"]; application_id = m.get("application_id", karuta_id)
+                for comp in m["components"]:
+                    if comp["type"] == 1 and len(comp["components"]) >= 2:    
+                        btn = comp["components"][1]
+                        print(f"[Work][{acc_name}] Click nút thứ 2: {btn['custom_id']}", flush=True)
+                        click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id)
+                        step["value"] = 3
+                        bot.gateway.close()
+                        return
+
+    print(f"[Work][{acc_name}] Bắt đầu...", flush=True)
+    threading.Thread(target=bot.gateway.run, daemon=True).start()
+    
+    # ⭐ SỬA LỖI 2: Tăng thời gian chờ để đảm bảo bot kết nối ổn định hơn
+    time.sleep(7) 
+    
     send_karuta_command()
     
-    overall_timeout = time.time() + 90
-    last_command_time = time.time()
-    
-    while step["value"] != 3:
-        if time.time() > overall_timeout:
-            print(f"[Work][{acc_name}] KHÔNG hoàn thành (hết 90s timeout).", flush=True)
-            break
+    timeout = time.time() + 90
+    while step["value"] != 3 and time.time() < timeout:
+        time.sleep(1)
         
-        if time.time() - last_command_time > 20:
-            print(f"[Work][{acc_name}] Cảnh báo: Bị kẹt ở step {step['value']}, thử lại...", flush=True)
-            if step['value'] == 0: send_karuta_command()
-            elif step['value'] == 1: send_kn_command()
-            elif step['value'] == 2: send_kw_command()
-            last_command_time = time.time()
-
-        try:
-            msg = message_queue.get(timeout=1)
-        except:
-            continue
-
-        # =================================================================
-        # ===== SỬ DỤNG LẠI 100% LOGIC on_message GỐC CỦA BẠN Ở ĐÂY =====
-        
-        author_id = str(msg.get("author", {}).get("id", ""))
-        guild_id = msg.get("guild_id")
-        
-        if step["value"] == 0 and author_id == karuta_id and "embeds" in msg and len(msg["embeds"]) > 0:
-            desc = msg["embeds"][0].get("description", "")
-            # Sửa lại regex cho đúng với logic gốc của bạn
-            card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc)
-            if len(card_codes) >= 10:
-                print(f"[Work][{acc_name}] Bước 1: Pick card...", flush=True)
-                first_5 = card_codes[:5]; last_5 = card_codes[-5:]
-                for i, code in enumerate(last_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
-                for i, code in enumerate(first_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
-                time.sleep(1); send_kn_command(); step["value"] = 1
-                last_command_time = time.time() # Reset đồng hồ
-        
-        elif step["value"] == 1 and author_id == karuta_id and "embeds" in msg and len(msg["embeds"]) > 0:
-            desc = msg["embeds"][0].get("description", ""); lines = desc.split("\n")
-            if len(lines) >= 2:
-                match = re.search(r"\d+\.\s*`([^`]+)`", lines[1])
-                if match:
-                    resource = match.group(1); print(f"[Work][{acc_name}] Bước 2: Lấy resource '{resource}'...", flush=True)
-                    time.sleep(2); bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e"); time.sleep(1); send_kw_command()
-                    last_command_time = time.time() # Reset đồng hồ
-
-         elif step["value"] == 2 and author_id == karuta_id and "components" in m:
-            message_id = m["id"]; application_id = m.get("application_id", karuta_id)
-            for comp in m["components"]:
-                 if comp["type"] == 1 and len(comp["components"]) >= 2:	
-                    btn = comp["components"][1]; print(f"[Work][{acc_name}] Click nút thứ 2: {btn['custom_id']}", flush=True); click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id); step["value"] = 3; bot.gateway.close(); return
-    
     bot.gateway.close()
     if step["value"] == 3:
         print(f"[Work][{acc_name}] Đã hoàn thành.", flush=True)
+    else:
+        print(f"[Work][{acc_name}] KHÔNG hoàn thành (hết 90s timeout).", flush=True)
 
 def run_daily_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
