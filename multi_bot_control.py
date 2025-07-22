@@ -1535,7 +1535,7 @@ def api_inject_codes():
         if target_id_str == 'main_1': target_bot, target_name = main_bot, "ALPHA"
         elif target_id_str == 'main_2': target_bot, target_name = main_bot_2, "BETA"
         elif target_id_str == 'main_3': target_bot, target_name = main_bot_3, "GAMMA"
-        elif target_id_str == 'main_3': target_bot, target_name = main_bot_4, "DELTA"
+        elif target_id_str == 'main_4': target_bot, target_name = main_bot_4, "DELTA"
         else:
             acc_idx = int(target_id_str)
             if acc_idx < len(bots): target_bot, target_name = bots[acc_idx], acc_names[acc_idx]
