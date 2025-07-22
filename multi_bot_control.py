@@ -1419,7 +1419,7 @@ def index():
     if main_bot: acc_options += '<option value="main_1">ALPHA NODE (Main)</option>'
     if main_bot_2: acc_options += '<option value="main_2">BETA NODE (Main)</option>'
     if main_bot_3: acc_options += '<option value="main_3">GAMMA NODE (Main)</option>'
-    if main_bot_4: acc_options += '<option value="main_3">DELTA NODE (Main)</option>'
+    if main_bot_4: acc_options += '<option value="main_4">DELTA NODE (Main)</option>'
     sub_account_buttons = "".join(f'<button type="button" data-reboot-target="sub_{i}" class="btn btn-necro btn-sm">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
 
     return render_template_string(HTML_TEMPLATE, 
