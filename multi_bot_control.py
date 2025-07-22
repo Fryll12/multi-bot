@@ -136,7 +136,7 @@ def load_settings():
         print(f"[Settings] Exception khi tải cài đặt: {e}", flush=True)
 def save_visit_data():
     """Lưu dữ liệu học của KVI vào một Bin riêng"""
-    api_key = os.getenv("JSONBIN_API_KEY")
+    api_key = os.getenv("KVI_JSONBIN_API_KEY")
     kvi_bin_id = os.getenv("KVI_JSONBIN_BIN_ID") # Dùng Bin ID riêng
     if not api_key or not kvi_bin_id: return
     headers = {'Content-Type': 'application/json', 'X-Master-Key': api_key}
@@ -151,7 +151,7 @@ def save_visit_data():
 def load_visit_data():
     """Tải dữ liệu học của KVI từ Bin riêng"""
     global visit_data
-    api_key = os.getenv("JSONBIN_API_KEY")
+    api_key = os.getenv("KVI_JSONBIN_API_KEY")
     kvi_bin_id = os.getenv("KVI_JSONBIN_BIN_ID")
     if not api_key or not kvi_bin_id: return
     headers = {'X-Master-Key': api_key, 'X-Bin-Meta': 'false'}
