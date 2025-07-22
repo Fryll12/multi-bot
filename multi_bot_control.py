@@ -681,7 +681,7 @@ def run_work_bot(token, acc_name):
                     # Sửa lại để quét tất cả các dòng, không chỉ dòng thứ 2
                     resource = None
                     for line in lines:
-                        match = re.search(r"\d+\.\s*`([^`]+)`", line)
+                        match = re.search(r"\d+\.\s*`([^`]+)`", line[1])
                         if match:
                             resource = match.group(1)
                             break
