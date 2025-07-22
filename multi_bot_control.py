@@ -719,17 +719,27 @@ def run_work_bot(token, acc_name):
                     time.sleep(2); bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e"); time.sleep(1); send_kw_command()
                     last_command_time = time.time() # Reset đồng hồ
 
-       elif step["value"] == 2 and author_id == karuta_id and "components" in msg:
-            if "Your work is complete" in msg.get("content", ""):
-                print(f"[Work][{acc_name}] Bước 3: Click nút...", flush=True)
-                message_id, application_id = msg["id"], msg.get("application_id", karuta_id)
-                for comp in msg["components"]:
-                    if comp["type"] == 1 and len(comp["components"]) >= 2:
-                        btn = comp["components"][1]
-                        click_tick(work_channel_id, message_id, btn["custom_id"], application_id, guild_id)
-                        step["value"] = 3                
-                        time.sleep(2)                 
-                        break 
+       elif step["value"] == 2 and author_id == karuta_id and "components" in m:
+            if "Your work is complete" in m.get("content", ""):
+                message_id = m["id"]
+                application_id = m.get("application_id", karuta_id)
+                guild_id = m.get("guild_id")
+                custom_id_to_click = None
+
+                # Logic đúng: Tìm custom_id của nút cuối cùng
+                for comp in m["components"]:
+                    if comp.get("type") == 1:
+                        for btn in comp.get("components", []):
+                            if btn.get("type") == 2:
+                                custom_id_to_click = btn.get("custom_id")
+                
+                if custom_id_to_click:
+                    print(f"[Work][{acc_name}] Click nút cuối cùng: {custom_id_to_click}", flush=True)
+                    click_tick(work_channel_id, message_id, custom_id_to_click, application_id, guild_id)
+                    step["value"] = 3
+                    time.sleep(2) # Thêm độ trễ để đảm bảo lệnh click được gửi đi
+                    bot.gateway.close()
+                    return
 
     bot.gateway.close()
     if step["value"] == 3:
