@@ -712,7 +712,7 @@ def run_work_bot(token, acc_name):
         
         elif step["value"] == 1 and author_id == karuta_id and "embeds" in msg and len(msg["embeds"]) > 0:
             desc = msg["embeds"][0].get("description", ""); lines = desc.split("\n")
-            if "You took the resources" in msg["embeds"][0].get("title", "") and len(lines) >= 2:
+            if len(lines) >= 2:
                 match = re.search(r"\d+\.\s*`([^`]+)`", lines[1])
                 if match:
                     resource = match.group(1); print(f"[Work][{acc_name}] Bước 2: Lấy resource '{resource}'...", flush=True)
