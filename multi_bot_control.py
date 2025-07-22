@@ -698,7 +698,7 @@ def run_work_bot(token, acc_name):
             # KIỂM TRA ĐÚNG THEO LOGIC BAN ĐẦU CỦA BẠN
             if "title" in msg["embeds"][0] and "Card Collection" in msg["embeds"][0]["title"]:
                 desc = msg["embeds"][0].get("description", "")
-                card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc))
+                card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc)
                 if len(card_codes) >= 10:
                     print(f"[Work][{acc_name}] Bước 1: Pick card...", flush=True)
                     first_5 = card_codes[:5]; last_5 = card_codes[-5:]
