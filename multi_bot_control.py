@@ -711,7 +711,7 @@ def run_work_bot(token, acc_name):
         except:
             continue
         
-        if step == "START" and "embeds" in msg and "You began working your shift" in msg["embeds"][0].get("description", ""):
+        if step == "START" and "embeds" in msg and "title" in msg["embeds"][0] and "Card Collection" in msg["embeds"][0]["title"]:
             desc = msg["embeds"][0].get("description", "")
             card_codes = re.findall(r"\b[a-zA-Z0-9]{6}\b", desc)
             if len(card_codes) >= 10:
