@@ -695,7 +695,7 @@ def run_work_bot(token, acc_name):
         # =================================================================
         # ===== SỬ DỤNG LẠI 100% LOGIC on_message GỐC CỦA BẠN Ở ĐÂY =====
         
-        if step["value"] == 0 and "embeds" in msg and len(msg["embeds"]) > 0:
+        if step["value"] == 0 and "embeds" in msg and len(msg["embeds"]) > 0 and "title" in msg["embeds"][0] and "Card Collection" in msg["embeds"][0]["title"]:
             desc = msg["embeds"][0].get("description", "")
             card_codes = re.findall(r"\b[a-zA-Z0-9]{6}\b", desc)
             if len(card_codes) >= 10:
