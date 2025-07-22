@@ -34,7 +34,7 @@ bots = []
 # Lấy danh sách tên phụ từ biến môi trường (nếu có)
 sub_acc_names_str = os.getenv("SUB_ACC_NAMES")
 acc_names = [name.strip() for name in sub_acc_names_str.split(',')] if sub_acc_names_str else []
-]
+
 main_bot, main_bot_2, main_bot_3, main_bot_4 = None, None, None, None
 auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3, auto_grab_enabled_4 = False, False, False, False
 heart_threshold, heart_threshold_2, heart_threshold_3, heart_threshold_4 = 15, 50, 75, 100
