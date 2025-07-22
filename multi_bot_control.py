@@ -719,8 +719,7 @@ def run_work_bot(token, acc_name):
                     time.sleep(2); bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e"); time.sleep(1); send_kw_command()
                     last_command_time = time.time() # Reset đồng hồ
 
-        elif step["value"] == 2 and author_id == karuta_id and "components" in msg:
-            if "Your work is complete" in m.get("content", ""):
+        elif step["value"] == 2 and author_id == karuta_id and "components" in m:
                 message_id = m["id"]
                 application_id = m.get("application_id", karuta_id)
                 guild_id = m.get("guild_id")
