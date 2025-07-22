@@ -334,7 +334,7 @@ def handle_farm_grab(bot, msg, bot_num):
         
 # --- CÁC HÀM LOGIC BOT ---
 def reboot_bot(target_id):
-    global main_bot, main_bot_2, main_bot_3, bots
+    global main_bot, main_bot_2, main_bot_3, main_bot_4, bots
     with bots_lock:
         print(f"[Reboot] Nhận được yêu cầu reboot cho target: {target_id}", flush=True)
         if target_id == 'main_1' and main_token:
