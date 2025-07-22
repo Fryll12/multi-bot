@@ -29,12 +29,11 @@ karuta_id = "646937666251915264"
 karibbit_id = "1274445226064220273"
 yoru_bot_id = "1311684840462225440"
 HATSUNE_ID= "974973431252680714"
-
 # --- BIẾN TRẠNG THÁI (đây là các giá trị mặc định nếu không có file settings.json) ---
-bots, acc_names = [], [
-    "Blacklist", "Khanh bang", "Dersale", "Venus", "WhyK", "Tan",
-    "Ylang", "Nina", "Nathan", "Ofer", "White", "the Wicker", "Leader", "Hu Tao", "Wyatt", "Daisy", "CantStop", "Token", 
-    "Kertz", "Molotov", "Jett", "Waifu", "CLown", "Angel",
+bots = []
+# Lấy danh sách tên phụ từ biến môi trường (nếu có)
+sub_acc_names_str = os.getenv("SUB_ACC_NAMES")
+acc_names = [name.strip() for name in sub_acc_names_str.split(',')] if sub_acc_names_str else []
 ]
 main_bot, main_bot_2, main_bot_3, main_bot_4 = None, None, None, None
 auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3, auto_grab_enabled_4 = False, False, False, False
