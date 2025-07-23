@@ -1389,6 +1389,7 @@ HTML_TEMPLATE = """
         document.getElementById('auto-kvi-toggle-btn').addEventListener('click', () => {
              postData('/api/broadcast_toggle', {
                 type: 'kvi',
+                target_account: document.getElementById('kvi-target-account').value,
                 clicks: document.getElementById('kvi-click-count').value,
                 click_delay: document.getElementById('kvi-click-delay').value,
                 loop_delay: document.getElementById('kvi-loop-delay').value
