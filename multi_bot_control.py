@@ -832,22 +832,13 @@ def auto_daily_loop():
             print(f"[ERROR in auto_daily_loop] {e}", flush=True); time.sleep(60)
 
 def auto_kvi_loop():
-    global last_kvi_cycle_time, kvi_target_account # Đảm bảo kvi_target_account là global
+    global last_kvi_cycle_time
     time.sleep(20) 
     while True:
         try:
-            # ==================================================================
-            # ===== KHỐI CODE DEBUG: In ra giá trị TRƯỚC KHI chọn bot =====
-            # ==================================================================
-            print("==================== DEBUG KVI ====================")
-            print(f"Thời điểm: {time.ctime()}")
-            print(f"Giá trị của kvi_target_account là: '{kvi_target_account}'")
-            print(f"auto_kvi_enabled: {auto_kvi_enabled}")
-            print("=====================================================")
-            # ==================================================================
-
             target_bot = None
             bot_name = "KVI-UNKNOWN"
+            
             if kvi_target_account == 'main_1': 
                 target_bot, bot_name = main_bot, "KVI-ALPHA"
             elif kvi_target_account == 'main_2': 
@@ -859,13 +850,10 @@ def auto_kvi_loop():
             
             if auto_kvi_enabled and target_bot and bot_active_states.get(kvi_target_account, False):
                 if (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
-                    # In ra bot sẽ được sử dụng
-                    print(f"===> QUYẾT ĐỊNH: Sẽ dùng bot '{bot_name}' để chạy KVI.")
+                    # Tất cả đều gọi hàm với 2 tham số
                     start_kvi_session(target_bot, bot_name)
                     last_kvi_cycle_time = time.time()
-            
-            time.sleep(60) # Vòng lặp này chạy 1 phút/lần
-            
+            time.sleep(60)
         except Exception as e: 
             print(f"[ERROR in auto_kvi_loop] {e}", flush=True)
             time.sleep(60)
