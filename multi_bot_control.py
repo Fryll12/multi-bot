@@ -172,9 +172,9 @@ def kvi_click_button(token, channel_id, guild_id, message_id, application_id, bu
     try: requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
     except Exception as e: print(f"🔥 [KVI CLICK LỖI] {e}", flush=True)
 
-def start_kvi_session(bot_instance):
+def start_kvi_session(bot_instance, bot_name):
     """Gửi lệnh kvi để bắt đầu"""
-    print("🚀 [KVI] Gửi lệnh 'kvi'...", flush=True)
+    print(f"🚀 [{bot_name}] Gửi lệnh 'kvi'...", flush=True)
     if kvi_channel_id:
         bot_instance.sendMessage(kvi_channel_id, "kvi")
 
