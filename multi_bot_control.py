@@ -172,9 +172,9 @@ def kvi_click_button(token, channel_id, guild_id, message_id, application_id, bu
     try: requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
     except Exception as e: print(f"🔥 [KVI CLICK LỖI] {e}", flush=True)
 
-def start_kvi_session(bot_instance, bot_name):
+def start_kvi_session(bot_instance):
     """Gửi lệnh kvi để bắt đầu"""
-    print(f"🚀 [{bot_name}] Gửi lệnh 'kvi'...", flush=True)
+    print("🚀 [KVI] Gửi lệnh 'kvi'...", flush=True)
     if kvi_channel_id:
         bot_instance.sendMessage(kvi_channel_id, "kvi")
 
@@ -837,21 +837,18 @@ def auto_kvi_loop():
     while True:
         try:
             target_bot = None
-            bot_name = "KVI-UNKNOWN"
-            
             if kvi_target_account == 'main_1': 
-                target_bot, bot_name = main_bot, "KVI-ALPHA"
+                target_bot = main_bot
             elif kvi_target_account == 'main_2': 
-                target_bot, bot_name = main_bot_2, "KVI-BETA"
+                target_bot = main_bot_2
             elif kvi_target_account == 'main_3': 
-                target_bot, bot_name = main_bot_3, "KVI-GAMMA"
+                target_bot = main_bot_3
             elif kvi_target_account == 'main_4': 
-                target_bot, bot_name = main_bot_4, "KVI-DELTA"
+                target_bot = main_bot_4
             
             if auto_kvi_enabled and target_bot and bot_active_states.get(kvi_target_account, False):
                 if (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
-                    # Tất cả đều gọi hàm với 2 tham số
-                    start_kvi_session(target_bot, bot_name)
+                    start_kvi_session(target_bot) # <-- Gọi hàm với 1 tham số
                     last_kvi_cycle_time = time.time()
             time.sleep(60)
         except Exception as e: 
