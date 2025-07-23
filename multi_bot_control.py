@@ -1628,6 +1628,7 @@ def api_broadcast_toggle():
         if auto_kvi_enabled and last_kvi_cycle_time == 0: last_kvi_cycle_time = time.time() - kvi_loop_delay - 1
         kvi_click_count, kvi_click_delay, kvi_loop_delay = int(data.get('clicks', 10)), int(data.get('click_delay', 3)), int(data.get('loop_delay', 7500))
         msg = f"Auto KVI {'ENABLED' if auto_kvi_enabled else 'DISABLED'} on {kvi_target_account.upper()}."
+        save_settings()
 
     return jsonify({'status': 'success', 'message': msg})
 
