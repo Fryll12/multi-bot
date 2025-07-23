@@ -535,7 +535,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
         @bot.gateway.command
         def on_message(resp):
             global auto_grab_enabled_2, heart_threshold_2
-            if not resp.event.message:
+            if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 return
             
             msg = resp.parsed.auto()
@@ -577,7 +577,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
         @bot.gateway.command
         def on_message(resp):
             global auto_grab_enabled_3, heart_threshold_3
-            if not resp.event.message:
+            if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 return
             
             msg = resp.parsed.auto()
@@ -618,7 +618,8 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
         @bot.gateway.command
         def on_message(resp):
             global auto_grab_enabled_4, heart_threshold_4
-            if not resp.event.message: return
+            if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
+                return
                 
             msg = resp.parsed.auto()
             channel_id = msg.get("channel_id")
