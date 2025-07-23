@@ -1069,11 +1069,28 @@ HTML_TEMPLATE = """
                 <div style="display: flex; flex-direction: column; gap: 15px;">
                     <div class="input-group"><input type="text" id="manual-message-input" placeholder="Enter manual message for slaves..." style="border-radius: 5px;"><button type="button" id="send-manual-message-btn" class="btn" style="flex-shrink: 0; border-color: var(--neon-yellow, #fff000); color: var(--neon-yellow, #fff000);">SEND</button></div>
                     <div id="quick-cmd-container" class="quick-cmd-grid">
-                        <button type="button" data-cmd="kc o:w" class="btn">KC O:W</button><button type="button" data-cmd="kc o:ef" class="btn">KC O:EF</button><button type="button" data-cmd="kc o:p" class="btn">KC O:P</button>
-                        <button type="button" data-cmd="kc e:1" class="btn">KC E:1</button><button type="button" data-cmd="kc e:2" class="btn">KC E:2</button><button type="button" data-cmd="kc e:3" class="btn">KC E:3</button>
-                        <button type="button" data-cmd="kc e:4" class="btn">KC E:4</button><button type="button" data-cmd="kc e:5" class="btn">KC E:5</button><button type="button" data-cmd="kc e:6" class="btn">KC E:6</button>
+                        <button type="button" data-cmd="kc o:w" class="btn">KC O:W</button>
+                        <button type="button" data-cmd="kc o:ef" class="btn">KC O:EF</button>
+                        <button type="button" data-cmd="kc o:p" class="btn">KC O:P</button>
+                        <button type="button" data-cmd="kc e:1" class="btn">KC E:1</button>
+                        <button type="button" data-cmd="kc e:2" class="btn">KC E:2</button>
+                        <button type="button" data-cmd="kc e:3" class="btn">KC E:3</button>
+                        <button type="button" data-cmd="kc e:4" class="btn">KC E:4</button>
+                        <button type="button" data-cmd="kc e:5" class="btn">KC E:5</button>
+                        <button type="button" data-cmd="kc e:6" class="btn">KC E:6</button>
                         <button type="button" data-cmd="kc e:7" class="btn">KC E:7</button>
+                        <button type="button" data-cmd="kjb" class="btn">KJB</button>
+                        <button type="button" data-cmd="kc o:w t:b" class="btn">KC O:W T:B</button>
                     </div>
+
+                    <hr style="border-color: var(--border-color); margin: 25px 0;">
+                    <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">
+                        MAIN ACCOUNTS COMMAND (2, 3, 4)
+                    </h3>
+                    <div class="input-group">
+                        <input type="text" id="manual-main-message-input" placeholder="Enter message for main accounts 2, 3, 4...">
+                        <button type="button" id="send-manual-main-message-btn" class="btn btn-primary">SEND TO MAINS</button>
+                    </div>                  
                 </div>
             </div>
             
@@ -1320,6 +1337,15 @@ HTML_TEMPLATE = """
                     document.getElementById('manual-message-input').value = '';
                 });
         });
+
+        document.getElementById('send-manual-main-message-btn').addEventListener('click', () => {
+            postData('/api/manual_ops_main', {
+                message: document.getElementById('manual-main-message-input').value
+            }).then(() => {
+                document.getElementById('manual-main-message-input').value = '';
+            });
+        });
+        
         document.getElementById('quick-cmd-container').addEventListener('click', (e) => {
             if (e.target.matches('button[data-cmd]')) {
                 postData('/api/manual_ops', { quickmsg: e.target.dataset.cmd });
@@ -1537,6 +1563,31 @@ def api_manual_ops():
     else: msg = "No message provided."
     return jsonify({'status': 'success', 'message': msg})
 
+@app.route("/api/manual_ops_main", methods=['POST'])
+def api_manual_ops_main():
+    data = request.get_json()
+    msg_to_send = data.get('message')
+    msg = "No message provided for main accounts."
+    if msg_to_send:
+        delay = 0
+        # Gửi tin nhắn đến Acc 2 nếu đang hoạt động
+        if main_bot_2 and bot_active_states.get('main_2', False):
+            threading.Timer(delay, main_bot_2.sendMessage, args=(other_channel_id, msg_to_send)).start()
+            delay += 2 # Thêm độ trễ 2 giây cho acc tiếp theo
+        
+        # Gửi tin nhắn đến Acc 3 nếu đang hoạt động
+        if main_bot_3 and bot_active_states.get('main_3', False):
+            threading.Timer(delay, main_bot_3.sendMessage, args=(other_channel_id, msg_to_send)).start()
+            delay += 2
+            
+        # Gửi tin nhắn đến Acc 4 nếu đang hoạt động
+        if main_bot_4 and bot_active_states.get('main_4', False):
+            threading.Timer(delay, main_bot_4.sendMessage, args=(other_channel_id, msg_to_send)).start()
+            
+        msg = f"Sent to Main Accounts (2,3,4): {msg_to_send}"
+        
+    return jsonify({'status': 'success', 'message': msg})
+    
 @app.route("/api/inject_codes", methods=['POST'])
 def api_inject_codes():
     global main_bot, main_bot_2, main_bot_3, main_bot_4, bots
