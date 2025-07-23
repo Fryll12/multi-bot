@@ -1623,7 +1623,7 @@ def api_broadcast_toggle():
         else: spam_enabled = False; msg = "Spam DISABLED."
             
     elif data.get('type') == 'kvi':
-        kvi_target_account = data.get('target_account', 'main_1') # Lấy target account từ request
+        kvi_target_account = data.get('target_account') # Lấy target account từ request
         auto_kvi_enabled = not auto_kvi_enabled
         if auto_kvi_enabled and last_kvi_cycle_time == 0: last_kvi_cycle_time = time.time() - kvi_loop_delay - 1
         kvi_click_count, kvi_click_delay, kvi_loop_delay = int(data.get('clicks', 10)), int(data.get('click_delay', 3)), int(data.get('loop_delay', 7500))
