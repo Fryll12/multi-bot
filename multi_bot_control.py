@@ -539,6 +539,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                 return
             
             msg = resp.parsed.auto()
+            channel_id = msg.get("channel_id")
 
             # --- KHỐI 1: XỬ LÝ GRAB TOÀN CỤC (SOUL HARVEST) ---
             if auto_grab_enabled_2 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
@@ -580,6 +581,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                 return
             
             msg = resp.parsed.auto()
+            channel_id = msg.get("channel_id")
 
             # --- KHỐI 1: XỬ LÝ GRAB TOÀN CỤC (SOUL HARVEST) ---
             if auto_grab_enabled_3 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
@@ -617,8 +619,10 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
         def on_message(resp):
             global auto_grab_enabled_4, heart_threshold_4
             if not resp.event.message: return
+                
             msg = resp.parsed.auto()
-
+            channel_id = msg.get("channel_id")
+            
             if auto_grab_enabled_4 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                 last_drop_msg_id = msg["id"]
                 def read_karibbit_4():
