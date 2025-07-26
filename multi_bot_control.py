@@ -660,7 +660,19 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
 # PHIÊN BẢN GỐC CỦA BẠN
 def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log=False)
-
+    headers = {"Authorization": token, "Content-Type": "application/json"}
+    
+    def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
+        try:
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3,"guild_id": guild_id,"channel_id": channel_id,"message_id": message_id,"application_id": application_id,"session_id": "a","data": {"component_type": 2,"custom_id": custom_id}})
+            print(f"[Work][{acc_name}] Click tick: Status {r.status_code}", flush=True)
+            if r.status_code != 204:
+                return False
+            return True
+        except Exception as e:
+            print(f"[Work][{acc_name}] Lỗi click tick: {e}", flush=True)
+            return False
+            
     # Hàm chủ động tìm phản hồi từ Karuta trong 15 giây
     def find_karuta_response(channel_id, after_timestamp, timeout=15):
         start_time = time.time()
@@ -718,11 +730,26 @@ def run_work_bot(token, acc_name):
             work_msg = find_karuta_response(work_channel_id, time_before_kw)
             if not work_msg: raise Exception("Karuta không phản hồi lệnh kw")
 
-            button = work_msg["components"][0]["components"][1]
-            headers = {"Authorization": token, "Content-Type": "application/json"}
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3, "guild_id": work_msg["guild_id"], "channel_id": work_channel_id, "message_id": work_msg["id"], "application_id": work_msg.get("application_id", karuta_id), "session_id": "a", "data": {"component_type": 2, "custom_id": button["custom_id"]}})
-            if r.status_code != 204: raise Exception(f"Click thất bại, status {r.status_code}")
+            message_id = work_msg["id"]
+            application_id = work_msg.get("application_id", karuta_id)
+            guild_id = work_msg.get("guild_id")
+            clicked_successfully = False
 
+            # Bắt đầu vòng lặp for y hệt code gốc của bạn
+            if "components" in work_msg and work_msg["components"]:
+                for comp in work_msg["components"]:
+                    if comp.get("type") == 1 and len(comp.get("components", [])) >= 2:
+                        btn_to_click = comp["components"][1]
+                        print(f"[Work][{acc_name}] Tìm thấy nút thứ 2. Click bằng logic cũ...", flush=True)
+                        # Gọi hàm click_tick gốc
+                        if click_tick(work_channel_id, message_id, btn_to_click["custom_id"], application_id, guild_id):
+                            clicked_successfully = True
+                        break # Click xong thì thoát
+            
+            # Nếu logic của bạn chạy mà không click được thì báo lỗi
+            if not clicked_successfully:
+                raise Exception("Logic click gốc của bạn đã chạy nhưng không thành công.")
+                
             print(f"✅ [{acc_name}] Hoàn thành.", flush=True)
 
         except Exception as e:
