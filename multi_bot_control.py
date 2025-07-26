@@ -657,37 +657,21 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
 
-# PHIÊN BẢN GỐC CỦA BẠN
+# =====================================================================
+# ===== PHIÊN BẢN CUỐI CÙNG - KẾT HỢP LOGIC MỚI VÀ LOGIC KW GỐC =====
+# =====================================================================
 def run_work_bot(token, acc_name):
     bot = discum.Client(token=token, log=False)
     headers = {"Authorization": token, "Content-Type": "application/json"}
-    
+
+    # --- SỬ DỤNG LẠI HÀM CLICK_TICK "FIRE AND FORGET" TỪ CODE GỐC CỦA BẠN ---
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            # SỬA LỖI QUAN TRỌNG: Lấy session_id thật từ bot thay vì dùng "a"
-            session_id_thuc = bot.gateway.session_id
-            
-            payload = {
-                "type": 3,
-                "guild_id": guild_id,
-                "channel_id": channel_id,
-                "message_id": message_id,
-                "application_id": application_id,
-                "session_id": session_id_thuc, # Dùng session_id thật ở đây
-                "data": {
-                    "component_type": 2,
-                    "custom_id": custom_id
-                }
-            }
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3,"guild_id": guild_id,"channel_id": channel_id,"message_id": message_id,"application_id": application_id,"session_id": "a","data": {"component_type": 2,"custom_id": custom_id}})
             print(f"[Work][{acc_name}] Click tick: Status {r.status_code}", flush=True)
-            if r.status_code != 204:
-                return False
-            return True
         except Exception as e:
             print(f"[Work][{acc_name}] Lỗi click tick: {e}", flush=True)
-            return False
-            
+
     # Hàm chủ động tìm phản hồi từ Karuta trong 15 giây
     def find_karuta_response(channel_id, after_timestamp, timeout=15):
         start_time = time.time()
@@ -697,49 +681,45 @@ def run_work_bot(token, acc_name):
                 for msg in messages:
                     msg_timestamp = (int(msg['id']) >> 22) + 1420070400000
                     if msg.get("author", {}).get("id") == karuta_id and msg_timestamp > after_timestamp:
-                        return msg # Trả về tin nhắn ngay khi tìm thấy
+                        return msg
                 time.sleep(1)
             except:
                 time.sleep(1)
-        return None # Trả về None nếu hết giờ mà không thấy
+        return None
 
-    # Logic thực thi mới, chạy tuần tự để không bao giờ lỗi
+    # Quy trình làm việc tuần tự, chủ động và đáng tin cậy
     def execute_sequence():
         try:
+            # === CÁC BƯỚC 0 VÀ 1 GIỮ NGUYÊN LOGIC MỚI ĐỂ KHÔNG BỊ ĐƠ ===
             # BƯỚC 0: LẤY CARD
             time_before_kc = time.time() * 1000
             bot.sendMessage(work_channel_id, "kc o:ef")
             card_msg = find_karuta_response(work_channel_id, time_before_kc)
             if not card_msg: raise Exception("Karuta không phản hồi lệnh kc o:ef")
-
             desc = card_msg["embeds"][0].get("description", "")
             card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc)
             if len(card_codes) < 10: raise Exception(f"Không đủ 10 card (chỉ có {len(card_codes)})")
-
             print(f"[{acc_name}] Picking cards...")
             first_5, last_5 = card_codes[:5], card_codes[-5:]
             for i, code in enumerate(last_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
             for i, code in enumerate(first_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+            time.sleep(1)
 
             # BƯỚC 1: LẤY TÀI NGUYÊN
-            time.sleep(1)
             time_before_kn = time.time() * 1000
             bot.sendMessage(work_channel_id, "kn")
             resource_msg = find_karuta_response(work_channel_id, time_before_kn)
             if not resource_msg: raise Exception("Karuta không phản hồi lệnh kn")
-
             res_desc = resource_msg["embeds"][0].get("description", "")
             lines = res_desc.split("\n")
             if len(lines) < 2: raise Exception("Embed tài nguyên không đủ 2 dòng")
-
-            match = re.search(r"\d+\.\s*`([^`]+)`", lines[1]) # Dùng regex gốc của bạn
+            match = re.search(r"\d+\.\s*`([^`]+)`", lines[1])
             if not match: raise Exception("Regex gốc không tìm thấy tài nguyên")
-            
             resource = match.group(1)
             time.sleep(2); bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
-
-            # BƯỚC 2: CLICK NÚT
             time.sleep(1)
+
+            # === BƯỚC 2: COPY HOÀN TOÀN LOGIC KW VÀ CLICK GỐC CỦA BẠN VÀO ĐÂY ===
             time_before_kw = time.time() * 1000
             bot.sendMessage(work_channel_id, "kw")
             work_msg = find_karuta_response(work_channel_id, time_before_kw)
@@ -748,24 +728,22 @@ def run_work_bot(token, acc_name):
             message_id = work_msg["id"]
             application_id = work_msg.get("application_id", karuta_id)
             guild_id = work_msg.get("guild_id")
-            clicked_successfully = False
-
-            # Bắt đầu vòng lặp for y hệt code gốc của bạn
+            
+            found_button_and_clicked = False
             if "components" in work_msg and work_msg["components"]:
                 for comp in work_msg["components"]:
                     if comp.get("type") == 1 and len(comp.get("components", [])) >= 2:
                         btn_to_click = comp["components"][1]
-                        print(f"[Work][{acc_name}] Tìm thấy nút thứ 2. Click bằng logic cũ...", flush=True)
-                        # Gọi hàm click_tick gốc
-                        if click_tick(work_channel_id, message_id, btn_to_click["custom_id"], application_id, guild_id):
-                            clicked_successfully = True
-                        break # Click xong thì thoát
+                        print(f"[Work][{acc_name}] Click nút thứ 2: {btn_to_click['custom_id']}", flush=True)
+                        click_tick(work_channel_id, message_id, btn_to_click["custom_id"], application_id, guild_id)
+                        found_button_and_clicked = True
+                        break
             
-            # Nếu logic của bạn chạy mà không click được thì báo lỗi
-            if not clicked_successfully:
-                raise Exception("Logic click gốc của bạn đã chạy nhưng không thành công.")
-                
-            print(f"✅ [{acc_name}] Hoàn thành.", flush=True)
+            if not found_button_and_clicked:
+                raise Exception("Không tìm thấy nút bấm theo logic gốc của bạn.")
+
+            # Ngay sau khi click, mặc định là thành công và kết thúc (y hệt code cũ)
+            print(f"✅ [{acc_name}] Đã hoàn thành.", flush=True)
 
         except Exception as e:
             print(f"🔥 [{acc_name}] Lỗi trong chuỗi thực thi: {e}", flush=True)
@@ -777,14 +755,13 @@ def run_work_bot(token, acc_name):
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     time.sleep(7)
     
-    # Chạy chuỗi công việc trong một luồng riêng để không bị block và có timeout
     main_thread = threading.Thread(target=execute_sequence)
     main_thread.start()
-    main_thread.join(timeout=90) # Chờ tối đa 90 giây cho toàn bộ quá trình
+    main_thread.join(timeout=90)
 
     if main_thread.is_alive():
         print(f"⏰ [{acc_name}] Thất bại do hết 90 giây timeout toàn cục.", flush=True)
-        bot.gateway.close() # Đảm bảo đóng bot nếu bị timeout
+        bot.gateway.close()
 
 def run_daily_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
