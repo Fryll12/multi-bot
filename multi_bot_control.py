@@ -720,7 +720,7 @@ def run_work_bot(token, acc_name):
 
             button = work_msg["components"][0]["components"][1]
             headers = {"Authorization": token, "Content-Type": "application/json"}
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3, "guild_id": work_msg["guild_id"], "channel_id": work_channel_id, "message_id": work_msg["id"], "application_id": karuta_id, "session_id": "a", "data": {"component_type": 2, "custom_id": button["custom_id"]}})
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3, "guild_id": work_msg["guild_id"], "channel_id": work_channel_id, "message_id": work_msg["id"], "application_id": work_msg.get("application_id", karuta_id), "session_id": "a", "data": {"component_type": 2, "custom_id": button["custom_id"]}})
             if r.status_code != 204: raise Exception(f"Click thất bại, status {r.status_code}")
 
             print(f"✅ [{acc_name}] Hoàn thành.", flush=True)
