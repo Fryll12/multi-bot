@@ -664,7 +664,22 @@ def run_work_bot(token, acc_name):
     
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3,"guild_id": guild_id,"channel_id": channel_id,"message_id": message_id,"application_id": application_id,"session_id": "a","data": {"component_type": 2,"custom_id": custom_id}})
+            # SỬA LỖI QUAN TRỌNG: Lấy session_id thật từ bot thay vì dùng "a"
+            session_id_thuc = bot.gateway.session_id
+            
+            payload = {
+                "type": 3,
+                "guild_id": guild_id,
+                "channel_id": channel_id,
+                "message_id": message_id,
+                "application_id": application_id,
+                "session_id": session_id_thuc, # Dùng session_id thật ở đây
+                "data": {
+                    "component_type": 2,
+                    "custom_id": custom_id
+                }
+            }
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
             print(f"[Work][{acc_name}] Click tick: Status {r.status_code}", flush=True)
             if r.status_code != 204:
                 return False
