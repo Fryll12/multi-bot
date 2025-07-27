@@ -26,7 +26,6 @@ work_channel_id = os.getenv("WORK_CHANNEL_ID")
 daily_channel_id = os.getenv("DAILY_CHANNEL_ID")
 kvi_channel_id = os.getenv("KVI_CHANNEL_ID")
 karuta_id = "646937666251915264"
-karibbit_id = "1274445226064220273"
 yoru_bot_id = "1311684840462225440"
 HATSUNE_ID= "974973431252680714"
 # --- BIẾN TRẠNG THÁI (đây là các giá trị mặc định nếu không có file settings.json) ---
@@ -499,15 +498,19 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             if auto_grab_enabled and channel_id == main_channel_id:
                 if msg.get("author", {}).get("id") == karuta_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                     last_drop_msg_id = msg["id"]
-                    def read_karibbit():
+                    def read_yoru_bot():
                         time.sleep(0.5)
                         try:
                             messages = bot.getMessages(main_channel_id, num=5).json()
                             for msg_item in messages:
-                                if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                                if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
                                     desc = msg_item["embeds"][0].get("description", "")
                                     lines = desc.split('\n')
-                                    heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                                    heart_numbers = []
+                                    for line in lines[:3]:
+                                        match = re.search(r'♡(\d+)', line)
+                                        heart_numbers.append(int(match.group(1)) if match else 0)
+                                    
                                     max_num = max(heart_numbers)
                                     if sum(heart_numbers) > 0 and max_num >= heart_threshold:
                                         max_index = heart_numbers.index(max_num)
@@ -519,8 +522,9 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                             bot.sendMessage(ktb_channel_id, "kt b")
                                         threading.Timer(delay, grab).start()
                                     break
-                        except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 1): {e}", flush=True)
-                    threading.Thread(target=read_karibbit).start()
+                        except Exception as e: 
+                            print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 1): {e}", flush=True)
+                    threading.Thread(target=read_yoru_bot).start()
             
             # --- 2. XỬ LÝ KÊNH KVI ---
             if auto_kvi_enabled and kvi_target_account == 'main_1' and channel_id == kvi_channel_id:
@@ -544,15 +548,19 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             # --- KHỐI 1: XỬ LÝ GRAB TOÀN CỤC (SOUL HARVEST) ---
             if auto_grab_enabled_2 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                 last_drop_msg_id = msg["id"]
-                def read_karibbit_2():
+                def read_yoru_bot_2():
                     time.sleep(0.5)
                     try:
                         messages = bot.getMessages(main_channel_id, num=5).json()
                         for msg_item in messages:
-                            if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                            if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
                                 desc = msg_item["embeds"][0].get("description", "")
                                 lines = desc.split('\n')
-                                heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                                heart_numbers = []
+                                for line in lines[:3]:
+                                    match = re.search(r'♡(\d+)', line)
+                                    heart_numbers.append(int(match.group(1)) if match else 0)
+                
                                 max_num = max(heart_numbers)
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_2:
                                     max_index = heart_numbers.index(max_num)
@@ -564,8 +572,9 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                         bot.sendMessage(ktb_channel_id, "kt b")
                                     threading.Timer(delay, grab_2).start()
                                 break
-                    except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 2): {e}", flush=True)
-                threading.Thread(target=read_karibbit_2).start()
+                    except Exception as e: 
+                        print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 2): {e}", flush=True)
+                threading.Thread(target=read_yoru_bot_2).start()
             
             # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
             handle_farm_grab(bot, msg, 2)
@@ -586,15 +595,19 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             # --- KHỐI 1: XỬ LÝ GRAB TOÀN CỤC (SOUL HARVEST) ---
             if auto_grab_enabled_3 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                 last_drop_msg_id = msg["id"]
-                def read_karibbit_3():
+                def read_yoru_bot_3():
                     time.sleep(0.5)
                     try:
                         messages = bot.getMessages(main_channel_id, num=5).json()
                         for msg_item in messages:
-                            if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                            if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
                                 desc = msg_item["embeds"][0].get("description", "")
                                 lines = desc.split('\n')
-                                heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                                heart_numbers = []
+                                for line in lines[:3]:
+                                    match = re.search(r'♡(\d+)', line)
+                                    heart_numbers.append(int(match.group(1)) if match else 0)
+                
                                 max_num = max(heart_numbers)
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_3:
                                     max_index = heart_numbers.index(max_num)
@@ -606,8 +619,9 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                         bot.sendMessage(ktb_channel_id, "kt b")
                                     threading.Timer(delay, grab_3).start()
                                 break
-                    except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 3): {e}", flush=True)
-                threading.Thread(target=read_karibbit_3).start()
+                    except Exception as e: 
+                        print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 3): {e}", flush=True)
+                threading.Thread(target=read_yoru_bot_3).start()
             # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
             handle_farm_grab(bot, msg, 3)
 
@@ -626,15 +640,19 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             
             if auto_grab_enabled_4 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                 last_drop_msg_id = msg["id"]
-                def read_karibbit_4():
+                def read_yoru_bot_4():
                     time.sleep(0.5)
                     try:
                         messages = bot.getMessages(main_channel_id, num=5).json()
                         for msg_item in messages:
-                            if msg_item.get("author", {}).get("id") == karibbit_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                            if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
                                 desc = msg_item["embeds"][0].get("description", "")
                                 lines = desc.split('\n')
-                                heart_numbers = [int(m[1]) if len(m := re.findall(r'`([^`]*)`', line)) >= 2 and m[1].isdigit() else 0 for line in lines[:3]]
+                                heart_numbers = []
+                                for line in lines[:3]:
+                                    match = re.search(r'♡(\d+)', line)
+                                    heart_numbers.append(int(match.group(1)) if match else 0)
+                                
                                 max_num = max(heart_numbers)
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_4:
                                     max_index = heart_numbers.index(max_num)
@@ -646,8 +664,9 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                         bot.sendMessage(ktb_channel_id, "kt b")
                                     threading.Timer(delay, grab_4).start()
                                 break
-                    except Exception as e: print(f"Lỗi khi đọc tin nhắn Karibbit (Bot 4): {e}", flush=True)
-                threading.Thread(target=read_karibbit_4).start()
+                    except Exception as e: 
+                        print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 4): {e}", flush=True)
+                threading.Thread(target=read_yoru_bot_4).start()
 
             handle_farm_grab(bot, msg, 4)
 
