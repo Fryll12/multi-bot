@@ -656,32 +656,26 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                 
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
-# =====================================================================
-# HÀM RUN_WORK_BOT PHIÊN BẢN HOÀN CHỈNH ĐỂ DÁN VÀO FILE LỚN
-# =====================================================================
+    
+# HÀM RUN_WORK_BOT PHIÊN BẢN SỬA LỖI GỬI KJN
 def run_work_bot(token, acc_name, shared_resource=None):
-    # Ngụy trang thành client trình duyệt để tăng độ tin cậy
     ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     bot = discum.Client(token=token, log=False, user_agent=ua)
     headers = {"Authorization": token, "Content-Type": "application/json"}
-    resource_to_return = None
-    step = {"value": 0}
     found_resource = None
+    step = {"value": 0}
 
     def send_karuta_command(): bot.sendMessage(work_channel_id, "kc o:ef")
     def send_kn_command(): bot.sendMessage(work_channel_id, "kn")
     def send_kw_command(): bot.sendMessage(work_channel_id, "kw"); step["value"] = 2
     
-    # Hàm click_tick đã được sửa lỗi session_id
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            # Lấy session_id thật từ bot, đây là phần sửa lỗi quan trọng
             session_id_thuc = bot.gateway.session_id
-            
             payload = {
                 "type": 3,"guild_id": guild_id,"channel_id": channel_id,
                 "message_id": message_id,"application_id": application_id,
-                "session_id": session_id_thuc, # Dùng session_id thật
+                "session_id": session_id_thuc,
                 "data": {"component_type": 2,"custom_id": custom_id}
             }
             r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
@@ -701,7 +695,6 @@ def run_work_bot(token, acc_name, shared_resource=None):
         author_id = str(m.get("author", {}).get("id", ""))
         guild_id = m.get("guild_id")
         
-        # BƯỚC 0 VÀ 1 GIỮ NGUYÊN
         if step["value"] == 0 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
             desc = m["embeds"][0].get("description", "")
             card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc)
@@ -713,19 +706,16 @@ def run_work_bot(token, acc_name, shared_resource=None):
                     for i, code in enumerate(first_5): time.sleep(1.5); bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
                     time.sleep(1)
 
-                    # LOGIC MỚI: Kiểm tra xem có cần lấy tài nguyên không
+                    def send_kjn_kw_thread(resource_to_use):
+                        time.sleep(2)
+                        bot.sendMessage(work_channel_id, f"kjn `{resource_to_use}` a b c d e")
+                        time.sleep(1)
+                        send_kw_command()
+
                     if shared_resource:
-                        # Nếu có sẵn, dùng luôn và nhảy tới bước kw
                         print(f"[{acc_name}] Sử dụng tài nguyên đã có: '{shared_resource}'")
-                        
-                def send_kjn_kw_thread():
-                    time.sleep(2)
-                    bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
-                    time.sleep(1)
-                    send_kw_command()
-                threading.Thread(target=send_kjn_kw_thread).start()
+                        threading.Thread(target=send_kjn_kw_thread, args=(shared_resource,)).start()
                     else:
-                        # Nếu chưa có, đi lấy như bình thường
                         print(f"[{acc_name}] Bot đầu tiên, đang tìm tài nguyên...")
                         send_kn_command()
                         step["value"] = 1
@@ -736,25 +726,29 @@ def run_work_bot(token, acc_name, shared_resource=None):
             if len(lines) >= 2:
                 match = re.search(r"\d+\.\s*`([^`]+)`", lines[1])
                 if match:
-                    resource = match.group(1); print(f"[{acc_name}] Resource: {resource}", flush=True)
                     nonlocal found_resource
+                    resource = match.group(1)
                     found_resource = resource
-                    time.sleep(2); bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e"); time.sleep(1); send_kw_command()
+                    print(f"[{acc_name}] Resource: {resource}", flush=True)
+                    
+                    # --- SỬA LỖI GỬI LỆNH KHÔNG ĐÁNG TIN CẬY ---
+                    def send_kjn_kw_thread():
+                        time.sleep(2)
+                        bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
+                        time.sleep(1)
+                        send_kw_command()
+                    threading.Thread(target=send_kjn_kw_thread).start()
         
-        # BƯỚC 2: TÍCH HỢP LOGIC "HOÀN HẢO" TỪ BOT_WORK.PY
         elif step["value"] == 2 and author_id == karuta_id and "components" in m:
                 message_id = m['id']
                 application_id = m.get('application_id', karuta_id)
                 last_custom_id = None
-
-                # Bắt đầu logic tìm nút cuối cùng y hệt code bot_work.py
                 for comp in m['components']:
                     if comp['type'] == 1:
                         for btn in comp['components']:
                             if btn['type'] == 2:
                                 last_custom_id = btn['custom_id']
                 
-                # Nếu tìm thấy nút cuối cùng thì thực hiện click
                 if last_custom_id:
                     print(f"[{acc_name}] Tìm thấy nút cuối cùng: '{last_custom_id}'. Bắt đầu click...", flush=True)
                     click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
