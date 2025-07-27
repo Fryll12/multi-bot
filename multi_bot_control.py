@@ -717,7 +717,13 @@ def run_work_bot(token, acc_name, shared_resource=None):
                     if shared_resource:
                         # Nếu có sẵn, dùng luôn và nhảy tới bước kw
                         print(f"[{acc_name}] Sử dụng tài nguyên đã có: '{shared_resource}'")
-                        time.sleep(2); bot.sendMessage(work_channel_id, f"kjn `{shared_resource}` a b c d e"); time.sleep(1); send_kw_command()
+                        
+                def send_kjn_kw_thread():
+                    time.sleep(2)
+                    bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
+                    time.sleep(1)
+                    send_kw_command()
+                threading.Thread(target=send_kjn_kw_thread).start()
                     else:
                         # Nếu chưa có, đi lấy như bình thường
                         print(f"[{acc_name}] Bot đầu tiên, đang tìm tài nguyên...")
