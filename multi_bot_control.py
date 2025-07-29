@@ -36,6 +36,7 @@ acc_names = [name.strip() for name in sub_acc_names_str.split(',')] if sub_acc_n
 
 main_bot, main_bot_2, main_bot_3, main_bot_4 = None, None, None, None
 auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3, auto_grab_enabled_4 = False, False, False, False
+event_grab_enabled = False
 heart_threshold, heart_threshold_2, heart_threshold_3, heart_threshold_4 = 15, 50, 75, 100
 spam_enabled, auto_work_enabled, auto_reboot_enabled = False, False, False
 spam_message, spam_delay, work_delay_between_acc, work_delay_after_all, auto_reboot_delay = "", 10, 10, 44100, 3600
@@ -75,6 +76,7 @@ def save_settings():
         'auto_grab_enabled_2': auto_grab_enabled_2, 'heart_threshold_2': heart_threshold_2,
         'auto_grab_enabled_3': auto_grab_enabled_3, 'heart_threshold_3': heart_threshold_3,
         'auto_grab_enabled_4': auto_grab_enabled_4, 'heart_threshold_4': heart_threshold_4,
+        'event_grab_enabled': event_grab_enabled,
         'spam_enabled': spam_enabled, 'spam_message': spam_message, 'spam_delay': spam_delay,
         'auto_work_enabled': auto_work_enabled, 'work_delay_between_acc': work_delay_between_acc, 'work_delay_after_all': work_delay_after_all,
         'auto_daily_enabled': auto_daily_enabled, 'daily_delay_between_acc': daily_delay_between_acc, 'daily_delay_after_all': daily_delay_after_all,
@@ -124,6 +126,8 @@ def load_settings():
             settings = req.json().get("record", {})
             if settings: # Chỉ load nếu bin không rỗng
                 globals().update(settings)
+                global event_grab_enabled
+                event_grab_enabled = settings.get('event_grab_enabled', False)
                 print("[Settings] Đã tải cài đặt từ JSONBin.io.", flush=True)
             else:
                 print("[Settings] JSONBin rỗng, bắt đầu với cài đặt mặc định và lưu lại.", flush=True)
@@ -421,6 +425,24 @@ def handle_farm_grab(bot, msg, bot_num):
                 print(f"Lỗi khi đọc Yoru Bot (FARM: {target_server['name']} | Bot {bot_num}): {e}", flush=True)
 
         threading.Thread(target=read_yoru_bot).start()
+    # === LOGIC NHẶT SỰ KIỆN (THÊM VÀO) ===
+    # 2. Luồng nhặt event nếu được bật TOÀN CỤC và đây là bot 1
+    # Biến event_grab_enabled được kiểm tra ở đây
+    if event_grab_enabled and bot_num == 1:
+        def check_farm_event():
+            try:
+                time.sleep(0.3)
+                full_msg_obj = bot.getMessage(channel_id, last_drop_msg_id).json()
+                if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
+                    full_msg_obj = full_msg_obj[0]
+                if 'reactions' in full_msg_obj:
+                    if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
+                        print(f"[EVENT GRAB | FARM: {target_server['name']}] Phát hiện dưa hấu! Bot 1 tiến hành nhặt.", flush=True)
+                        bot.addReaction(channel_id, last_drop_msg_id, "🍉")
+            except Exception as e:
+                print(f"Lỗi khi kiểm tra event tại farm (Bot 1): {e}", flush=True)
+
+        threading.Thread(target=check_farm_event).start()
         
 # --- CÁC HÀM LOGIC BOT ---
 def reboot_bot(target_id):
@@ -525,7 +547,25 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                         except Exception as e: 
                             print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 1): {e}", flush=True)
                     threading.Thread(target=read_yoru_bot).start()
-            
+            # Xử lý 
+            if event_grab_enabled:
+                def check_and_grab_event():
+                    try:
+                        time.sleep(0.3) 
+                        full_msg_obj = bot.getMessage(main_channel_id, last_drop_msg_id).json()
+                        
+                        if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
+                            full_msg_obj = full_msg_obj[0]
+
+                        if 'reactions' in full_msg_obj:
+                            if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
+                                print(f"[EVENT GRAB | Bot 1] Phát hiện dưa hấu! Tiến hành nhặt.", flush=True)
+                                bot.addReaction(main_channel_id, last_drop_msg_id, "🍉")
+                        
+                    except Exception as e:
+                        print(f"Lỗi khi kiểm tra event (Bot 1): {e}", flush=True)
+
+                threading.Thread(target=check_and_grab_event).start()
             # --- 2. XỬ LÝ KÊNH KVI ---
             if auto_kvi_enabled and kvi_target_account == 'main_1' and channel_id == kvi_channel_id:
                 handle_kvi_message(bot, msg, main_token)
@@ -1169,6 +1209,13 @@ HTML_TEMPLATE = """
                 <div class="input-group"><label>Delay</label><input type="number" id="inject-delay" value="1.0" step="0.1"></div>
                 <div class="input-group" style="flex-direction: column; align-items: stretch;"><label style="border-radius: 5px 5px 0 0; border-bottom: none;">Code List (comma-separated)</label><textarea id="inject-codes" placeholder="paste codes here, separated by commas" rows="3" style="border-radius: 0 0 5px 5px;"></textarea></div>
                 <button type="button" id="inject-codes-btn" class="btn btn-primary" style="width: 100%; margin-top:10px;">Inject Codes</button>
+                <hr style="border-color: var(--border-color); margin: 20px 0;">
+                <h3 style="text-align:center; font-family: 'Orbitron'; margin-bottom: 10px; color: var(--text-secondary);">
+                    EVENT GRAB (ALPHA NODE)
+                </h3>
+                <button type="button" id="event-grab-toggle-btn" class="btn {{ event_grab_button_class }}" style="width:100%;">
+                    <i class="fas fa-star"></i> {{ event_grab_action }} EVENT GRAB
+                </button>
             </div>
 
             <div class="panel void-panel">
@@ -1349,6 +1396,10 @@ HTML_TEMPLATE = """
                 updateElement('spam-status-badge', { textContent: data.spam_enabled ? 'ON' : 'OFF', className: `status-badge ${data.spam_enabled ? 'active' : 'inactive'}` });
                 const serverUptimeSeconds = (Date.now() / 1000) - data.server_start_time;
                 updateElement('uptime-timer', { textContent: formatTime(serverUptimeSeconds) });
+                updateElement('event-grab-toggle-btn', { 
+                textContent: `${data.ui_states.event_grab_action} EVENT GRAB`, 
+                className: `btn ${data.ui_states.event_grab_button_class}` 
+                });
 
                 updateElement('harvest-toggle-1', { textContent: data.ui_states.grab_action, className: `btn ${data.ui_states.grab_button_class}` });
                 updateElement('harvest-status-1', { textContent: data.ui_states.grab_text, className: `status-badge ${data.ui_states.grab_status}` });
@@ -1389,6 +1440,8 @@ HTML_TEMPLATE = """
             } catch (error) { console.error('Error fetching status:', error); }
         }
         setInterval(fetchStatus, 1000);
+
+        
 
         // --- Event Listeners for Buttons ---
 
@@ -1432,7 +1485,7 @@ HTML_TEMPLATE = """
                  document.getElementById('inject-codes').value = '';
             });
         });
-
+        document.getElementById('event-grab-toggle-btn').addEventListener('click', () => postData('/api/event_grab_toggle', {}));
         // Shadow Labor
         document.getElementById('auto-work-toggle-btn').addEventListener('click', () => {
             postData('/api/labor_toggle', {
@@ -1515,6 +1568,7 @@ def index():
     grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
     grab_status_4, grab_text_4, grab_action_4, grab_button_class_4 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_4 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
+    event_grab_action, event_grab_button_class = ("DISABLE", "btn-blood") if event_grab_enabled else ("ENABLE", "btn-necro")
     spam_action, spam_button_class = ("DISABLE", "btn-blood") if spam_enabled else ("ENABLE", "btn-necro")
     work_action, work_button_class = ("DISABLE", "btn-blood") if auto_work_enabled else ("ENABLE", "btn-necro")
     daily_action, daily_button_class = ("DISABLE", "btn-blood") if auto_daily_enabled else ("ENABLE", "btn-necro")
@@ -1533,6 +1587,8 @@ def index():
         grab_status_2=grab_status_2, grab_text_2=grab_text_2, grab_action_2=grab_action_2, grab_button_class_2=grab_button_class_2, heart_threshold_2=heart_threshold_2,
         grab_status_3=grab_status_3, grab_text_3=grab_text_3, grab_action_3=grab_action_3, grab_button_class_3=grab_button_class_3, heart_threshold_3=heart_threshold_3,
         grab_status_4=grab_status_4, grab_text_4=grab_text_4, grab_action_4=grab_action_4, grab_button_class_4=grab_button_class_4, heart_threshold_4=heart_threshold_4,
+        event_grab_action=event_grab_action,
+        event_grab_button_class=event_grab_button_class,
         spam_message=spam_message, spam_delay=spam_delay, spam_action=spam_action, spam_button_class=spam_button_class,
         work_delay_between_acc=work_delay_between_acc, work_delay_after_all=work_delay_after_all, work_action=work_action, work_button_class=work_button_class,
         daily_delay_between_acc=daily_delay_between_acc, daily_delay_after_all=daily_delay_after_all, daily_action=daily_action, daily_button_class=daily_button_class,
@@ -1604,6 +1660,14 @@ def api_farm_broadcast_toggle():
     state = "BẬT" if server['spam_enabled'] else "TẮT"
     return jsonify({'status': 'success', 'message': f"Spam đã {state} cho farm {server['name']}."})
 # --- API ENDPOINTS ---
+@app.route("/api/event_grab_toggle", methods=['POST'])
+def api_event_grab_toggle():
+    global event_grab_enabled
+    event_grab_enabled = not event_grab_enabled
+    msg = f"Event Grab for Main Acc 1 was {'ENABLED' if event_grab_enabled else 'DISABLED'}"
+    save_settings() # Lưu lại trạng thái mới
+    return jsonify({'status': 'success', 'message': msg})
+    
 @app.route("/api/harvest_toggle", methods=['POST'])
 def api_harvest_toggle():
     global auto_grab_enabled, heart_threshold, auto_grab_enabled_2, heart_threshold_2, auto_grab_enabled_3, heart_threshold_3, auto_grab_enabled_4, heart_threshold_4
@@ -1809,6 +1873,7 @@ def status():
         "daily_action": "DISABLE" if auto_daily_enabled else "ENABLE", "daily_button_class": "btn-blood" if auto_daily_enabled else "btn-necro",
         "kvi_action": "DISABLE" if auto_kvi_enabled else "ENABLE", "kvi_button_class": "btn-blood" if auto_kvi_enabled else "btn-necro",
         "reboot_action": "DISABLE" if auto_reboot_enabled else "ENABLE", "reboot_button_class": "btn-blood" if auto_reboot_enabled else "btn-necro",
+        "event_grab_action": "DISABLE" if event_grab_enabled else "ENABLE", "event_grab_button_class": "btn-blood" if event_grab_enabled else "btn-necro",
     }
 
     return jsonify({
