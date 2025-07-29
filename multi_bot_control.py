@@ -498,7 +498,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                     else: bot_type = ""
                     print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
 
-     if is_main:
+    if is_main:
         @bot.gateway.command
         def on_message(resp):
             # Khai báo global vẫn giữ nguyên
