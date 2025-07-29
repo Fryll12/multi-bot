@@ -498,7 +498,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                     else: bot_type = ""
                     print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
 
-    if is_main:
+     if is_main:
         @bot.gateway.command
         def on_message(resp):
             # Khai báo global vẫn giữ nguyên
@@ -507,13 +507,13 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             # Thoát sớm nếu không phải là tin nhắn hợp lệ
             if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 return
-            
+
             # Phân tích cú pháp tin nhắn một lần duy nhất
             msg = resp.parsed.auto()
             channel_id = msg.get("channel_id")
 
             # Cấu trúc if/elif mới để xử lý các kênh khác nhau một cách độc lập
-            
+
             # --- 1. XỬ LÝ KÊNH GRAB CHÍNH (SOUL HARVEST) ---
             if auto_grab_enabled and channel_id == main_channel_id:
                 if msg.get("author", {}).get("id") == karuta_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
@@ -530,7 +530,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                     for line in lines[:3]:
                                         match = re.search(r'♡(\d+)', line)
                                         heart_numbers.append(int(match.group(1)) if match else 0)
-                                    
+
                                     max_num = max(heart_numbers)
                                     if sum(heart_numbers) > 0 and max_num >= heart_threshold:
                                         max_index = heart_numbers.index(max_num)
@@ -549,9 +549,10 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             if event_grab_enabled:
                 def check_and_grab_event():
                     try:
+                        time.sleep(1) 
                         time.sleep(0.5) 
                         full_msg_obj = bot.getMessage(main_channel_id, last_drop_msg_id).json()
-                        
+
                         if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
                             full_msg_obj = full_msg_obj[0]
 
@@ -559,11 +560,19 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                             if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
                                 print(f"[EVENT GRAB | Bot 1] Phát hiện dưa hấu! Tiến hành nhặt.", flush=True)
                                 bot.addReaction(main_channel_id, last_drop_msg_id, "🍉")
-                        
+
                     except Exception as e:
                         print(f"Lỗi khi kiểm tra event (Bot 1): {e}", flush=True)
 
                 threading.Thread(target=check_and_grab_event).start()
+            # --- 2. XỬ LÝ KÊNH KVI ---
+            if auto_kvi_enabled and kvi_target_account == 'main_1' and channel_id == kvi_channel_id:
+                handle_kvi_message(bot, msg, main_token)
+
+             #--- 3. XỬ LÝ FARM ---    
+            is_farm_channel = any(server.get('main_channel_id') == channel_id for server in farm_servers)
+            if is_farm_channel:
+                handle_farm_grab(bot, msg, 1)
                     
     if is_main_2:
         @bot.gateway.command
