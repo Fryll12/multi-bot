@@ -377,61 +377,70 @@ def handle_farm_grab(bot, msg, bot_num):
     target_server = next((s for s in farm_servers if s.get('main_channel_id') == channel_id), None)
     if not target_server: return
 
-    # Chỉ xử lý khi đây là tin nhắn drop thẻ
+    grab_map = {1: 'auto_grab_enabled_1', 2: 'auto_grab_enabled_2', 3: 'auto_grab_enabled_3', 4: 'auto_grab_enabled_4'}
+    thresh_map = {1: 'heart_threshold_1', 2: 'heart_threshold_2', 3: 'heart_threshold_3', 4: 'heart_threshold_4'}
+    
+    if not target_server.get(grab_map[bot_num], False): return
+    
+    heart_threshold = int(target_server.get(thresh_map[bot_num], 50))
+    ktb_channel_id = target_server.get('ktb_channel_id')
+    if not ktb_channel_id: return
+
     if msg.get("author", {}).get("id") == karuta_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
         last_drop_msg_id = msg["id"]
+        
+        def read_yoru_bot():
+            time.sleep(0.5)
+            try:
+                messages = bot.getMessages(channel_id, num=5).json()
+                for msg_item in messages:
+                    # ⭐ SỬA ĐỔI QUAN TRỌNG: Kiểm tra ID của bot Yoru thay vì Karibbit
+                    if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                        desc = msg_item["embeds"][0].get("description", "")
+                        lines = desc.split('\n')
+                        heart_numbers = []
+                        for line in lines[:3]:
+                            match = re.search(r'♡(\d+)', line)
+                            heart_numbers.append(int(match.group(1)) if match else 0)
+                        
+                        if not any(heart_numbers): break
+                        max_num = max(heart_numbers)
+                        if max_num >= heart_threshold:
+                            max_index = heart_numbers.index(max_num)
+                            delays = {1: [0.3, 1.3, 2.1], 2: [0.6, 1.6, 2.3], 3: [0.6, 1.6, 2.3], 4: [0.6, 1.6, 2.3]}
+                            emojis = ["1️⃣", "2️⃣", "3️⃣"]
+                            emoji = emojis[max_index]
+                            delay = delays[bot_num][max_index]
 
-        grab_map = {1: 'auto_grab_enabled_1', 2: 'auto_grab_enabled_2', 3: 'auto_grab_enabled_3', 4: 'auto_grab_enabled_4'}
-        is_card_grab_enabled = target_server.get(grab_map.get(bot_num), False)
-        ktb_channel_id = target_server.get('ktb_channel_id')
+                            print(f"[FARM: {target_server['name']} | Bot {bot_num}] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
+                            
+                            def grab_action():
+                                bot.addReaction(channel_id, last_drop_msg_id, emoji)
+                                time.sleep(2)
+                                bot.sendMessage(ktb_channel_id, "kt b")
+                            
+                            threading.Timer(delay, grab_action).start()
+                        break
+            except Exception as e:
+                print(f"Lỗi khi đọc Yoru Bot (FARM: {target_server['name']} | Bot {bot_num}): {e}", flush=True)
 
-        # 1. Luồng nhặt thẻ
-        if is_card_grab_enabled and ktb_channel_id:
-            thresh_map = {1: 'heart_threshold_1', 2: 'heart_threshold_2', 3: 'heart_threshold_3', 4: 'heart_threshold_4'}
-            heart_threshold = int(target_server.get(thresh_map[bot_num], 50))
-            def read_yoru_bot():
+        threading.Thread(target=read_yoru_bot).start()
+    # 2. Luồng nhặt event nếu được bật TOÀN CỤC và đây là bot 1
+    if event_grab_enabled and bot_num == 1:
+        def check_farm_event():
+            try:
                 time.sleep(0.5)
-                try:
-                    messages = bot.getMessages(channel_id, num=5).json()
-                    for msg_item in messages:
-                        if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                            desc = msg_item["embeds"][0].get("description", "")
-                            lines = desc.split('\n')
-                            heart_numbers = [int(match.group(1)) if (match := re.search(r'♡(\d+)', line)) else 0 for line in lines[:3]]
-                            if not any(heart_numbers): break
-                            max_num = max(heart_numbers)
-                            if max_num >= heart_threshold:
-                                max_index = heart_numbers.index(max_num)
-                                delays = {1: [0.3, 1.3, 2.1], 2: [0.6, 1.6, 2.3], 3: [0.6, 1.6, 2.3], 4: [0.6, 1.6, 2.3]}
-                                emojis = ["1️⃣", "2️⃣", "3️⃣"]
-                                emoji = emojis[max_index]
-                                delay = delays.get(bot_num, [0.7, 1.7, 2.4])[max_index]
-                                print(f"[FARM: {target_server['name']} | Bot {bot_num}] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
-                                def grab_action():
-                                    bot.addReaction(channel_id, last_drop_msg_id, emoji)
-                                    time.sleep(2)
-                                    bot.sendMessage(ktb_channel_id, "kt b")
-                                threading.Timer(delay, grab_action).start()
-                            break
-                except Exception as e:
-                    print(f"Lỗi khi đọc Yoru Bot (FARM: {target_server['name']} | Bot {bot_num}): {e}", flush=True)
-            threading.Thread(target=read_yoru_bot).start()
+                full_msg_obj = bot.getMessage(channel_id, last_drop_msg_id).json()
+                if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
+                    full_msg_obj = full_msg_obj[0]
+                if 'reactions' in full_msg_obj:
+                    if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
+                        print(f"[EVENT GRAB | FARM: {target_server['name']}] Phát hiện dưa hấu! Bot 1 tiến hành nhặt.", flush=True)
+                        bot.addReaction(channel_id, last_drop_msg_id, "🍉")
+            except Exception as e:
+                print(f"Lỗi khi kiểm tra event tại farm (Bot 1): {e}", flush=True)
 
-        # *** ĐÃ SỬA LỖI: Luồng nhặt event chỉ chạy sau khi xác nhận có drop thẻ ***
-        if event_grab_enabled and bot_num == 1:
-            def check_farm_event():
-                try:
-                    time.sleep(0.5)
-                    full_msg_obj = bot.getMessage(channel_id, last_drop_msg_id).json()
-                    if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
-                        full_msg_obj = full_msg_obj[0]
-                    if 'reactions' in full_msg_obj:
-                        if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
-                            print(f"[EVENT GRAB | FARM: {target_server['name']}] Phát hiện dưa hấu! Bot 1 tiến hành nhặt.", flush=True)
-                            bot.addReaction(channel_id, last_drop_msg_id, "🍉")
-                except Exception as e:
-                    print(f"Lỗi khi kiểm tra event tại farm (Bot 1): {e}", flush=True)
-            threading.Thread(target=check_farm_event).start()
+        threading.Thread(target=check_farm_event).start()
         
 # --- CÁC HÀM LOGIC BOT ---
 def reboot_bot(target_id):
@@ -492,73 +501,69 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
     if is_main:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled, heart_threshold, event_grab_enabled, visit_data, kvi_session_state, main_token
+            # Khai báo global vẫn giữ nguyên
+            global auto_grab_enabled, heart_threshold, visit_data, kvi_session_state, main_token
+
+            # Thoát sớm nếu không phải là tin nhắn hợp lệ
             if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 return
             
+            # Phân tích cú pháp tin nhắn một lần duy nhất
             msg = resp.parsed.auto()
             channel_id = msg.get("channel_id")
 
+            # Cấu trúc if/elif mới để xử lý các kênh khác nhau một cách độc lập
+            
             # --- 1. XỬ LÝ KÊNH GRAB CHÍNH (SOUL HARVEST) ---
-            if (auto_grab_enabled or event_grab_enabled) and channel_id == main_channel_id:
-                # Chỉ xử lý khi đây là tin nhắn drop thẻ
+            if auto_grab_enabled and channel_id == main_channel_id:
                 if msg.get("author", {}).get("id") == karuta_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                     last_drop_msg_id = msg["id"]
-                    
-                    # Luồng nhặt thẻ (nếu được bật)
-                    if auto_grab_enabled:
-                        def read_yoru_bot():
-                            time.sleep(0.5)
-                            try:
-                                messages = bot.getMessages(main_channel_id, num=5).json()
-                                for msg_item in messages:
-                                    if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                        desc = msg_item["embeds"][0].get("description", "")
-                                        lines = desc.split('\n')
-                                        heart_numbers = []
-                                        for line in lines[:3]:
-                                            match = re.search(r'♡(\d+)', line)
-                                            heart_numbers.append(int(match.group(1)) if match else 0)
-                                        
-                                        max_num = max(heart_numbers)
-                                        if sum(heart_numbers) > 0 and max_num >= heart_threshold:
-                                            max_index = heart_numbers.index(max_num)
-                                            emoji, delay = [("1️⃣", 0.3), ("2️⃣", 1.3), ("3️⃣", 2)][max_index]
-                                            print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
-                                            def grab():
-                                                bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                                time.sleep(1)
-                                                bot.sendMessage(ktb_channel_id, "kt b")
-                                            threading.Timer(delay, grab).start()
-                                        break
-                            except Exception as e: 
-                                print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 1): {e}", flush=True)
-                        threading.Thread(target=read_yoru_bot).start()
+                    def read_yoru_bot():
+                        time.sleep(0.5)
+                        try:
+                            messages = bot.getMessages(main_channel_id, num=5).json()
+                            for msg_item in messages:
+                                if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
+                                    desc = msg_item["embeds"][0].get("description", "")
+                                    lines = desc.split('\n')
+                                    heart_numbers = []
+                                    for line in lines[:3]:
+                                        match = re.search(r'♡(\d+)', line)
+                                        heart_numbers.append(int(match.group(1)) if match else 0)
+                                    
+                                    max_num = max(heart_numbers)
+                                    if sum(heart_numbers) > 0 and max_num >= heart_threshold:
+                                        max_index = heart_numbers.index(max_num)
+                                        emoji, delay = [("1️⃣", 0.3), ("2️⃣", 1.3), ("3️⃣", 2)][max_index]
+                                        print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
+                                        def grab():
+                                            bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
+                                            time.sleep(1)
+                                            bot.sendMessage(ktb_channel_id, "kt b")
+                                        threading.Timer(delay, grab).start()
+                                    break
+                        except Exception as e: 
+                            print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 1): {e}", flush=True)
+                    threading.Thread(target=read_yoru_bot).start()
+            # Xử lý 
+            if event_grab_enabled:
+                def check_and_grab_event():
+                    try:
+                        time.sleep(0.5) 
+                        full_msg_obj = bot.getMessage(main_channel_id, last_drop_msg_id).json()
+                        
+                        if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
+                            full_msg_obj = full_msg_obj[0]
 
-                    # *** ĐÃ SỬA LỖI: Luồng nhặt event chỉ chạy sau khi xác nhận có drop thẻ ***
-                    if event_grab_enabled:
-                        def check_and_grab_event():
-                            try:
-                                time.sleep(0.8) 
-                                full_msg_obj = bot.getMessage(main_channel_id, last_drop_msg_id).json()
-                                if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
-                                    full_msg_obj = full_msg_obj[0]
-                                if 'reactions' in full_msg_obj:
-                                    if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
-                                        print(f"[EVENT GRAB | Bot 1] Phát hiện dưa hấu! Tiến hành nhặt.", flush=True)
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, "🍉")
-                            except Exception as e:
-                                print(f"Lỗi khi kiểm tra event (Bot 1): {e}", flush=True)
-                        threading.Thread(target=check_and_grab_event).start()
-            
-            # --- 2. XỬ LÝ KÊNH KVI ---
-            if auto_kvi_enabled and kvi_target_account == 'main_1' and channel_id == kvi_channel_id:
-                handle_kvi_message(bot, msg, main_token)
-                
-            # --- 3. XỬ LÝ FARM ---    
-            is_farm_channel = any(server.get('main_channel_id') == channel_id for server in farm_servers)
-            if is_farm_channel:
-                handle_farm_grab(bot, msg, 1)
+                        if 'reactions' in full_msg_obj:
+                            if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
+                                print(f"[EVENT GRAB | Bot 1] Phát hiện dưa hấu! Tiến hành nhặt.", flush=True)
+                                bot.addReaction(main_channel_id, last_drop_msg_id, "🍉")
+                        
+                    except Exception as e:
+                        print(f"Lỗi khi kiểm tra event (Bot 1): {e}", flush=True)
+
+                threading.Thread(target=check_and_grab_event).start()
                     
     if is_main_2:
         @bot.gateway.command
