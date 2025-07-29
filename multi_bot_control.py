@@ -549,7 +549,6 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             if event_grab_enabled:
                 def check_and_grab_event():
                     try:
-                        time.sleep(1) 
                         time.sleep(0.5) 
                         full_msg_obj = bot.getMessage(main_channel_id, last_drop_msg_id).json()
 
