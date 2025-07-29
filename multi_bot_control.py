@@ -431,7 +431,7 @@ def handle_farm_grab(bot, msg, bot_num):
     if event_grab_enabled and bot_num == 1:
         def check_farm_event():
             try:
-                time.sleep(0.3)
+                time.sleep(1)
                 full_msg_obj = bot.getMessage(channel_id, last_drop_msg_id).json()
                 if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
                     full_msg_obj = full_msg_obj[0]
@@ -551,7 +551,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             if event_grab_enabled:
                 def check_and_grab_event():
                     try:
-                        time.sleep(0.3) 
+                        time.sleep(1) 
                         full_msg_obj = bot.getMessage(main_channel_id, last_drop_msg_id).json()
                         
                         if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
