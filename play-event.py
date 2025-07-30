@@ -31,27 +31,22 @@ is_bot_running = False
 is_hourly_loop_enabled = False
 loop_delay_seconds = 3600  # Mặc định 1 giờ
 lock = threading.Lock()
-active_message_id = None
-action_queue = deque()
+
 # ===================================================================
 # LOGIC BOT
 # ===================================================================
-def reset_game_state():
-    global active_message_id, action_queue # Dùng global thay cho nonlocal
-    with lock:
-        print("[RESET] Đang reset trạng thái game...", flush=True)
-        active_message_id = None
-        action_queue.clear()
-        print("[RESET] Bot đã sẵn sàng nhận game mới.", flush=True)
-        
+
 def run_event_bot_thread():
     """Hàm này chứa toàn bộ logic bot, chạy trong một luồng riêng."""
     global is_bot_running, bot_instance
-    
+
+    active_message_id = None
+    action_queue = deque()
+
     bot = discum.Client(token=TOKEN, log=False)
     with lock:
         bot_instance = bot
-            
+
     def click_button_by_index(message_data, index):
         try:
             rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
@@ -66,7 +61,7 @@ def run_event_bot_thread():
 
             headers = {"Authorization": TOKEN}
             
-            max_retries = 8
+            max_retries = 40
             for attempt in range(max_retries):
                 session_id = bot.gateway.session_id 
                 payload = {
@@ -97,12 +92,10 @@ def run_event_bot_thread():
                 except requests.exceptions.RequestException as e:
                     print(f"LỖI KẾT NỐI: {e}. Sẽ thử lại sau 3 giây...")
                     time.sleep(3)
-            print(f"LỖI: Đã thử click {max_retries} lần mà không thành công.", flush=True)
-            reset_game_state()
-            
+            print(f"LỖI: Đã thử click {max_retries} lần mà không thành công.")
         except Exception as e:
-            print(f"LỖI NGOẠI LỆ trong hàm click_button_by_index: {e}", flush=True)
-            reset_game_state()
+            print(f"LỖI NGOẠI LỆ trong hàm click_button_by_index: {e}")
+
     def perform_final_confirmation(message_data):
         print("ACTION: Chờ 2 giây để nút xác nhận cuối cùng load...")
         time.sleep(2)
@@ -111,6 +104,7 @@ def run_event_bot_thread():
 
     @bot.gateway.command
     def on_message(resp):
+        nonlocal active_message_id, action_queue
         if not is_bot_running:
             bot.gateway.close()
             return
@@ -191,7 +185,6 @@ def run_hourly_loop_thread():
         with lock:
             if is_hourly_loop_enabled and bot_instance and is_bot_running:
                 print(f"\n[HOURLY LOOP] Hết {loop_delay_seconds} giây. Tự động gửi lại lệnh 'kevent'...", flush=True)
-                reset_game_state()
                 bot_instance.sendMessage(CHANNEL_ID, "kevent")
             else:
                 break
