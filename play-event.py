@@ -77,7 +77,7 @@ def run_event_bot_thread():
                 print(f"[EVENT BOT] WARN: Bị rate limit! Chờ {retry_after} giây.", flush=True)
                 time.sleep(retry_after)
             
-            time.sleep(1.8)
+            time.sleep(2.5)
         except Exception as e:
             print(f"[EVENT BOT] LỖI NGOẠI LỆ khi click: {e}", flush=True)
 
