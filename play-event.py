@@ -178,7 +178,7 @@ def run_hourly_loop_thread():
         for _ in range(loop_delay_seconds):
             if not is_hourly_loop_enabled:
                 break
-            time.sleep(15)
+            time.sleep(1)
         
         with lock:
             if is_hourly_loop_enabled and bot_instance and is_bot_running:
