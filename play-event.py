@@ -61,7 +61,7 @@ def run_event_bot_thread():
 
             headers = {"Authorization": TOKEN}
             
-            max_retries = 3
+            max_retries = 8
             for attempt in range(max_retries):
                 session_id = bot.gateway.session_id 
                 payload = {
