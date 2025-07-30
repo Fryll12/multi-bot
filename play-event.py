@@ -80,10 +80,10 @@ def run_event_bot_thread():
                     if 200 <= r.status_code < 300:
                         print(f"INFO: Click thành công! (Status: {r.status_code})")
                         # Bạn có thể điều chỉnh thời gian chờ ở đây để tránh rate limit
-                        time.sleep(5) 
+                        time.sleep(2.5) 
                         return 
                     elif r.status_code == 429:
-                        retry_after = r.json().get("retry_after", 3)
+                        retry_after = r.json().get("retry_after", 1.5)
                         print(f"WARN: Bị rate limit! Sẽ thử lại sau {retry_after:.2f} giây...")
                         time.sleep(retry_after)
                     else:
