@@ -45,33 +45,38 @@ def run_solisfair_bot():
         bot_instance = bot
 
     def click_button_by_index(message_data, index):
-        try:
-            rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
-            all_buttons = [button for row in rows for button in row]
-            if index >= len(all_buttons): return
+    """Nhấn button bằng cách gửi request thủ công."""
+    try:
+        rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
+        all_buttons = [button for row in rows for button in row]
+        if index >= len(all_buttons):
+            print(f"LỖI: Không tìm thấy button ở vị trí {index}")
+            return
 
-            button_to_click = all_buttons[index]
-            custom_id = button_to_click.get("custom_id")
-            if not custom_id: return
+        button_to_click = all_buttons[index]
+        custom_id = button_to_click.get("custom_id")
+        if not custom_id: return
 
-            headers = {"Authorization": TOKEN}
-            payload = {
-                "type": 3, "guild_id": message_data.get("guild_id"),
-                "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
-                "application_id": KARUTA_ID, "session_id": bot.gateway.session_id,
-                "data": {"component_type": 2, "custom_id": custom_id}
-            }
-            
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
-            
-            if r.status_code == 429:
-                retry_after = r.json().get("retry_after", 1.0)
-                print(f"[EVENT BOT] WARN: Bị rate limit! Chờ {retry_after} giây.")
-                time.sleep(retry_after)
-            
-            time.sleep(1.8)
-        except Exception as e:
-            print(f"[EVENT BOT] LỖI NGOẠI LỆ khi click: {e}")
+        headers = {"Authorization": TOKEN}
+        payload = {
+            "type": 3, "guild_id": message_data.get("guild_id"),
+            "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
+            "application_id": KARUTA_ID, "session_id": bot.gateway.session_id,
+            "data": {"component_type": 2, "custom_id": custom_id}
+        }
+        
+        emoji_name = button_to_click.get('emoji', {}).get('name', 'Không có')
+        print(f"INFO: Chuẩn bị click button ở vị trí {index} (Emoji: {emoji_name})")
+        
+        r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
+        
+        if 200 <= r.status_code < 300:
+            print(f"INFO: Click thành công! (Status: {r.status_code})")
+        else:
+            print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})")
+        time.sleep(1.8)
+    except Exception as e:
+        print(f"LỖI NGOẠI LỆ khi click button: {e}")
 
     def perform_final_confirmation(message_data):
         time.sleep(2)
