@@ -1,10 +1,11 @@
 import discum
 import time
 import threading
+import json
+import random
 import requests
 import os
 import sys
-import random
 from collections import deque
 from flask import Flask, jsonify, render_template_string, request
 
@@ -12,24 +13,27 @@ from flask import Flask, jsonify, render_template_string, request
 # CẤU HÌNH VÀ BIẾN TOÀN CỤC
 # ===================================================================
 
+# --- Lấy cấu hình từ biến môi trường ---
 TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 KARUTA_ID = "646937666251915264"
 
+# --- Kiểm tra biến môi trường ---
 if not TOKEN or not CHANNEL_ID:
     print("LỖI: Vui lòng cung cấp DISCORD_TOKEN và CHANNEL_ID trong biến môi trường.", flush=True)
     sys.exit(1)
 
+# --- Các biến trạng thái để điều khiển qua web ---
 bot_thread = None
 hourly_loop_thread = None
 bot_instance = None
 is_bot_running = False
 is_hourly_loop_enabled = False
-loop_delay_seconds = 3600
+loop_delay_seconds = 3600  # Mặc định 1 giờ
 lock = threading.Lock()
 
 # ===================================================================
-# LOGIC BOT CHƠI EVENT (TÍCH HỢP TỪ FILE THAM KHẢO)
+# LOGIC BOT (LẤY TỪ FILE CỦA BẠN)
 # ===================================================================
 
 def run_event_bot_thread():
@@ -43,49 +47,62 @@ def run_event_bot_thread():
     with lock:
         bot_instance = bot
 
-    # --- LOGIC CLICK LẤY TỪ FILE THAM KHẢO CỦA BẠN (với fix session_id) ---
+    # --- LOGIC CLICK GIỮ NGUYÊN TỪ FILE CỦA BẠN ---
     def click_button_by_index(message_data, index):
         try:
             rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
             all_buttons = [button for row in rows for button in row]
             if index >= len(all_buttons):
-                print(f"LỖI: Không tìm thấy button ở vị trí {index}", flush=True)
+                print(f"LỖI: Không tìm thấy button ở vị trí {index}")
                 return
 
             button_to_click = all_buttons[index]
             custom_id = button_to_click.get("custom_id")
             if not custom_id: return
 
-            # Dùng session id của gateway, đúng như code tham khảo
-            session_id = bot.gateway.session_id
-
             headers = {"Authorization": TOKEN}
-            payload = {
-                "type": 3, "guild_id": message_data.get("guild_id"),
-                "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
-                "application_id": KARUTA_ID, "session_id": session_id,
-                "data": {"component_type": 2, "custom_id": custom_id}
-            }
             
-            emoji_name = button_to_click.get('emoji', {}).get('name', 'Không có')
-            print(f"INFO: Chuẩn bị click button ở vị trí {index} (Emoji: {emoji_name})", flush=True)
-            
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
-            
-            if 200 <= r.status_code < 300:
-                print(f"INFO: Click thành công! (Status: {r.status_code})", flush=True)
-            else:
-                print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})", flush=True)
+            max_retries = 3
+            for attempt in range(max_retries):
+                session_id = bot.gateway.session_id 
+                payload = {
+                    "type": 3, "guild_id": message_data.get("guild_id"),
+                    "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
+                    "application_id": KARUTA_ID, "session_id": session_id,
+                    "data": {"component_type": 2, "custom_id": custom_id}
+                }
+                
+                emoji_name = button_to_click.get('emoji', {}).get('name', 'Không có')
+                print(f"INFO (Lần {attempt + 1}): Chuẩn bị click button ở vị trí {index} (Emoji: {emoji_name})")
+                
+                try:
+                    r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+
+                    if 200 <= r.status_code < 300:
+                        print(f"INFO: Click thành công! (Status: {r.status_code})")
+                        time.sleep(1.8)
+                        return 
+                    elif r.status_code == 429:
+                        retry_after = r.json().get("retry_after", 1.5)
+                        print(f"WARN: Bị rate limit! Sẽ thử lại sau {retry_after:.2f} giây...")
+                        time.sleep(retry_after)
+                    else:
+                        print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})")
+                        return
+                except requests.exceptions.RequestException as e:
+                    print(f"LỖI KẾT NỐI: {e}. Sẽ thử lại sau 3 giây...")
+                    time.sleep(3)
+            print(f"LỖI: Đã thử click {max_retries} lần mà không thành công.")
         except Exception as e:
-            print(f"LỖI NGOẠI LỆ khi click button: {e}", flush=True)
+            print(f"LỖI NGOẠI LỆ trong hàm click_button_by_index: {e}")
 
     def perform_final_confirmation(message_data):
-        print("ACTION: Chờ 2 giây để nút xác nhận cuối cùng load...", flush=True)
-        time.sleep(2.0)
+        print("ACTION: Chờ 2 giây để nút xác nhận cuối cùng load...")
+        time.sleep(2)
         click_button_by_index(message_data, 2)
-        print("INFO: Đã hoàn thành lượt. Chờ game tự động cập nhật để bắt đầu lượt mới...", flush=True)
+        print("INFO: Đã hoàn thành lượt. Chờ game tự động cập nhật để bắt đầu lượt mới...")
 
-    # --- LOGIC CHƠI SỰ KIỆN LẤY TỪ FILE THAM KHẢO CỦA BẠN ---
+    # --- LOGIC ON_MESSAGE GIỮ NGUYÊN TỪ FILE CỦA BẠN ---
     @bot.gateway.command
     def on_message(resp):
         nonlocal active_message_id, action_queue
@@ -97,33 +114,33 @@ def run_event_bot_thread():
         m = resp.parsed.auto()
         if not (m.get("author", {}).get("id") == KARUTA_ID and m.get("channel_id") == CHANNEL_ID): return
         
-        action_to_perform = None
-        
         with lock:
             if resp.event.message and "Takumi's Solisfair Stand" in m.get("embeds", [{}])[0].get("title", ""):
                 if active_message_id is not None: return
                 active_message_id = m.get("id")
                 action_queue.clear()
-                print(f"\nINFO: Bắt đầu game mới trên tin nhắn ID: {active_message_id}", flush=True)
+                print(f"\nINFO: Bắt đầu game mới trên tin nhắn ID: {active_message_id}")
             if m.get("id") != active_message_id: return
 
-            embed_desc = m.get("embeds", [{}])[0].get("description", "")
-            all_buttons_flat = [b for row in m.get('components', []) for b in row.get('components', []) if row.get('type') == 1]
-            is_movement_phase = any(b.get('emoji', {}).get('name') == '▶️' for b in all_buttons_flat)
-            is_final_confirm_phase = any(b.get('emoji', {}).get('name') == '❌' for b in all_buttons_flat)
-            found_good_move = "If placed here, you will receive the following fruit:" in embed_desc
-            has_received_fruit = "You received the following fruit:" in embed_desc
+        embed_desc = m.get("embeds", [{}])[0].get("description", "")
+        all_buttons_flat = [b for row in m.get('components', []) for b in row.get('components', []) if row.get('type') == 1]
+        is_movement_phase = any(b.get('emoji', {}).get('name') == '▶️' for b in all_buttons_flat)
+        is_final_confirm_phase = any(b.get('emoji', {}).get('name') == '❌' for b in all_buttons_flat)
+        found_good_move = "If placed here, you will receive the following fruit:" in embed_desc
+        has_received_fruit = "You received the following fruit:" in embed_desc
 
-            if is_final_confirm_phase:
-                action_to_perform = {"type": "final_confirm", "data": m}
-            elif has_received_fruit:
-                action_to_perform = {"type": "click", "index": 0, "data": m}
-            elif is_movement_phase:
+        if is_final_confirm_phase:
+            with lock:
+                action_queue.clear() 
+            threading.Thread(target=perform_final_confirmation, args=(m,)).start()
+        elif has_received_fruit:
+            threading.Thread(target=click_button_by_index, args=(m, 0)).start()
+        elif is_movement_phase:
+            with lock:
                 if found_good_move:
                     action_queue.clear()
                     action_queue.append(0)
                 elif not action_queue:
-                    # Lấy đúng logic random 7-14 từ file tham khảo
                     num_moves = random.randint(7, 14)
                     movement_indices = [1, 2, 3, 4]
                     for _ in range(num_moves):
@@ -131,50 +148,44 @@ def run_event_bot_thread():
                     action_queue.append(0)
                 if action_queue:
                     next_action_index = action_queue.popleft()
-                    action_to_perform = {"type": "click", "index": next_action_index, "data": m}
-        
-        if action_to_perform:
-            action_type = action_to_perform["type"]
-            if action_type == "final_confirm":
-                threading.Thread(target=perform_final_confirmation, args=(action_to_perform["data"],)).start()
-            elif action_type == "click":
-                threading.Thread(target=click_button_by_index, args=(action_to_perform["data"], action_to_perform["index"])).start()
-            
-            # Khoảng nghỉ 2 giây giữa các hành động để tránh rate limit
-            time.sleep(1.0)
+                    threading.Thread(target=click_button_by_index, args=(m, next_action_index)).start()
 
-    # Gửi lệnh đầu tiên khi luồng bắt đầu
-    def send_initial_command():
-        time.sleep(7)
-        print("[EVENT BOT] Gửi lệnh 'kevent' đầu tiên...", flush=True)
-        bot.sendMessage(CHANNEL_ID, "kevent")
-    
-    threading.Thread(target=send_initial_command).start()
+    # Sử dụng on_ready để gửi lệnh đầu tiên một cách đáng tin cậy
+    initial_kevent_sent = False
+    @bot.gateway.command
+    def on_ready(resp):
+        nonlocal initial_kevent_sent
+        if resp.event.ready_supplemental and not initial_kevent_sent:
+            print("[EVENT BOT] Gateway đã sẵn sàng. Gửi lệnh 'kevent' đầu tiên...", flush=True)
+            bot.sendMessage(CHANNEL_ID, "kevent")
+            initial_kevent_sent = True
 
-    print("[EVENT BOT] Luồng bot đã khởi động và đang lắng nghe tin nhắn.", flush=True)
+    # Khởi chạy gateway
+    print("[EVENT BOT] Luồng bot đã khởi động, đang kết nối gateway...", flush=True)
     bot.gateway.run(auto_reconnect=True)
     print("[EVENT BOT] Luồng bot đã dừng.", flush=True)
-
 
 # ===================================================================
 # CÁC HÀM TIỆN ÍCH VÀ VÒNG LẶP NỀN
 # ===================================================================
 
 def run_hourly_loop_thread():
-    """Hàm này chứa vòng lặp gửi kevent, chạy trong một luồng riêng."""
+    """Hàm chứa vòng lặp gửi kevent, chạy trong một luồng riêng."""
     global is_hourly_loop_enabled, loop_delay_seconds
     print("[HOURLY LOOP] Luồng vòng lặp đã khởi động.", flush=True)
     while is_hourly_loop_enabled:
+        # Chờ theo từng giây để có thể dừng ngay lập tức
         for _ in range(loop_delay_seconds):
             if not is_hourly_loop_enabled:
                 break
-            time.sleep(1)
+            time.sleep(15)
+        
         with lock:
             if is_hourly_loop_enabled and bot_instance and is_bot_running:
                 print(f"\n[HOURLY LOOP] Hết {loop_delay_seconds} giây. Tự động gửi lại lệnh 'kevent'...", flush=True)
                 bot_instance.sendMessage(CHANNEL_ID, "kevent")
             else:
-                break
+                break # Thoát khỏi vòng lặp nếu bị tắt từ web
     print("[HOURLY LOOP] Luồng vòng lặp đã dừng.", flush=True)
 
 # ===================================================================
@@ -258,9 +269,11 @@ def toggle_bot():
     global bot_thread, is_bot_running
     with lock:
         if is_bot_running:
-            is_bot_running = False; print("[CONTROL] Nhận được lệnh DỪNG bot.", flush=True)
+            is_bot_running = False
+            print("[CONTROL] Nhận được lệnh DỪNG bot.", flush=True)
         else:
-            is_bot_running = True; print("[CONTROL] Nhận được lệnh BẬT bot.", flush=True)
+            is_bot_running = True
+            print("[CONTROL] Nhận được lệnh BẬT bot.", flush=True)
             bot_thread = threading.Thread(target=run_event_bot_thread, daemon=True)
             bot_thread.start()
     return jsonify({"status": "ok"})
@@ -271,10 +284,14 @@ def toggle_hourly_loop():
     data = request.get_json()
     with lock:
         is_hourly_loop_enabled = data.get('enabled')
-        loop_delay_seconds = data.get('delay', 3600)
-        if is_hourly_loop_enabled and (hourly_loop_thread is None or not hourly_loop_thread.is_alive()):
-            hourly_loop_thread = threading.Thread(target=run_hourly_loop_thread, daemon=True)
-            hourly_loop_thread.start()
+        loop_delay_seconds = int(data.get('delay', 3600))
+        if is_hourly_loop_enabled:
+            if hourly_loop_thread is None or not hourly_loop_thread.is_alive():
+                hourly_loop_thread = threading.Thread(target=run_hourly_loop_thread, daemon=True)
+                hourly_loop_thread.start()
+            print(f"[CONTROL] Vòng lặp ĐÃ BẬT với delay {loop_delay_seconds} giây.", flush=True)
+        else:
+            print("[CONTROL] Vòng lặp ĐÃ TẮT.", flush=True)
     return jsonify({"status": "ok"})
 
 # ===================================================================
