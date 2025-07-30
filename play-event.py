@@ -46,7 +46,7 @@ lock = threading.Lock()
 # ===================================================================
 
 def click_button_by_index(message_data, index):
-    """Nhấn button bằng cách gửi request thủ công."""
+    """Nhấn button bằng cách gửi request thủ công và xử lý rate limit."""
     try:
         rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
         all_buttons = [button for row in rows for button in row]
@@ -71,11 +71,20 @@ def click_button_by_index(message_data, index):
         
         r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
         
+        # KIỂM TRA VÀ XỬ LÝ LỖI RATE LIMIT (429)
+        if r.status_code == 429:
+            retry_after = r.json().get("retry_after", 1.0)
+            print(f"WARN: Bị rate limit! Tự động chờ trong {retry_after} giây.")
+            time.sleep(retry_after)
+
         if 200 <= r.status_code < 300:
             print(f"INFO: Click thành công! (Status: {r.status_code})")
-        else:
+        # Bỏ qua việc in lại lỗi 429 vì đã xử lý
+        elif r.status_code != 429:
             print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})")
-        time.sleep(2.5)
+        
+        # Khoảng nghỉ ngắn sau mỗi lần click để an toàn hơn
+        time.sleep(1.8)
     except Exception as e:
         print(f"LỖI NGOẠI LỆ khi click button: {e}")
 
@@ -196,3 +205,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nĐang đóng kết nối...")
         bot.gateway.close()
+        
+    port = int(os.environ.get("PORT", 10000))
+    print(f"Khởi động Web Server tại http://0.0.0.0:{port}", flush=True)
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
