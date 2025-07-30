@@ -100,7 +100,7 @@ def click_button_by_index(message_data, index):
     # ĐỊNH NGHĨA ON_MESSAGE Ở ĐÂY, BÊN TRONG HÀM
     @bot.gateway.command
     def on_message(resp):
-        nonlocal active_message_id, action_queue
+        global active_message_id, action_queue
         if not is_bot_running:
             bot.gateway.close()
             return
