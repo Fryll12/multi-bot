@@ -6,7 +6,7 @@ import os
 import sys
 import random
 from collections import deque
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, request
 
 # ===================================================================
 # CẤU HÌNH VÀ BIẾN TOÀN CỤC
@@ -19,20 +19,24 @@ KARUTA_ID = "646937666251915264"
 
 # --- Kiểm tra biến môi trường ---
 if not TOKEN or not CHANNEL_ID:
-    print("LỖI: Vui lòng cung cấp DISCORD_TOKEN và CHANNEL_ID trong biến môi trường.")
+    print("LỖI: Vui lòng cung cấp DISCORD_TOKEN và CHANNEL_ID trong biến môi trường.", flush=True)
     sys.exit(1)
 
-# --- Biến trạng thái của Bot ---
+# --- Các biến trạng thái để điều khiển qua web ---
 bot_thread = None
-is_bot_running = False
+hourly_loop_thread = None
 bot_instance = None
+is_bot_running = False
+is_hourly_loop_enabled = False
+loop_delay_seconds = 3600  # Mặc định 1 giờ
 lock = threading.Lock()
 
 # ===================================================================
-# LOGIC BOT CHƠI EVENT (Gói gọn trong một hàm)
+# LOGIC BOT CHƠI EVENT (Giữ nguyên 100% logic gốc)
 # ===================================================================
 
-def run_solisfair_bot():
+def run_event_bot_thread():
+    """Hàm này chứa toàn bộ logic bot, chạy trong một luồng riêng."""
     global is_bot_running, bot_instance
 
     # Khởi tạo các biến riêng cho luồng bot
@@ -44,48 +48,51 @@ def run_solisfair_bot():
     with lock:
         bot_instance = bot
 
-def click_button_by_index(message_data, index):
-    """Nhấn button bằng cách gửi request thủ công."""
-    try:
-        rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
-        all_buttons = [button for row in rows for button in row]
-        if index >= len(all_buttons):
-            print(f"LỖI: Không tìm thấy button ở vị trí {index}")
-            return
+    def click_button_by_index(message_data, index):
+        """Nhấn button bằng cách gửi request thủ công."""
+        try:
+            # Tự tạo session_id ngẫu nhiên, đáng tin cậy hơn
+            session_id = 'a' + ''.join(random.choices('0123456789abcdef', k=31))
 
-        button_to_click = all_buttons[index]
-        custom_id = button_to_click.get("custom_id")
-        if not custom_id: return
+            rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
+            all_buttons = [button for row in rows for button in row]
+            if index >= len(all_buttons): return
 
-        headers = {"Authorization": TOKEN}
-        payload = {
-            "type": 3, "guild_id": message_data.get("guild_id"),
-            "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
-            "application_id": KARUTA_ID, "session_id": bot.gateway.session_id,
-            "data": {"component_type": 2, "custom_id": custom_id}
-        }
-        
-        emoji_name = button_to_click.get('emoji', {}).get('name', 'Không có')
-        print(f"INFO: Chuẩn bị click button ở vị trí {index} (Emoji: {emoji_name})")
-        
-        r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
-        
-        if 200 <= r.status_code < 300:
-            print(f"INFO: Click thành công! (Status: {r.status_code})")
-        else:
-            print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})")
-        time.sleep(1.8)
-    except Exception as e:
-        print(f"LỖI NGOẠI LỆ khi click button: {e}")
+            button_to_click = all_buttons[index]
+            custom_id = button_to_click.get("custom_id")
+            if not custom_id: return
+
+            headers = {"Authorization": TOKEN}
+            payload = {
+                "type": 3, "guild_id": message_data.get("guild_id"),
+                "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
+                "application_id": KARUTA_ID, "session_id": session_id,
+                "data": {"component_type": 2, "custom_id": custom_id}
+            }
+            
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+            
+            if r.status_code == 429:
+                retry_after = r.json().get("retry_after", 1.0)
+                print(f"[EVENT BOT] WARN: Bị rate limit! Chờ {retry_after} giây.", flush=True)
+                time.sleep(retry_after)
+            
+            time.sleep(1.8)
+        except Exception as e:
+            print(f"[EVENT BOT] LỖI NGOẠI LỆ khi click: {e}", flush=True)
 
     def perform_final_confirmation(message_data):
+        """Chờ 2 giây rồi mới nhấn nút xác nhận cuối cùng."""
+        print("ACTION: Chờ 2 giây để nút xác nhận cuối cùng load...", flush=True)
         time.sleep(2)
         click_button_by_index(message_data, 2)
+        print("INFO: Đã hoàn thành lượt. Chờ game tự động cập nhật để bắt đầu lượt mới...", flush=True)
 
     @bot.gateway.command
     def on_message(resp):
         nonlocal active_message_id, action_queue
         
+        # Nếu bot bị tắt từ web, ngắt kết nối gateway
         if not is_bot_running:
             bot.gateway.close()
             return
@@ -94,14 +101,12 @@ def click_button_by_index(message_data, index):
         m = resp.parsed.auto()
         if not (m.get("author", {}).get("id") == KARUTA_ID and m.get("channel_id") == CHANNEL_ID): return
         
-        # Logic xử lý game
         with lock:
             if resp.event.message and "Takumi's Solisfair Stand" in m.get("embeds", [{}])[0].get("title", ""):
                 if active_message_id is not None: return
                 active_message_id = m.get("id")
                 action_queue.clear()
-                print(f"[EVENT BOT] INFO: Bắt đầu game mới trên tin nhắn ID: {active_message_id}")
-            
+                print(f"\nINFO: Bắt đầu game mới trên tin nhắn ID: {active_message_id}", flush=True)
             if m.get("id") != active_message_id: return
 
         embed_desc = m.get("embeds", [{}])[0].get("description", "")
@@ -132,10 +137,33 @@ def click_button_by_index(message_data, index):
                     threading.Thread(target=click_button_by_index, args=(m, next_action_index)).start()
 
     # Vòng lặp chính của gateway
-    print("[EVENT BOT] Luồng bot đã khởi động.")
+    print("[EVENT BOT] Luồng bot đã khởi động.", flush=True)
     bot.gateway.run(auto_reconnect=True)
-    print("[EVENT BOT] Luồng bot đã dừng.")
+    print("[EVENT BOT] Luồng bot đã dừng.", flush=True)
 
+
+def run_hourly_loop_thread():
+    """Hàm này chứa vòng lặp gửi kevent, chạy trong một luồng riêng."""
+    global is_hourly_loop_enabled, loop_delay_seconds
+    
+    print("[HOURLY LOOP] Luồng vòng lặp đã khởi động.", flush=True)
+    while is_hourly_loop_enabled:
+        # Chờ khoảng thời gian đã được cấu hình
+        # Thay vì sleep một lần dài, sleep 1 giây nhiều lần để có thể dừng ngay lập tức
+        for _ in range(loop_delay_seconds):
+            if not is_hourly_loop_enabled:
+                break
+            time.sleep(1)
+
+        # Nếu vòng lặp vẫn được bật sau khi chờ xong
+        with lock:
+            if is_hourly_loop_enabled and bot_instance:
+                print(f"\n[HOURLY LOOP] Hết {loop_delay_seconds} giây. Tự động gửi lại lệnh 'kevent'...", flush=True)
+                bot_instance.sendMessage(CHANNEL_ID, "kevent")
+            else:
+                break # Thoát khỏi vòng lặp nếu bị tắt
+
+    print("[HOURLY LOOP] Luồng vòng lặp đã dừng.", flush=True)
 
 # ===================================================================
 # WEB SERVER (FLASK) ĐỂ ĐIỀU KHIỂN
@@ -147,48 +175,104 @@ HTML_TEMPLATE = """
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Solis-Fair Bot Control</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .container { text-align: center; background-color: #1e1e1e; padding: 40px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        h1 { color: #bb86fc; }
-        #status { font-size: 1.2em; margin: 20px 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; flex-direction: column; gap: 20px;}
+        .panel { text-align: center; background-color: #1e1e1e; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.5); width: 400px; }
+        h1, h2 { color: #bb86fc; }
+        .status { font-size: 1.1em; margin: 15px 0; }
         .status-on { color: #03dac6; }
         .status-off { color: #cf6679; }
-        button { background-color: #bb86fc; color: #121212; border: none; padding: 15px 30px; font-size: 1em; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; }
-        button:hover { background-color: #3700b3; }
+        button { background-color: #bb86fc; color: #121212; border: none; padding: 12px 24px; font-size: 1em; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; font-weight: bold; }
+        button:hover { background-color: #a050f0; }
+        button.off-button { background-color: #444; color: #ccc; }
+        button.off-button:hover { background-color: #555; }
+        .input-group { display: flex; margin-top: 15px; }
+        .input-group label { padding: 10px; background-color: #333; border-radius: 5px 0 0 5px; }
+        .input-group input { flex-grow: 1; border: 1px solid #333; background-color: #222; color: #eee; padding: 10px; border-radius: 0 5px 5px 0; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Solis-Fair Event Bot Control</h1>
-        <div id="status">Trạng thái: Đang tải...</div>
-        <button id="toggleBtn">Bắt đầu</button>
+    <div class="panel">
+        <h1>Bot Event Solis-Fair</h1>
+        <div id="bot-status" class="status">Trạng thái: Đang tải...</div>
+        <button id="toggleBotBtn">Bắt đầu</button>
     </div>
+    <div class="panel">
+        <h2>Vòng lặp hàng giờ</h2>
+        <div id="loop-status" class="status">Trạng thái: Đang tải...</div>
+        <div class="input-group">
+            <label for="delay-input">Delay (giây)</label>
+            <input type="number" id="delay-input" value="3600">
+        </div>
+        <button id="toggleLoopBtn" style="margin-top: 15px;">Bắt đầu</button>
+    </div>
+
     <script>
-        const statusDiv = document.getElementById('status');
-        const toggleBtn = document.getElementById('toggleBtn');
+        const botStatusDiv = document.getElementById('bot-status');
+        const toggleBotBtn = document.getElementById('toggleBotBtn');
+        const loopStatusDiv = document.getElementById('loop-status');
+        const toggleLoopBtn = document.getElementById('toggleLoopBtn');
+        const delayInput = document.getElementById('delay-input');
+
+        async function postData(url, data) {
+            await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            fetchStatus();
+        }
 
         async function fetchStatus() {
-            const response = await fetch('/api/status');
-            const data = await response.json();
-            if (data.is_running) {
-                statusDiv.textContent = 'Trạng thái: ĐANG CHẠY';
-                statusDiv.className = 'status-on';
-                toggleBtn.textContent = 'DỪNG BOT';
-            } else {
-                statusDiv.textContent = 'Trạng thái: ĐÃ DỪNG';
-                statusDiv.className = 'status-off';
-                toggleBtn.textContent = 'BẬT BOT & GỬI KEVENT';
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+
+                // Cập nhật trạng thái Bot chính
+                if (data.is_bot_running) {
+                    botStatusDiv.textContent = 'Trạng thái: ĐANG CHẠY';
+                    botStatusDiv.className = 'status status-on';
+                    toggleBotBtn.textContent = 'DỪNG BOT';
+                    toggleBotBtn.className = '';
+                } else {
+                    botStatusDiv.textContent = 'Trạng thái: ĐÃ DỪNG';
+                    botStatusDiv.className = 'status status-off';
+                    toggleBotBtn.textContent = 'BẬT BOT & GỬI KEVENT';
+                    toggleBotBtn.className = '';
+                }
+
+                // Cập nhật trạng thái Vòng lặp
+                if (data.is_hourly_loop_enabled) {
+                    loopStatusDiv.textContent = 'Trạng thái: ĐANG CHẠY';
+                    loopStatusDiv.className = 'status status-on';
+                    toggleLoopBtn.textContent = 'TẮT VÒNG LẶP';
+                    toggleLoopBtn.className = '';
+                } else {
+                    loopStatusDiv.textContent = 'Trạng thái: ĐÃ DỪNG';
+                    loopStatusDiv.className = 'status status-off';
+                    toggleLoopBtn.textContent = 'BẬT VÒNG LẶP';
+                    toggleLoopBtn.className = 'off-button';
+                }
+                delayInput.value = data.loop_delay_seconds;
+
+            } catch (e) {
+                botStatusDiv.textContent = 'Lỗi kết nối đến server.';
+                botStatusDiv.className = 'status status-off';
             }
         }
 
-        toggleBtn.addEventListener('click', async () => {
-            await fetch('/api/toggle', { method: 'POST' });
-            fetchStatus();
+        toggleBotBtn.addEventListener('click', () => postData('/api/toggle_bot', {}));
+        toggleLoopBtn.addEventListener('click', () => {
+            const currentStatus = loopStatusDiv.textContent.includes('ĐANG CHẠY');
+            postData('/api/toggle_hourly_loop', {
+                enabled: !currentStatus,
+                delay: parseInt(delayInput.value, 10)
+            });
         });
 
-        setInterval(fetchStatus, 3000);
+        setInterval(fetchStatus, 5000);
         fetchStatus();
     </script>
 </body>
@@ -201,29 +285,58 @@ def index():
 
 @app.route("/api/status")
 def status():
-    return jsonify({"is_running": is_bot_running})
+    """Cung cấp trạng thái hiện tại của các tính năng."""
+    return jsonify({
+        "is_bot_running": is_bot_running,
+        "is_hourly_loop_enabled": is_hourly_loop_enabled,
+        "loop_delay_seconds": loop_delay_seconds
+    })
 
-@app.route("/api/toggle", methods=['POST'])
+@app.route("/api/toggle_bot", methods=['POST'])
 def toggle_bot():
+    """Bật hoặc tắt luồng bot chính."""
     global bot_thread, is_bot_running, bot_instance
     with lock:
         if is_bot_running:
-            print("[CONTROL] Nhận được lệnh DỪNG bot.")
+            print("[CONTROL] Nhận được lệnh DỪNG bot.", flush=True)
             is_bot_running = False
             if bot_instance:
                 bot_instance.gateway.close()
             bot_thread = None
         else:
-            print("[CONTROL] Nhận được lệnh BẬT bot.")
+            print("[CONTROL] Nhận được lệnh BẬT bot.", flush=True)
             is_bot_running = True
-            bot_thread = threading.Thread(target=run_solisfair_bot, daemon=True)
+            bot_thread = threading.Thread(target=run_event_bot_thread, daemon=True)
             bot_thread.start()
             # Chờ một chút để bot kết nối rồi mới gửi lệnh
             time.sleep(7)
             if bot_instance:
                 bot_instance.sendMessage(CHANNEL_ID, "kevent")
-                print("[CONTROL] Đã gửi lệnh 'kevent' đầu tiên.")
+                print("[CONTROL] Đã gửi lệnh 'kevent' đầu tiên.", flush=True)
+    return jsonify({"status": "ok"})
 
+@app.route("/api/toggle_hourly_loop", methods=['POST'])
+def toggle_hourly_loop():
+    """Bật/tắt và cập nhật cài đặt cho vòng lặp."""
+    global hourly_loop_thread, is_hourly_loop_enabled, loop_delay_seconds
+    data = request.get_json()
+    new_state = data.get('enabled')
+    new_delay = data.get('delay')
+
+    with lock:
+        is_hourly_loop_enabled = new_state
+        if new_delay is not None:
+            loop_delay_seconds = int(new_delay)
+        
+        if is_hourly_loop_enabled:
+            # Chỉ bắt đầu luồng mới nếu nó chưa chạy
+            if hourly_loop_thread is None or not hourly_loop_thread.is_alive():
+                hourly_loop_thread = threading.Thread(target=run_hourly_loop_thread, daemon=True)
+                hourly_loop_thread.start()
+            print(f"[CONTROL] Vòng lặp ĐÃ BẬT với delay {loop_delay_seconds} giây.", flush=True)
+        else:
+            print("[CONTROL] Vòng lặp ĐÃ TẮT.", flush=True)
+            # Luồng sẽ tự thoát ở lần kiểm tra tiếp theo
     return jsonify({"status": "ok"})
 
 
@@ -232,5 +345,5 @@ def toggle_bot():
 # ===================================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    print(f"[SERVER] Khởi động Web Server tại http://0.0.0.0:{port}")
+    print(f"[SERVER] Khởi động Web Server tại http://0.0.0.0:{port}", flush=True)
     app.run(host="0.0.0.0", port=port, debug=False)
