@@ -44,7 +44,7 @@ def run_solisfair_bot():
     with lock:
         bot_instance = bot
 
-    def click_button_by_index(message_data, index):
+def click_button_by_index(message_data, index):
     """Nhấn button bằng cách gửi request thủ công."""
     try:
         rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
