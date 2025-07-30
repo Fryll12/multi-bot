@@ -143,7 +143,7 @@ def run_event_bot_thread():
     # Vòng lặp chính của gateway
     print("[EVENT BOT] Luồng bot đã khởi động và đang lắng nghe tin nhắn.", flush=True)
     bot.gateway.run(auto_reconnect=True)
-    print("[EVENT BOT] Luồng bot đã dừng.", flush=True))
+    print("[EVENT BOT] Luồng bot đã dừng.", flush=True)
 
 
 def run_hourly_loop_thread():
