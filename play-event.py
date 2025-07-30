@@ -111,7 +111,7 @@ def run_event_bot_thread():
 
     @bot.gateway.command
     def on_message(resp):
-        nonlocal active_message_id, action_queue
+        global active_message_id, action_queue
         if not is_bot_running:
             bot.gateway.close()
             return
