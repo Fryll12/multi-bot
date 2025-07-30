@@ -88,7 +88,7 @@ def run_event_bot_thread():
         click_button_by_index(message_data, 2)
         print("INFO: Đã hoàn thành lượt. Chờ game tự động cập nhật để bắt đầu lượt mới...", flush=True)
 
-    @bot.gateway.command
+@bot.gateway.command
 def on_message(resp):
     global active_message_id, action_queue
     
