@@ -136,10 +136,14 @@ def run_event_bot_thread():
                     next_action_index = action_queue.popleft()
                     threading.Thread(target=click_button_by_index, args=(m, next_action_index)).start()
 
+    print("[EVENT BOT] Chờ 7 giây để kết nối và gửi lệnh đầu tiên...", flush=True)
+    time.sleep(7)
+    bot.sendMessage(CHANNEL_ID, "kevent")
+
     # Vòng lặp chính của gateway
-    print("[EVENT BOT] Luồng bot đã khởi động.", flush=True)
+    print("[EVENT BOT] Luồng bot đã khởi động và đang lắng nghe tin nhắn.", flush=True)
     bot.gateway.run(auto_reconnect=True)
-    print("[EVENT BOT] Luồng bot đã dừng.", flush=True)
+    print("[EVENT BOT] Luồng bot đã dừng.", flush=True))
 
 
 def run_hourly_loop_thread():
@@ -308,11 +312,6 @@ def toggle_bot():
             is_bot_running = True
             bot_thread = threading.Thread(target=run_event_bot_thread, daemon=True)
             bot_thread.start()
-            # Chờ một chút để bot kết nối rồi mới gửi lệnh
-            time.sleep(7)
-            if bot_instance:
-                bot_instance.sendMessage(CHANNEL_ID, "kevent")
-                print("[CONTROL] Đã gửi lệnh 'kevent' đầu tiên.", flush=True)
     return jsonify({"status": "ok"})
 
 @app.route("/api/toggle_hourly_loop", methods=['POST'])
