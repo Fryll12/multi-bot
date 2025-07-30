@@ -1,211 +1,231 @@
 import discum
 import time
 import threading
-import json
-import random
 import requests
 import os
 import sys
+import random
 from collections import deque
+from flask import Flask, jsonify, render_template_string
 
 # ===================================================================
-# LẤY CẤU HÌNH TỪ BIẾN MÔI TRƯỜNG
+# CẤU HÌNH VÀ BIẾN TOÀN CỤC
 # ===================================================================
 
-# !!! TOKEN VÀ CHANNEL ID SẼ ĐƯỢC LẤY TỪ BIẾN MÔI TRƯỜNG TRÊN RENDER !!!
+# --- Lấy cấu hình từ biến môi trường ---
 TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 KARUTA_ID = "646937666251915264"
 
-# --- Kiểm tra các biến môi trường bắt buộc ---
+# --- Kiểm tra biến môi trường ---
 if not TOKEN or not CHANNEL_ID:
     print("LỖI: Vui lòng cung cấp DISCORD_TOKEN và CHANNEL_ID trong biến môi trường.")
-    sys.exit(1) # Dừng chương trình nếu thiếu
+    sys.exit(1)
 
-# --- Cấu hình tùy chọn với giá trị mặc định ---
-# Bật/tắt tính năng gửi kevent hàng giờ (mặc định là "true")
-HOURLY_KEVENT_ENABLED = os.getenv("HOURLY_KEVENT_ENABLED", "true").lower() == "true"
-
-# Tùy chỉnh thời gian lặp lại (mặc định là 3600 giây = 1 giờ)
-try:
-    KEVENT_INTERVAL_SECONDS = int(os.getenv("KEVENT_INTERVAL_SECONDS", "3600"))
-except ValueError:
-    print("LỖI: KEVENT_INTERVAL_SECONDS phải là một con số. Sử dụng giá trị mặc định 3600.")
-    KEVENT_INTERVAL_SECONDS = 3600
-
-# ===================================================================
-# KHAI BÁO BIẾN TOÀN CỤC
-# ===================================================================
-bot = discum.Client(token=TOKEN, log=False)
-active_message_id = None
-action_queue = deque()
+# --- Biến trạng thái của Bot ---
+bot_thread = None
+is_bot_running = False
+bot_instance = None
 lock = threading.Lock()
 
 # ===================================================================
-# HÀM LOGIC (Không thay đổi)
+# LOGIC BOT CHƠI EVENT (Gói gọn trong một hàm)
 # ===================================================================
 
-def click_button_by_index(message_data, index):
-    """Nhấn button bằng cách gửi request thủ công và xử lý rate limit."""
-    try:
-        rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
-        all_buttons = [button for row in rows for button in row]
-        if index >= len(all_buttons):
-            print(f"LỖI: Không tìm thấy button ở vị trí {index}")
-            return
+def run_solisfair_bot():
+    global is_bot_running, bot_instance
 
-        button_to_click = all_buttons[index]
-        custom_id = button_to_click.get("custom_id")
-        if not custom_id: return
+    # Khởi tạo các biến riêng cho luồng bot
+    active_message_id = None
+    action_queue = deque()
 
-        headers = {"Authorization": TOKEN}
-        payload = {
-            "type": 3, "guild_id": message_data.get("guild_id"),
-            "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
-            "application_id": KARUTA_ID, "session_id": bot.gateway.session_id,
-            "data": {"component_type": 2, "custom_id": custom_id}
-        }
-        
-        emoji_name = button_to_click.get('emoji', {}).get('name', 'Không có')
-        print(f"INFO: Chuẩn bị click button ở vị trí {index} (Emoji: {emoji_name})")
-        
-        r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
-        
-        # KIỂM TRA VÀ XỬ LÝ LỖI RATE LIMIT (429)
-        if r.status_code == 429:
-            retry_after = r.json().get("retry_after", 1.0)
-            print(f"WARN: Bị rate limit! Tự động chờ trong {retry_after} giây.")
-            time.sleep(retry_after)
-
-        if 200 <= r.status_code < 300:
-            print(f"INFO: Click thành công! (Status: {r.status_code})")
-        # Bỏ qua việc in lại lỗi 429 vì đã xử lý
-        elif r.status_code != 429:
-            print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})")
-        
-        # Khoảng nghỉ ngắn sau mỗi lần click để an toàn hơn
-        time.sleep(1.8)
-    except Exception as e:
-        print(f"LỖI NGOẠI LỆ khi click button: {e}")
-
-def perform_final_confirmation(message_data):
-    """Chờ 2 giây rồi mới nhấn nút xác nhận cuối cùng."""
-    print("ACTION: Chờ 2 giây để nút xác nhận cuối cùng load...")
-    time.sleep(2)
-    click_button_by_index(message_data, 2)
-    print("INFO: Đã hoàn thành lượt. Chờ game tự động cập nhật để bắt đầu lượt mới...")
-
-# ===================================================================
-# HÀM TỰ ĐỘNG GỬI LỆNH THEO THỜI GIAN
-# ===================================================================
-
-def send_kevent_periodically(interval_seconds):
-    """Gửi lệnh 'kevent' theo chu kỳ và reset trạng thái game."""
-    global active_message_id
-    while True:
-        # Chờ khoảng thời gian đã được cấu hình
-        time.sleep(interval_seconds)
-        try:
-            print(f"\nINFO: Đã hết {interval_seconds} giây. Tự động gửi lại lệnh 'kevent'...")
-            
-            with lock:
-                active_message_id = None
-                action_queue.clear()
-            
-            bot.sendMessage(CHANNEL_ID, "kevent")
-            print("INFO: Đã gửi 'kevent' và reset trạng thái game.")
-            
-        except Exception as e:
-            print(f"LỖI NGOẠI LỆ khi gửi 'kevent' định kỳ: {e}")
-
-# ===================================================================
-# BỘ XỬ LÝ TIN NHẮN (GATEWAY - Không thay đổi)
-# ===================================================================
-
-@bot.gateway.command
-def on_message(resp):
-    global active_message_id, action_queue
-    
-    if not (resp.event.message or resp.event.message_updated): return
-    m = resp.parsed.auto()
-    if not (m.get("author", {}).get("id") == KARUTA_ID and m.get("channel_id") == CHANNEL_ID): return
-    
+    # Tạo đối tượng bot
+    bot = discum.Client(token=TOKEN, log=False)
     with lock:
-        if resp.event.message and "Takumi's Solisfair Stand" in m.get("embeds", [{}])[0].get("title", ""):
-            if active_message_id is not None: return
-            active_message_id = m.get("id")
-            action_queue.clear()
-            print(f"\nINFO: Bắt đầu game mới trên tin nhắn ID: {active_message_id}")
+        bot_instance = bot
+
+    def click_button_by_index(message_data, index):
+        try:
+            rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
+            all_buttons = [button for row in rows for button in row]
+            if index >= len(all_buttons): return
+
+            button_to_click = all_buttons[index]
+            custom_id = button_to_click.get("custom_id")
+            if not custom_id: return
+
+            headers = {"Authorization": TOKEN}
+            payload = {
+                "type": 3, "guild_id": message_data.get("guild_id"),
+                "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
+                "application_id": KARUTA_ID, "session_id": bot.gateway.session_id,
+                "data": {"component_type": 2, "custom_id": custom_id}
+            }
+            
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+            
+            if r.status_code == 429:
+                retry_after = r.json().get("retry_after", 1.0)
+                print(f"[EVENT BOT] WARN: Bị rate limit! Chờ {retry_after} giây.")
+                time.sleep(retry_after)
+            
+            time.sleep(1.8)
+        except Exception as e:
+            print(f"[EVENT BOT] LỖI NGOẠI LỆ khi click: {e}")
+
+    def perform_final_confirmation(message_data):
+        time.sleep(2)
+        click_button_by_index(message_data, 2)
+
+    @bot.gateway.command
+    def on_message(resp):
+        nonlocal active_message_id, action_queue
         
-        if m.get("id") != active_message_id: return
-
-    embed_desc = m.get("embeds", [{}])[0].get("description", "")
-    all_buttons_flat = [b for row in m.get('components', []) for b in row.get('components', []) if row.get('type') == 1]
-    
-    is_movement_phase = any(b.get('emoji', {}).get('name') == '▶️' for b in all_buttons_flat)
-    is_final_confirm_phase = any(b.get('emoji', {}).get('name') == '❌' for b in all_buttons_flat)
-    found_good_move = "If placed here, you will receive the following fruit:" in embed_desc
-    has_received_fruit = "You received the following fruit:" in embed_desc
-
-    if is_final_confirm_phase:
-        print("INFO: Phát hiện giai đoạn xác nhận cuối cùng. Thực hiện click cuối.")
+        if not is_bot_running:
+            bot.gateway.close()
+            return
+            
+        if not (resp.event.message or resp.event.message_updated): return
+        m = resp.parsed.auto()
+        if not (m.get("author", {}).get("id") == KARUTA_ID and m.get("channel_id") == CHANNEL_ID): return
+        
+        # Logic xử lý game
         with lock:
-            action_queue.clear() 
-        threading.Thread(target=perform_final_confirmation, args=(m,)).start()
-    elif has_received_fruit:
-        print("INFO: Phát hiện đã nhận được trái cây. Nhấn nút 0 để tiếp tục...")
-        threading.Thread(target=click_button_by_index, args=(m, 0)).start()
-    elif is_movement_phase:
-        with lock:
-            if found_good_move:
-                print("INFO: NGẮT QUÃNG - Phát hiện nước đi có kết quả. Xóa hàng đợi và xác nhận ngay.")
+            if resp.event.message and "Takumi's Solisfair Stand" in m.get("embeds", [{}])[0].get("title", ""):
+                if active_message_id is not None: return
+                active_message_id = m.get("id")
                 action_queue.clear()
-                action_queue.append(0)
-            elif not action_queue:
-                print("INFO: Bắt đầu lượt mới. Tạo chuỗi hành động ngẫu nhiên...")
-                num_moves = random.randint(10, 20)
-                movement_indices = [1, 2, 3, 4]
-                for _ in range(num_moves):
-                    action_queue.append(random.choice(movement_indices))
-                action_queue.append(0)
-                print(f"INFO: Chuỗi hành động mới ({len(action_queue)} bước): {list(action_queue)}")
-            if action_queue:
-                next_action_index = action_queue.popleft()
-                threading.Thread(target=click_button_by_index, args=(m, next_action_index)).start()
+                print(f"[EVENT BOT] INFO: Bắt đầu game mới trên tin nhắn ID: {active_message_id}")
+            
+            if m.get("id") != active_message_id: return
 
-def main_gateway():
-    print("Đang kết nối với Discord Gateway...")
-    bot.gateway.run(auto_reconnect=True)
-
-# ===================================================================
-# KHỞI CHẠY BOT
-# ===================================================================
-
-if __name__ == "__main__":
-    gateway_thread = threading.Thread(target=main_gateway, daemon=True)
-    gateway_thread.start()
-    
-    # Chỉ bắt đầu luồng gửi định kỳ nếu được bật
-    if HOURLY_KEVENT_ENABLED:
-        print(f"INFO: Tính năng tự động gửi 'kevent' mỗi {KEVENT_INTERVAL_SECONDS} giây đã được BẬT.")
-        periodic_thread = threading.Thread(target=send_kevent_periodically, args=(KEVENT_INTERVAL_SECONDS,), daemon=True)
-        periodic_thread.start()
-    else:
-        print("INFO: Tính năng tự động gửi 'kevent' đã được TẮT.")
-
-    time.sleep(7)
-    
-    print("--- BOT TỰ ĐỘNG CHƠI EVENT SOLISFAIR (LOGIC CUỐI CÙNG) ---")
-    print("INFO: Gửi lệnh 'kevent' đầu tiên để bắt đầu.")
-    bot.sendMessage(CHANNEL_ID, "kevent")
-
-    try:
-        while True:
-            time.sleep(1) # Giữ chương trình chính chạy
-    except KeyboardInterrupt:
-        print("\nĐang đóng kết nối...")
-        bot.gateway.close()
+        embed_desc = m.get("embeds", [{}])[0].get("description", "")
+        all_buttons_flat = [b for row in m.get('components', []) for b in row.get('components', []) if row.get('type') == 1]
         
+        is_movement_phase = any(b.get('emoji', {}).get('name') == '▶️' for b in all_buttons_flat)
+        is_final_confirm_phase = any(b.get('emoji', {}).get('name') == '❌' for b in all_buttons_flat)
+        found_good_move = "If placed here, you will receive the following fruit:" in embed_desc
+        has_received_fruit = "You received the following fruit:" in embed_desc
+
+        if is_final_confirm_phase:
+            threading.Thread(target=perform_final_confirmation, args=(m,)).start()
+        elif has_received_fruit:
+            threading.Thread(target=click_button_by_index, args=(m, 0)).start()
+        elif is_movement_phase:
+            with lock:
+                if found_good_move:
+                    action_queue.clear()
+                    action_queue.append(0)
+                elif not action_queue:
+                    num_moves = random.randint(10, 20)
+                    movement_indices = [1, 2, 3, 4]
+                    for _ in range(num_moves):
+                        action_queue.append(random.choice(movement_indices))
+                    action_queue.append(0)
+                if action_queue:
+                    next_action_index = action_queue.popleft()
+                    threading.Thread(target=click_button_by_index, args=(m, next_action_index)).start()
+
+    # Vòng lặp chính của gateway
+    print("[EVENT BOT] Luồng bot đã khởi động.")
+    bot.gateway.run(auto_reconnect=True)
+    print("[EVENT BOT] Luồng bot đã dừng.")
+
+
+# ===================================================================
+# WEB SERVER (FLASK) ĐỂ ĐIỀU KHIỂN
+# ===================================================================
+app = Flask(__name__)
+
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Solis-Fair Bot Control</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #121212; color: #e0e0e0; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { text-align: center; background-color: #1e1e1e; padding: 40px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        h1 { color: #bb86fc; }
+        #status { font-size: 1.2em; margin: 20px 0; }
+        .status-on { color: #03dac6; }
+        .status-off { color: #cf6679; }
+        button { background-color: #bb86fc; color: #121212; border: none; padding: 15px 30px; font-size: 1em; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #3700b3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Solis-Fair Event Bot Control</h1>
+        <div id="status">Trạng thái: Đang tải...</div>
+        <button id="toggleBtn">Bắt đầu</button>
+    </div>
+    <script>
+        const statusDiv = document.getElementById('status');
+        const toggleBtn = document.getElementById('toggleBtn');
+
+        async function fetchStatus() {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+            if (data.is_running) {
+                statusDiv.textContent = 'Trạng thái: ĐANG CHẠY';
+                statusDiv.className = 'status-on';
+                toggleBtn.textContent = 'DỪNG BOT';
+            } else {
+                statusDiv.textContent = 'Trạng thái: ĐÃ DỪNG';
+                statusDiv.className = 'status-off';
+                toggleBtn.textContent = 'BẬT BOT & GỬI KEVENT';
+            }
+        }
+
+        toggleBtn.addEventListener('click', async () => {
+            await fetch('/api/toggle', { method: 'POST' });
+            fetchStatus();
+        });
+
+        setInterval(fetchStatus, 3000);
+        fetchStatus();
+    </script>
+</body>
+</html>
+"""
+
+@app.route("/")
+def index():
+    return render_template_string(HTML_TEMPLATE)
+
+@app.route("/api/status")
+def status():
+    return jsonify({"is_running": is_bot_running})
+
+@app.route("/api/toggle", methods=['POST'])
+def toggle_bot():
+    global bot_thread, is_bot_running, bot_instance
+    with lock:
+        if is_bot_running:
+            print("[CONTROL] Nhận được lệnh DỪNG bot.")
+            is_bot_running = False
+            if bot_instance:
+                bot_instance.gateway.close()
+            bot_thread = None
+        else:
+            print("[CONTROL] Nhận được lệnh BẬT bot.")
+            is_bot_running = True
+            bot_thread = threading.Thread(target=run_solisfair_bot, daemon=True)
+            bot_thread.start()
+            # Chờ một chút để bot kết nối rồi mới gửi lệnh
+            time.sleep(7)
+            if bot_instance:
+                bot_instance.sendMessage(CHANNEL_ID, "kevent")
+                print("[CONTROL] Đã gửi lệnh 'kevent' đầu tiên.")
+
+    return jsonify({"status": "ok"})
+
+
+# ===================================================================
+# KHỞI CHẠY WEB SERVER
+# ===================================================================
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    print(f"Khởi động Web Server tại http://0.0.0.0:{port}", flush=True)
-    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
+    print(f"[SERVER] Khởi động Web Server tại http://0.0.0.0:{port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
