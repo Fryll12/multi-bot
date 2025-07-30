@@ -170,22 +170,34 @@ def run_event_bot_thread():
 # ===================================================================
 
 def run_hourly_loop_thread():
-    """Hàm chứa vòng lặp gửi kevent, chạy trong một luồng riêng."""
+    """Hàm chứa vòng lặp gửi kevent, tự quản lý việc gửi tin để đảm bảo độ tin cậy."""
     global is_hourly_loop_enabled, loop_delay_seconds
     print("[HOURLY LOOP] Luồng vòng lặp đã khởi động.", flush=True)
+    
     while is_hourly_loop_enabled:
-        # Chờ theo từng giây để có thể dừng ngay lập tức
+        # Chờ theo từng giây để có thể dừng ngay lập tức từ web
         for _ in range(loop_delay_seconds):
             if not is_hourly_loop_enabled:
                 break
             time.sleep(1)
         
-        with lock:
-            if is_hourly_loop_enabled and bot_instance and is_bot_running:
-                print(f"\n[HOURLY LOOP] Hết {loop_delay_seconds} giây. Tự động gửi lại lệnh 'kevent'...", flush=True)
-                bot_instance.sendMessage(CHANNEL_ID, "kevent")
-            else:
-                break # Thoát khỏi vòng lặp nếu bị tắt từ web
+        # Nếu vòng lặp bị tắt trong lúc chờ, thoát ra
+        if not is_hourly_loop_enabled:
+            break
+
+        # Chỉ gửi khi vòng lặp và bot chính đều được bật
+        if is_bot_running:
+            print(f"\n[HOURLY LOOP] Hết {loop_delay_seconds} giây. Tự động gửi lại lệnh 'kevent'...", flush=True)
+            try:
+                # Tạo một bot tạm thời CHỈ để gửi tin nhắn, đảm bảo kết nối luôn mới
+                temp_bot = discum.Client(token=TOKEN, log=False)
+                temp_bot.sendMessage(CHANNEL_ID, "kevent")
+                print("[HOURLY LOOP] Gửi 'kevent' thành công.", flush=True)
+            except Exception as e:
+                print(f"[HOURLY LOOP] Lỗi khi gửi 'kevent': {e}", flush=True)
+        else:
+            print("[HOURLY LOOP] Bỏ qua vì bot chính đang không chạy.", flush=True)
+
     print("[HOURLY LOOP] Luồng vòng lặp đã dừng.", flush=True)
 
 # ===================================================================
