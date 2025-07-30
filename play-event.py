@@ -89,25 +89,24 @@ def run_event_bot_thread():
         print("INFO: Đã hoàn thành lượt. Chờ game tự động cập nhật để bắt đầu lượt mới...", flush=True)
 
     @bot.gateway.command
-    def on_message(resp):
-        nonlocal active_message_id, action_queue
+def on_message(resp):
+    global active_message_id, action_queue
+    
+    if not (resp.event.message or resp.event.message_updated): return
+    m = resp.parsed.auto()
+    if not (m.get("author", {}).get("id") == KARUTA_ID and m.get("channel_id") == CHANNEL_ID): return
+    
+    # Biến để lưu hành động cần thực hiện
+    action_to_perform = None
+    
+    with lock:
+        if resp.event.message and "Takumi's Solisfair Stand" in m.get("embeds", [{}])[0].get("title", ""):
+            if active_message_id is not None: return
+            active_message_id = m.get("id")
+            action_queue.clear()
+            print(f"\nINFO: Bắt đầu game mới trên tin nhắn ID: {active_message_id}", flush=True)
         
-        # Nếu bot bị tắt từ web, ngắt kết nối gateway
-        if not is_bot_running:
-            bot.gateway.close()
-            return
-            
-        if not (resp.event.message or resp.event.message_updated): return
-        m = resp.parsed.auto()
-        if not (m.get("author", {}).get("id") == KARUTA_ID and m.get("channel_id") == CHANNEL_ID): return
-        
-        with lock:
-            if resp.event.message and "Takumi's Solisfair Stand" in m.get("embeds", [{}])[0].get("title", ""):
-                if active_message_id is not None: return
-                active_message_id = m.get("id")
-                action_queue.clear()
-                print(f"\nINFO: Bắt đầu game mới trên tin nhắn ID: {active_message_id}", flush=True)
-            if m.get("id") != active_message_id: return
+        if m.get("id") != active_message_id: return
 
         embed_desc = m.get("embeds", [{}])[0].get("description", "")
         all_buttons_flat = [b for row in m.get('components', []) for b in row.get('components', []) if row.get('type') == 1]
@@ -118,33 +117,37 @@ def run_event_bot_thread():
         has_received_fruit = "You received the following fruit:" in embed_desc
 
         if is_final_confirm_phase:
-            threading.Thread(target=perform_final_confirmation, args=(m,)).start()
+            # Lên lịch hành động và thoát khỏi lock
+            action_to_perform = {"type": "final_confirm", "data": m}
         elif has_received_fruit:
-            threading.Thread(target=click_button_by_index, args=(m, 0)).start()
+            action_to_perform = {"type": "click", "index": 0, "data": m}
         elif is_movement_phase:
-            with lock:
-                if found_good_move:
-                    action_queue.clear()
-                    action_queue.append(0)
-                elif not action_queue:
-                    num_moves = random.randint(10, 20)
-                    movement_indices = [1, 2, 3, 4]
-                    for _ in range(num_moves):
-                        action_queue.append(random.choice(movement_indices))
-                    action_queue.append(0)
-                if action_queue:
-                    next_action_index = action_queue.popleft()
-                    threading.Thread(target=click_button_by_index, args=(m, next_action_index)).start()
-                    time.sleep(1.5)
-
-    print("[EVENT BOT] Chờ 7 giây để kết nối và gửi lệnh đầu tiên...", flush=True)
-    time.sleep(7)
-    bot.sendMessage(CHANNEL_ID, "kevent")
-
-    # Vòng lặp chính của gateway
-    print("[EVENT BOT] Luồng bot đã khởi động và đang lắng nghe tin nhắn.", flush=True)
-    bot.gateway.run(auto_reconnect=True)
-    print("[EVENT BOT] Luồng bot đã dừng.", flush=True)
+            if found_good_move:
+                action_queue.clear()
+                action_queue.append(0)
+            
+            elif not action_queue:
+                num_moves = random.randint(7, 14)
+                movement_indices = [1, 2, 3, 4]
+                for _ in range(num_moves):
+                    action_queue.append(random.choice(movement_indices))
+                action_queue.append(0)
+            
+            if action_queue:
+                next_action_index = action_queue.popleft()
+                action_to_perform = {"type": "click", "index": next_action_index, "data": m}
+    
+    # ----- THỰC THI HÀNH ĐỘNG VÀ TẠO ĐỘ TRỄ -----
+    # Toàn bộ khối này nằm BÊN NGOÀI `with lock:`
+    if action_to_perform:
+        action_type = action_to_perform["type"]
+        
+        # Bắt đầu luồng thực thi hành động trong nền
+        if action_type == "final_confirm":
+            threading.Thread(target=perform_final_confirmation, args=(action_to_perform["data"],)).start()
+        elif action_type == "click":
+            threading.Thread(target=click_button_by_index, args=(action_to_perform["data"], action_to_perform["index"])).start()
+        time.sleep(1.0)
 
 
 def run_hourly_loop_thread():
