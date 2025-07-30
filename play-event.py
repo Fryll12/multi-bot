@@ -47,38 +47,55 @@ def run_event_bot_thread():
     with lock:
         bot_instance = bot
 
-    def click_button_by_index(message_data, index):
-        try:
-            session_id = 'a' + ''.join(random.choices('0123456789abcdef', k=31))
-            rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
-            all_buttons = [button for row in rows for button in row]
-            if index >= len(all_buttons): return
+def click_button_by_index(message_data, index):
+    """Nhấn button bằng cách gửi request thủ công (phiên bản đầy đủ và đã sửa lỗi)."""
+    try:
+        rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
+        all_buttons = [button for row in rows for button in row]
+        if index >= len(all_buttons):
+            print(f"[EVENT BOT] LỖI: Không tìm thấy button ở vị trí {index}", flush=True)
+            return
 
-            button_to_click = all_buttons[index]
-            custom_id = button_to_click.get("custom_id")
-            if not custom_id: return
+        button_to_click = all_buttons[index]
+        custom_id = button_to_click.get("custom_id")
+        if not custom_id:
+            print(f"[EVENT BOT] LỖI: Button ở vị trí {index} không có custom_id.", flush=True)
+            return
 
-            headers = {"Authorization": TOKEN}
-            payload = {
-                "type": 3, "guild_id": message_data.get("guild_id"),
-                "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
-                "application_id": KARUTA_ID, "session_id": session_id,
-                "data": {"component_type": 2, "custom_id": custom_id}
+        # Tự tạo một session_id hợp lệ ngẫu nhiên cho mỗi lần click
+        session_id = 'a' + ''.join(random.choices('0123456789abcdef', k=31))
+
+        headers = {"Authorization": TOKEN}
+        payload = {
+            "type": 3,
+            "guild_id": message_data.get("guild_id"),
+            "channel_id": message_data.get("channel_id"),
+            "message_id": message_data.get("id"),
+            "application_id": KARUTA_ID,
+            "session_id": session_id,
+            "data": {
+                "component_type": 2,
+                "custom_id": custom_id
             }
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
-            if r.status_code == 429:
-                retry_after = r.json().get("retry_after", 1.0)
-                print(f"[EVENT BOT] WARN: Bị rate limit! Chờ {retry_after} giây.", flush=True)
-                time.sleep(retry_after)
-            time.sleep(2.0)
-        except Exception as e:
-            print(f"[EVENT BOT] LỖI NGOẠI LỆ khi click: {e}", flush=True)
-
-    def perform_final_confirmation(message_data):
-        print("ACTION: Chờ 2 giây để nút xác nhận cuối cùng load...", flush=True)
-        time.sleep(2.0)
-        click_button_by_index(message_data, 2)
-        print("INFO: Đã hoàn thành lượt.", flush=True)
+        }
+        
+        emoji_name = button_to_click.get('emoji', {}).get('name', 'Không có')
+        print(f"INFO: Chuẩn bị click button ở vị trí {index} (Emoji: {emoji_name})", flush=True)
+        
+        r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+        
+        if r.status_code == 429:
+            retry_after = r.json().get("retry_after", 1.0)
+            print(f"[EVENT BOT] WARN: Bị rate limit! Tự động chờ trong {retry_after} giây.", flush=True)
+            time.sleep(retry_after)
+            # Không cần làm gì thêm, lần chạy sau sẽ cách ra 2s
+        elif 200 <= r.status_code < 300:
+            print(f"INFO: Click thành công! (Status: {r.status_code})", flush=True)
+        else:
+            print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})", flush=True)
+        
+    except Exception as e:
+        print(f"[EVENT BOT] LỖI NGOẠI LỆ khi click button: {e}", flush=True)
 
     # ĐỊNH NGHĨA ON_MESSAGE Ở ĐÂY, BÊN TRONG HÀM
     @bot.gateway.command
