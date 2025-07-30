@@ -42,11 +42,19 @@ def run_event_bot_thread():
 
     active_message_id = None
     action_queue = deque()
-
+    
     bot = discum.Client(token=TOKEN, log=False)
     with lock:
         bot_instance = bot
-
+        
+    def reset_game_state():
+        nonlocal active_message_id, action_queue
+        with lock:
+            print("[RESET] Click không thành công sau nhiều lần thử. Đang reset trạng thái game...", flush=True)
+            active_message_id = None
+            action_queue.clear()
+            print("[RESET] Bot đã sẵn sàng nhận game mới từ vòng lặp tự động.", flush=True)
+            
     def click_button_by_index(message_data, index):
         try:
             rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
@@ -92,10 +100,12 @@ def run_event_bot_thread():
                 except requests.exceptions.RequestException as e:
                     print(f"LỖI KẾT NỐI: {e}. Sẽ thử lại sau 3 giây...")
                     time.sleep(3)
-            print(f"LỖI: Đã thử click {max_retries} lần mà không thành công.")
+            print(f"LỖI: Đã thử click {max_retries} lần mà không thành công.", flush=True)
+            reset_game_state()
+            
         except Exception as e:
-            print(f"LỖI NGOẠI LỆ trong hàm click_button_by_index: {e}")
-
+            print(f"LỖI NGOẠI LỆ trong hàm click_button_by_index: {e}", flush=True)
+            reset_game_state()
     def perform_final_confirmation(message_data):
         print("ACTION: Chờ 2 giây để nút xác nhận cuối cùng load...")
         time.sleep(2)
