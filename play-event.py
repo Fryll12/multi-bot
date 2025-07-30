@@ -13,9 +13,6 @@ load_dotenv()
 
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
-
-# --- CẤU HÌNH ---
-CHANNEL_ID = "1396508484203319447"
 KARUTA_ID = "646937666251915264"
 
 bot = discum.Client(token=TOKEN, log=False)
