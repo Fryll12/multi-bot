@@ -48,6 +48,7 @@ lock = threading.Lock()
 def click_button_by_index(message_data, index):
     """Nhấn button bằng cách gửi request thủ công."""
     try:
+        # ... (giữ nguyên phần code ở đầu hàm)
         rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
         all_buttons = [button for row in rows for button in row]
         if index >= len(all_buttons):
@@ -71,11 +72,22 @@ def click_button_by_index(message_data, index):
         
         r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
         
+        # --- PHẦN CODE MỚI ĐƯỢC THÊM VÀO ---
+        if r.status_code == 429:
+            # Lấy thời gian cần chờ từ phản hồi của Discord, mặc định là 1 giây nếu không có
+            retry_after = r.json().get("retry_after", 1)
+            print(f"WARN: Bị rate limit! Tự động chờ trong {retry_after} giây.")
+            time.sleep(retry_after) # Chờ đúng khoảng thời gian Discord yêu cầu
+
         if 200 <= r.status_code < 300:
             print(f"INFO: Click thành công! (Status: {r.status_code})")
         else:
-            print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})")
-        time.sleep(1.8)
+            # Bỏ qua việc in lại lỗi 429 vì đã xử lý ở trên
+            if r.status_code != 429:
+                print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})")
+        
+        # Bạn có thể giữ hoặc giảm nhẹ thời gian chờ cố định này
+        time.sleep(1.8) 
     except Exception as e:
         print(f"LỖI NGOẠI LỆ khi click button: {e}")
 
