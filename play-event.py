@@ -31,29 +31,26 @@ is_bot_running = False
 is_hourly_loop_enabled = False
 loop_delay_seconds = 3600  # Mặc định 1 giờ
 lock = threading.Lock()
-
+active_message_id = None
+action_queue = deque()
 # ===================================================================
 # LOGIC BOT
 # ===================================================================
-
+def reset_game_state():
+    global active_message_id, action_queue # Dùng global thay cho nonlocal
+    with lock:
+        print("[RESET] Đang reset trạng thái game...", flush=True)
+        active_message_id = None
+        action_queue.clear()
+        print("[RESET] Bot đã sẵn sàng nhận game mới.", flush=True)
+        
 def run_event_bot_thread():
     """Hàm này chứa toàn bộ logic bot, chạy trong một luồng riêng."""
     global is_bot_running, bot_instance
-
-    active_message_id = None
-    action_queue = deque()
     
     bot = discum.Client(token=TOKEN, log=False)
     with lock:
         bot_instance = bot
-        
-    def reset_game_state():
-        nonlocal active_message_id, action_queue
-        with lock:
-            print("[RESET] Click không thành công sau nhiều lần thử. Đang reset trạng thái game...", flush=True)
-            active_message_id = None
-            action_queue.clear()
-            print("[RESET] Bot đã sẵn sàng nhận game mới từ vòng lặp tự động.", flush=True)
             
     def click_button_by_index(message_data, index):
         try:
@@ -195,6 +192,7 @@ def run_hourly_loop_thread():
         with lock:
             if is_hourly_loop_enabled and bot_instance and is_bot_running:
                 print(f"\n[HOURLY LOOP] Hết {loop_delay_seconds} giây. Tự động gửi lại lệnh 'kevent'...", flush=True)
+                reset_game_state()
                 bot_instance.sendMessage(CHANNEL_ID, "kevent")
             else:
                 break
