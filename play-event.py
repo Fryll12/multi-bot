@@ -160,7 +160,7 @@ def run_event_bot_thread():
                     action_queue.extend(fixed_sequence)
                     print(f"INFO: -> Đã thêm {len(fixed_sequence)} bước di chuyển theo công thức.", flush=True)
 
-              12)
+                    num_moves = random.randint(4, 12)
                     movement_indices = [1, 2, 3, 4]
                     random_sequence = [random.choice(movement_indices) for _ in range(num_moves)]
                     action_queue.extend(random_sequence)
