@@ -8,7 +8,7 @@ import os
 import sys
 from collections import deque
 from flask import Flask, jsonify, render_template_string, request
-from multiprocessing import Process,
+from multiprocessing import Process, Queue
 
 # ===================================================================
 # CẤU HÌNH VÀ BIẾN TOÀN CỤC
