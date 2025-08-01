@@ -350,7 +350,17 @@ HTML_TEMPLATE = """
             countdown = Math.max(0, Math.ceil(countdown));
             div.innerHTML = `<textarea class="message-input" placeholder="Nội dung spam...">${panel.message}</textarea><input type="text" class="channel-input" placeholder="ID Kênh..." value="${panel.channel_id}"><input type="number" class="delay-input" placeholder="Delay (giây)..." value="${panel.delay}"><div class="panel-controls"><button class="toggle-btn">${panel.is_active ? 'TẮT' : 'BẬT'}</button><button class="delete-btn">XÓA</button></div><div class="timer">Hẹn giờ: ${countdown}s</div>`;
             const updatePanelData = () => { const updatedPanel = { ...panel, message: div.querySelector('.message-input').value, channel_id: div.querySelector('.channel-input').value, delay: parseInt(div.querySelector('.delay-input').value, 10) || 60 }; apiCall('/api/panel/update', 'POST', updatedPanel); };
-            div.querySelector('.toggle-btn').addEventListener('click', () => apiCall('/api/panel/update', 'POST', { ...panel, is_active: !panel.is_active }).then(fetchPanels));
+            div.querySelector('.toggle-btn').addEventListener('click', () => {
+                // Đọc giá trị mới nhất từ các ô input trước khi gửi
+                const updatedPanel = { 
+                    ...panel, 
+                    message: div.querySelector('.message-input').value,
+                    channel_id: div.querySelector('.channel-input').value,
+                    delay: parseInt(div.querySelector('.delay-input').value, 10) || 60,
+                    is_active: !panel.is_active // Đảo ngược trạng thái bật/tắt
+                };
+                apiCall('/api/panel/update', 'POST', updatedPanel).then(fetchPanels);
+            });
             div.querySelector('.delete-btn').addEventListener('click', () => { if (confirm('Xóa bảng này?')) apiCall('/api/panel/delete', 'POST', { id: panel.id }).then(fetchPanels); });
             div.querySelector('.message-input').addEventListener('change', updatePanelData);
             div.querySelector('.channel-input').addEventListener('change', updatePanelData);
