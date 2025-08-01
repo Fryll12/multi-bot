@@ -1,6 +1,6 @@
 import discum
 import time
-from threading import Thread, RLock
+import threading
 import json
 import random
 import requests
@@ -30,7 +30,7 @@ bot_instance = None
 is_bot_running = False
 is_hourly_loop_enabled = False
 loop_delay_seconds = 3600  # Mặc định 1 giờ
-lock = RLock()
+lock = threading.RLock()
 spam_panels = []
 panel_id_counter = 0
 spam_thread = None
