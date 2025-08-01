@@ -358,6 +358,17 @@ HTML_TEMPLATE = """
             return div;
         }
         async function fetchPanels() {
+            // KIỂM TRA XEM NGƯỜI DÙNG CÓ ĐANG GÕ CHỮ KHÔNG
+            const focusedElement = document.activeElement;
+            if (focusedElement && (focusedElement.tagName === 'INPUT' || focusedElement.tagName === 'TEXTAREA')) {
+                const panel = focusedElement.closest('.spam-panel');
+                if (panel) {
+                    // Nếu đang focus vào một ô nhập liệu trong panel spam, thì không làm gì cả
+                    return; 
+                }
+            }
+        
+            // Nếu không, tiếp tục cập nhật như bình thường
             const data = await apiCall('/api/panels');
             const container = document.getElementById('panel-container');
             container.innerHTML = '';
