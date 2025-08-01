@@ -503,9 +503,8 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             # Chỉ xử lý khi tin nhắn đến từ kênh grab chính
             if channel_id == main_channel_id:
                 # KIỂM TRA DROP TRƯỚC TIÊN
-                if msg.get("author", {}).get("id") == karuta_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
+                if msg.get("author", {}).get("id") == karuta_id and 'dropping 3' in msg.get("content", ""):
                     last_drop_msg_id = msg["id"]
-                    
                     # Luồng nhặt thẻ (độc lập)
                     if auto_grab_enabled:
                         def read_yoru_bot():
