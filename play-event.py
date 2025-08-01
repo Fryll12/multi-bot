@@ -8,7 +8,6 @@ import os
 import sys
 from collections import deque
 from flask import Flask, jsonify, render_template_string, request
-from multiprocessing import Process, Queue
 
 # ===================================================================
 # CẤU HÌNH VÀ BIẾN TOÀN CỤC
@@ -32,13 +31,12 @@ is_bot_running = False
 is_hourly_loop_enabled = False
 loop_delay_seconds = 3600  # Mặc định 1 giờ
 lock = threading.Lock()
-command_queue = Queue()
 
 # ===================================================================
 # LOGIC BOT
 # ===================================================================
 
-def run_event_bot_thread(cmd_queue):
+def run_event_bot_thread():
     """Hàm này chứa toàn bộ logic bot, chạy trong một luồng riêng."""
     global is_bot_running, bot_instance
 
@@ -48,24 +46,7 @@ def run_event_bot_thread(cmd_queue):
     bot = discum.Client(token=TOKEN, log=False)
     with lock:
         bot_instance = bot
-        
-    def command_listener(bot_instance, queue):
-        """Luồng phụ này chỉ để nghe lệnh từ queue."""
-        while True:
-            try:
-                # Lấy lệnh từ queue, nếu không có sẽ chờ 1 giây
-                command = queue.get(timeout=1) 
-                if command == "send_kevent":
-                    print("[BOT PROCESS] Nhận được lệnh 'send_kevent'. Đang gửi...", flush=True)
-                    bot_instance.sendMessage(CHANNEL_ID, "kevent")
-                elif command == "stop":
-                    print("[BOT PROCESS] Nhận được lệnh 'stop'. Đang dừng...", flush=True)
-                    bot_instance.gateway.close()
-                    break # Thoát khỏi vòng lặp để dừng luồng
-            except Exception:
-                # Bỏ qua nếu queue rỗng (hết timeout)
-                pass
-    
+
     def click_button_by_index(message_data, index):
         try:
             rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
@@ -194,7 +175,6 @@ def run_event_bot_thread(cmd_queue):
                     next_action_index = action_queue.popleft()
                     threading.Thread(target=click_button_by_index, args=(m, next_action_index)).start()
 
-    
     initial_kevent_sent = False
     @bot.gateway.command
     def on_ready(resp):
@@ -203,7 +183,6 @@ def run_event_bot_thread(cmd_queue):
             print("[EVENT BOT] Gateway đã sẵn sàng. Gửi lệnh 'kevent' đầu tiên...", flush=True)
             bot.sendMessage(CHANNEL_ID, "kevent")
             initial_kevent_sent = True
-            threading.Thread(target=command_listener, args=(bot, cmd_queue), daemon=True).start()
 
     print("[EVENT BOT] Luồng bot đã khởi động, đang kết nối gateway...", flush=True)
     bot.gateway.run(auto_reconnect=True)
@@ -222,13 +201,13 @@ def run_hourly_loop_thread():
         for _ in range(loop_delay_seconds):
             if not is_hourly_loop_enabled:
                 break
+            # FIX 1: Thời gian chờ chính xác
             time.sleep(1)
         
         with lock:
-            if is_hourly_loop_enabled and is_bot_running:
-                print(f"\n[HOURLY LOOP] Hết {loop_delay_seconds} giây. Gửi lệnh 'kevent' qua queue...", flush=True)
-                # Không gọi trực tiếp nữa, mà gửi lệnh qua queue
-                command_queue.put("send_kevent")
+            if is_hourly_loop_enabled and bot_instance and is_bot_running:
+                print(f"\n[HOURLY LOOP] Hết {loop_delay_seconds} giây. Tự động gửi lại lệnh 'kevent'...", flush=True)
+                bot_instance.sendMessage(CHANNEL_ID, "kevent")
             else:
                 break
     print("[HOURLY LOOP] Luồng vòng lặp đã dừng.", flush=True)
@@ -315,18 +294,16 @@ def status():
 
 @app.route("/api/toggle_bot", methods=['POST'])
 def toggle_bot():
-    global bot_process, is_bot_running # Đổi tên bot_thread thành bot_process cho rõ nghĩa
+    global bot_thread, is_bot_running
     with lock:
         if is_bot_running:
             is_bot_running = False
-            command_queue.put("stop") # Gửi lệnh 'stop' qua queue
-            print("[CONTROL] Đã gửi lệnh DỪNG bot.", flush=True)
+            print("[CONTROL] Nhận được lệnh DỪNG bot.", flush=True)
         else:
             is_bot_running = True
             print("[CONTROL] Nhận được lệnh BẬT bot.", flush=True)
-            # Tạo một tiến trình (Process) mới, không phải luồng (Thread)
-            bot_process = Process(target=run_event_bot_thread, args=(command_queue,), daemon=True)
-            bot_process.start()
+            bot_thread = threading.Thread(target=run_event_bot_thread, daemon=True)
+            bot_thread.start()
     return jsonify({"status": "ok"})
 
 @app.route("/api/toggle_hourly_loop", methods=['POST'])
