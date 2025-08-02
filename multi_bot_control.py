@@ -378,7 +378,7 @@ def handle_farm_grab(bot, msg, bot_num):
     if not target_server: return
 
     # KIỂM TRA DROP TRƯỚC TIÊN
-    if msg.get("author", {}).get("id") == karuta_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
+    if msg.get("author", {}).get("id") == karuta_id and 'dropping 3' in msg.get("content", ""):
         last_drop_msg_id = msg["id"]
 
         # 1. Luồng nhặt thẻ (độc lập)
