@@ -8,73 +8,53 @@ import os
 import sys
 from collections import deque
 from flask import Flask, jsonify, render_template_string, request
-from dotenv import load_dotenv
-from threading import Thread, RLock
 
 # ===================================================================
 # CẤU HÌNH VÀ BIẾN TOÀN CỤC
 # ===================================================================
 
-load_dotenv()
+# --- Lấy cấu hình từ biến môi trường ---
 TOKEN = os.getenv("DISCORD_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 KARUTA_ID = "646937666251915264"
 
+# --- Kiểm tra biến môi trường ---
 if not TOKEN or not CHANNEL_ID:
     print("LỖI: Vui lòng cung cấp DISCORD_TOKEN và CHANNEL_ID trong biến môi trường.", flush=True)
     sys.exit(1)
 
-# --- Các biến trạng thái ---
+# --- Các biến trạng thái để điều khiển qua web ---
 bot_thread = None
 hourly_loop_thread = None
 bot_instance = None
 is_bot_running = False
 is_hourly_loop_enabled = False
-loop_delay_seconds = 3600
-lock = RLock()
-
-# --- Biến cho Event Bot ---
-active_message_id = None
-action_queue = deque()
-
-# --- Biến cho Spammer ---
+loop_delay_seconds = 3600  # Mặc định 1 giờ
+lock = threading.RLock()
 spam_panels = []
 panel_id_counter = 0
 spam_thread = None
-
-# --- Biến cho Auto Clicker ---
-is_auto_clicker_running = False
-auto_clicker_message_id = None
-auto_clicker_button_index = 0
-auto_clicker_clicks_left = 0
-
 # ===================================================================
-# HÀM LOGIC CHUNG
+# LOGIC BOT
 # ===================================================================
-
-def reset_game_state():
-    global active_message_id, action_queue
-    with lock:
-        print("[RESET] Đang reset trạng thái game event...", flush=True)
-        active_message_id = None
-        action_queue.clear()
-        print("[RESET] Bot event đã sẵn sàng nhận game mới.", flush=True)
-
-# ===================================================================
-# LOGIC SPAMMER
-# ===================================================================
+# Dán toàn bộ hàm này vào code của bạn
 def spam_loop():
+    """Vòng lặp vô tận kiểm tra và gửi tin nhắn spam cho các bảng đang hoạt động."""
     bot = discum.Client(token=TOKEN, log=False)
+
     @bot.gateway.command
     def on_ready(resp):
         if resp.event.ready:
             print("[SPAM BOT] Gateway đã kết nối. Luồng spam đã sẵn sàng.", flush=True)
+
     threading.Thread(target=bot.gateway.run, daemon=True).start()
-    time.sleep(5)
+    time.sleep(5) 
+
     while True:
         try:
             with lock:
                 panels_to_process = list(spam_panels)
+
             for panel in panels_to_process:
                 if panel['is_active'] and panel['channel_id'] and panel['message']:
                     current_time = time.time()
@@ -84,23 +64,27 @@ def spam_loop():
                             bot.sendMessage(str(panel['channel_id']), str(panel['message']))
                             with lock:
                                 for p in spam_panels:
-                                    if p['id'] == panel['id']: p['last_spam_time'] = current_time
+                                    if p['id'] == panel['id']:
+                                        p['last_spam_time'] = current_time
+                                        break
                         except Exception as e:
                             print(f"LỖI: Không thể gửi tin nhắn tới kênh {panel['channel_id']}. Lỗi: {e}", flush=True)
                             with lock:
                                 for p in spam_panels:
-                                    if p['id'] == panel['id']: p['is_active'] = False
+                                    if p['id'] == panel['id']:
+                                        p['is_active'] = False
+                                        break
             time.sleep(1)
         except Exception as e:
             print(f"LỖI NGOẠI LỆ trong vòng lặp spam: {e}", flush=True)
             time.sleep(5)
-
-# ===================================================================
-# LOGIC EVENT BOT VÀ AUTO CLICKER
-# ===================================================================
+            
 def run_event_bot_thread():
-    global is_bot_running, bot_instance, active_message_id, action_queue
-    global is_auto_clicker_running, auto_clicker_message_id, auto_clicker_button_index, auto_clicker_clicks_left
+    """Hàm này chứa toàn bộ logic bot, chạy trong một luồng riêng."""
+    global is_bot_running, bot_instance
+
+    active_message_id = None
+    action_queue = deque()
 
     bot = discum.Client(token=TOKEN, log=False)
     with lock:
@@ -111,83 +95,79 @@ def run_event_bot_thread():
             rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
             all_buttons = [button for row in rows for button in row]
             if index >= len(all_buttons):
-                print(f"LỖI: Không tìm thấy button ở vị trí {index}", flush=True)
+                print(f"LỖI: Không tìm thấy button ở vị trí {index}")
                 return
+
             button_to_click = all_buttons[index]
             custom_id = button_to_click.get("custom_id")
             if not custom_id: return
+
             headers = {"Authorization": TOKEN}
+            
             max_retries = 40
             for attempt in range(max_retries):
-                session_id = bot.gateway.session_id
-                if not session_id:
-                    time.sleep(2)
-                    continue
-                payload = {"type": 3, "guild_id": message_data.get("guild_id"), "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"), "application_id": KARUTA_ID, "session_id": session_id, "data": {"component_type": 2, "custom_id": custom_id}}
+                session_id = bot.gateway.session_id 
+                payload = {
+                    "type": 3, "guild_id": message_data.get("guild_id"),
+                    "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
+                    "application_id": KARUTA_ID, "session_id": session_id,
+                    "data": {"component_type": 2, "custom_id": custom_id}
+                }
+                
                 emoji_name = button_to_click.get('emoji', {}).get('name', 'Không có')
-                print(f"INFO (Lần {attempt + 1}): Chuẩn bị click button ở vị trí {index} (Emoji: {emoji_name})", flush=True)
+                print(f"INFO (Lần {attempt + 1}): Chuẩn bị click button ở vị trí {index} (Emoji: {emoji_name})")
+                
                 try:
                     r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+
                     if 200 <= r.status_code < 300:
-                        print(f"INFO: Click thành công! (Status: {r.status_code})", flush=True)
-                        time.sleep(2.5)
-                        return
+                        print(f"INFO: Click thành công! (Status: {r.status_code})")
+                        # Bạn có thể điều chỉnh thời gian chờ ở đây để tránh rate limit
+                        time.sleep(2.5) 
+                        return 
                     elif r.status_code == 429:
                         retry_after = r.json().get("retry_after", 1.5)
-                        print(f"WARN: Bị rate limit! Sẽ thử lại sau {retry_after:.2f} giây...", flush=True)
+                        print(f"WARN: Bị rate limit! Sẽ thử lại sau {retry_after:.2f} giây...")
                         time.sleep(retry_after)
                     else:
-                        print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})", flush=True)
+                        print(f"LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})")
                         return
                 except requests.exceptions.RequestException as e:
-                    print(f"LỖI KẾT NỐI: {e}. Sẽ thử lại sau 3 giây...", flush=True)
+                    print(f"LỖI KẾT NỐI: {e}. Sẽ thử lại sau 3 giây...")
                     time.sleep(3)
-            print(f"LỖI: Đã thử click {max_retries} lần mà không thành công.", flush=True)
-            reset_game_state()
+            print(f"LỖI: Đã thử click {max_retries} lần mà không thành công.")
         except Exception as e:
-            print(f"LỖI NGOẠI LỆ trong hàm click_button_by_index: {e}", flush=True)
-            reset_game_state()
+            print(f"LỖI NGOẠI LỆ trong hàm click_button_by_index: {e}")
 
     def perform_final_confirmation(message_data):
-        print("ACTION: Chờ 2 giây để nút xác nhận cuối cùng load...", flush=True)
+        print("ACTION: Chờ 2 giây để nút xác nhận cuối cùng load...")
         time.sleep(2)
         click_button_by_index(message_data, 2)
-        print("INFO: Đã hoàn thành lượt.", flush=True)
+        print("INFO: Đã hoàn thành lượt. Chờ game tự động cập nhật để bắt đầu lượt mới...")
 
     @bot.gateway.command
     def on_message(resp):
-        global active_message_id, action_queue
-        global is_auto_clicker_running, auto_clicker_message_id, auto_clicker_button_index, auto_clicker_clicks_left
+        nonlocal active_message_id, action_queue
+        if not is_bot_running:
+            bot.gateway.close()
+            return
         
         if not (resp.event.message or resp.event.message_updated): return
         m = resp.parsed.auto()
         if not (m.get("author", {}).get("id") == KARUTA_ID and m.get("channel_id") == CHANNEL_ID): return
-
-        # --- LOGIC AUTO CLICKER (LUÔN CHẠY) ---
+        
         with lock:
-            if is_auto_clicker_running and m.get("id") == auto_clicker_message_id:
-                if auto_clicker_clicks_left > 0:
-                    print(f"[Auto Clicker] Còn lại {auto_clicker_clicks_left} lần click. Thực hiện click nút {auto_clicker_button_index}...", flush=True)
-                    threading.Thread(target=click_button_by_index, args=(m, auto_clicker_button_index)).start()
-                    auto_clicker_clicks_left -= 1
-                if auto_clicker_clicks_left <= 0:
-                    print("[Auto Clicker] Đã hoàn thành chuỗi click.", flush=True)
-                    is_auto_clicker_running = False
-                return
-
-        # --- LOGIC EVENT BOT (CHỈ CHẠY KHI ĐƯỢC BẬT) ---
-        if not is_bot_running:
-            return
-            
-        with lock:
+            # FIX 3: Sửa lỗi logic không nhận game mới từ vòng lặp tự động.
+            # Bot sẽ luôn ưu tiên game mới nhất được tạo ra.
             if resp.event.message and "Takumi's Solisfair Stand" in m.get("embeds", [{}])[0].get("title", ""):
-                if is_auto_clicker_running: return
-                if active_message_id is not None and m.get("id") != active_message_id : return
                 active_message_id = m.get("id")
                 action_queue.clear()
-                print(f"\nINFO: Bắt đầu game mới trên tin nhắn ID: {active_message_id}", flush=True)
-            if m.get("id") != active_message_id: return
-        
+                print(f"\nINFO: Đã phát hiện game mới. Chuyển sang tin nhắn ID: {active_message_id}")
+
+            # Chỉ xử lý các sự kiện (như update button) trên tin nhắn game đang hoạt động
+            if m.get("id") != active_message_id:
+                return
+
         embed_desc = m.get("embeds", [{}])[0].get("description", "")
         all_buttons_flat = [b for row in m.get('components', []) for b in row.get('components', []) if row.get('type') == 1]
         is_movement_phase = any(b.get('emoji', {}).get('name') == '▶️' for b in all_buttons_flat)
@@ -196,12 +176,10 @@ def run_event_bot_thread():
         has_received_fruit = "You received the following fruit:" in embed_desc
 
         if is_final_confirm_phase:
-            print("INFO: Phát hiện giai đoạn xác nhận cuối cùng. Thực hiện click cuối.", flush=True)
             with lock:
-                action_queue.clear()
+                action_queue.clear() 
             threading.Thread(target=perform_final_confirmation, args=(m,)).start()
         elif has_received_fruit:
-            print("INFO: Phát hiện đã nhận được trái cây. Nhấn nút 0 để tiếp tục...", flush=True)
             threading.Thread(target=click_button_by_index, args=(m, 0)).start()
         elif is_movement_phase:
             with lock:
@@ -211,14 +189,31 @@ def run_event_bot_thread():
                     action_queue.append(0)
                 elif not action_queue:
                     print("INFO: Bắt đầu lượt mới. Tạo chuỗi hành động kết hợp...", flush=True)
-                    fixed_sequence = [1, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 1, 1, 1, 1, 2, 2, 3, 3]
+                    
+                    # --- BƯỚC 1: Thêm công thức cố định của bạn ---
+                    fixed_sequence = [
+                        1, 1,       # 2 lần nút 1 (Lên)
+                        2, 2,       # 2 lần nút 2 (Trái)
+                        3, 3, 3, 3, # 4 lần nút 3 (Xuống)
+                        4, 4, 4, 4, # 4 lần nút 4 (Phải)
+                        1, 1, 1, 1, # 4 lần nút 1 (Lên)
+                        2, 2,       # 2 lần nút 2 (Trái)
+                        3, 3        # 2 lần nút 3 (Xuống)
+                    ]
                     action_queue.extend(fixed_sequence)
-                    num_moves = random.randint(4, 14)
+                    print(f"INFO: -> Đã thêm {len(fixed_sequence)} bước di chuyển theo công thức.", flush=True)
+
+                    num_moves = random.randint(4, 12)
                     movement_indices = [1, 2, 3, 4]
                     random_sequence = [random.choice(movement_indices) for _ in range(num_moves)]
                     action_queue.extend(random_sequence)
+                    print(f"INFO: -> Đã thêm {num_moves} bước di chuyển ngẫu nhiên.", flush=True)
+
+                    # --- BƯỚC 3: Thêm hành động xác nhận cuối cùng ---
                     action_queue.append(0)
                     print(f"INFO: Chuỗi hành động mới có tổng cộng {len(action_queue)} bước.", flush=True)
+
+                # Luôn thực hiện hành động tiếp theo trong hàng đợi
                 if action_queue:
                     next_action_index = action_queue.popleft()
                     threading.Thread(target=click_button_by_index, args=(m, next_action_index)).start()
@@ -232,26 +227,36 @@ def run_event_bot_thread():
             bot.sendMessage(CHANNEL_ID, "kevent")
             initial_kevent_sent = True
 
-    print("[BOT THREAD] Luồng chính đã khởi động (chứa cả Event Bot và Auto Clicker).", flush=True)
+    print("[EVENT BOT] Luồng bot đã khởi động, đang kết nối gateway...", flush=True)
     bot.gateway.run(auto_reconnect=True)
-    print("[BOT THREAD] Luồng chính đã dừng.", flush=True)
+    print("[EVENT BOT] Luồng bot đã dừng.", flush=True)
 
 # ===================================================================
 # VÒNG LẶP TỰ ĐỘNG
 # ===================================================================
+
 def run_hourly_loop_thread():
+    """Hàm chứa vòng lặp gửi kevent, chạy trong một luồng riêng."""
     global is_hourly_loop_enabled, loop_delay_seconds
+    print("[HOURLY LOOP] Luồng vòng lặp đã khởi động.", flush=True)
     while is_hourly_loop_enabled:
-        time.sleep(loop_delay_seconds)
+        # Chờ theo từng giây để có thể dừng ngay lập tức
+        for _ in range(loop_delay_seconds):
+            if not is_hourly_loop_enabled:
+                break
+            # FIX 1: Thời gian chờ chính xác
+            time.sleep(1)
+        
         with lock:
             if is_hourly_loop_enabled and bot_instance and is_bot_running:
-                print(f"\n[HOURLY LOOP] Hết {loop_delay_seconds} giây. Reset và gửi lại lệnh 'kevent'...", flush=True)
-                reset_game_state()
+                print(f"\n[HOURLY LOOP] Hết {loop_delay_seconds} giây. Tự động gửi lại lệnh 'kevent'...", flush=True)
                 bot_instance.sendMessage(CHANNEL_ID, "kevent")
+            else:
+                break
     print("[HOURLY LOOP] Luồng vòng lặp đã dừng.", flush=True)
 
 # ===================================================================
-# WEB SERVER (FLASK)
+# WEB SERVER (FLASK) ĐỂ ĐIỀU KHIỂN
 # ===================================================================
 app = Flask(__name__)
 
@@ -269,7 +274,7 @@ HTML_TEMPLATE = """
         .status-on { color: #03dac6; } .status-off { color: #cf6679; }
         button { background-color: #bb86fc; color: #121212; border: none; padding: 12px 24px; font-size: 1em; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; font-weight: bold; }
         button:hover { background-color: #a050f0; }
-        .input-group { display: flex; margin-top: 15px; } .input-group label { padding: 10px; background-color: #333; border-radius: 5px 0 0 5px; min-width: 100px; text-align: left;}
+        .input-group { display: flex; margin-top: 15px; } .input-group label { padding: 10px; background-color: #333; border-radius: 5px 0 0 5px; }
         .input-group input { flex-grow: 1; border: 1px solid #333; background-color: #222; color: #eee; padding: 10px; border-radius: 0 5px 5px 0; }
         #panel-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; margin-top: 20px; width: 100%; }
         .spam-panel { background-color: #2a2a2a; padding: 20px; border-radius: 10px; display: flex; flex-direction: column; gap: 15px; border-left: 5px solid #333; }
@@ -300,25 +305,10 @@ HTML_TEMPLATE = """
             <button id="toggleLoopBtn" style="margin-top: 15px;">Bắt đầu</button>
         </div>
     </div>
-    <div class="container">
-        <div class="panel">
-            <h2><i class="fas fa-mouse-pointer"></i> Auto Clicker</h2>
-            <div class="input-group">
-                <label for="clicker-button-index">Button Index</label>
-                <input type="number" id="clicker-button-index" value="0" placeholder="Vị trí nút (từ 0)">
-            </div>
-            <div class="input-group">
-                <label for="clicker-times">Số lần click</label>
-                <input type="number" id="clicker-times" value="10" placeholder="Nhập số lần click">
-            </div>
-            <div id="auto-clicker-status" class="status">Trạng thái: ĐÃ DỪNG</div>
-            <button id="toggle-auto-clicker-btn">BẬT</button>
-        </div>
-        <div class="panel" style="width: auto; max-width: 800px;">
-            <h2>Bảng Điều Khiển Spam</h2>
-            <div id="panel-container"></div>
-            <button class="add-panel-btn" onclick="addPanel()">+</button>
-        </div>
+    <div class="panel" style="width: auto; max-width: 800px;">
+        <h2>Bảng Điều Khiển Spam</h2>
+        <div id="panel-container"></div>
+        <button class="add-panel-btn" onclick="addPanel()">+</button>
     </div>
     <script>
         // --- SCRIPT CHUNG ---
@@ -342,13 +332,14 @@ HTML_TEMPLATE = """
                 loopStatusDiv.className = data.is_hourly_loop_enabled ? 'status status-on' : 'status status-off';
                 toggleLoopBtn.textContent = data.is_hourly_loop_enabled ? 'TẮT VÒNG LẶP' : 'BẬT VÒNG LẶP';
                 if (document.activeElement !== delayInput) { delayInput.value = data.loop_delay_seconds; }
-            } catch (e) { botStatusDiv.textContent = 'Lỗi kết nối đến server.'; }
+            } catch (e) { botStatusDiv.textContent = 'Lỗi kết nối đến server.'; botStatusDiv.className = 'status status-off'; }
         }
         toggleBotBtn.addEventListener('click', () => apiCall('/api/toggle_bot', 'POST').then(fetchStatus));
         toggleLoopBtn.addEventListener('click', () => {
             const currentStatus = loopStatusDiv.textContent.includes('ĐANG CHẠY');
             apiCall('/api/toggle_hourly_loop', 'POST', { enabled: !currentStatus, delay: parseInt(delayInput.value, 10) }).then(fetchStatus);
         });
+        setInterval(fetchStatus, 5000);
         
         // --- SCRIPT CHO SPAMMER ---
         function createPanelElement(panel) {
@@ -360,7 +351,14 @@ HTML_TEMPLATE = """
             div.innerHTML = `<textarea class="message-input" placeholder="Nội dung spam...">${panel.message}</textarea><input type="text" class="channel-input" placeholder="ID Kênh..." value="${panel.channel_id}"><input type="number" class="delay-input" placeholder="Delay (giây)..." value="${panel.delay}"><div class="panel-controls"><button class="toggle-btn">${panel.is_active ? 'TẮT' : 'BẬT'}</button><button class="delete-btn">XÓA</button></div><div class="timer">Hẹn giờ: ${countdown}s</div>`;
             const updatePanelData = () => { const updatedPanel = { ...panel, message: div.querySelector('.message-input').value, channel_id: div.querySelector('.channel-input').value, delay: parseInt(div.querySelector('.delay-input').value, 10) || 60 }; apiCall('/api/panel/update', 'POST', updatedPanel); };
             div.querySelector('.toggle-btn').addEventListener('click', () => {
-                const updatedPanel = { ...panel, message: div.querySelector('.message-input').value, channel_id: div.querySelector('.channel-input').value, delay: parseInt(div.querySelector('.delay-input').value, 10) || 60, is_active: !panel.is_active };
+                // Đọc giá trị mới nhất từ các ô input trước khi gửi
+                const updatedPanel = { 
+                    ...panel, 
+                    message: div.querySelector('.message-input').value,
+                    channel_id: div.querySelector('.channel-input').value,
+                    delay: parseInt(div.querySelector('.delay-input').value, 10) || 60,
+                    is_active: !panel.is_active // Đảo ngược trạng thái bật/tắt
+                };
                 apiCall('/api/panel/update', 'POST', updatedPanel).then(fetchPanels);
             });
             div.querySelector('.delete-btn').addEventListener('click', () => { if (confirm('Xóa bảng này?')) apiCall('/api/panel/delete', 'POST', { id: panel.id }).then(fetchPanels); });
@@ -370,58 +368,34 @@ HTML_TEMPLATE = """
             return div;
         }
         async function fetchPanels() {
+            // KIỂM TRA XEM NGƯỜI DÙNG CÓ ĐANG GÕ CHỮ KHÔNG
             const focusedElement = document.activeElement;
             if (focusedElement && (focusedElement.tagName === 'INPUT' || focusedElement.tagName === 'TEXTAREA')) {
                 const panel = focusedElement.closest('.spam-panel');
-                if (panel) return;
+                if (panel) {
+                    // Nếu đang focus vào một ô nhập liệu trong panel spam, thì không làm gì cả
+                    return; 
+                }
             }
+        
+            // Nếu không, tiếp tục cập nhật như bình thường
             const data = await apiCall('/api/panels');
             const container = document.getElementById('panel-container');
             container.innerHTML = '';
             data.panels.forEach(panel => container.appendChild(createPanelElement(panel)));
         }
         async function addPanel() { await apiCall('/api/panel/add', 'POST'); fetchPanels(); }
+        setInterval(fetchPanels, 2000);
 
-        // --- SCRIPT MỚI CHO AUTO CLICKER ---
-        const autoClickerStatus = document.getElementById('auto-clicker-status');
-        const toggleAutoClickerBtn = document.getElementById('toggle-auto-clicker-btn');
-        const clickerButtonIndexInput = document.getElementById('clicker-button-index');
-        const clickerTimesInput = document.getElementById('clicker-times');
-
-        async function fetchAutoClickerStatus() {
-            try {
-                const r = await fetch('/api/auto_clicker_status');
-                const data = await r.json();
-                autoClickerStatus.textContent = `Trạng thái: ${data.is_running ? `ĐANG CHẠY (${data.clicks_left} lần còn lại)` : 'ĐÃ DỪNG'}`;
-                autoClickerStatus.className = data.is_running ? 'status status-on' : 'status status-off';
-                toggleAutoClickerBtn.textContent = data.is_running ? 'DỪNG' : 'BẬT';
-            } catch(e) {}
-        }
-        toggleAutoClickerBtn.addEventListener('click', () => {
-            const payload = {
-                button_index: parseInt(clickerButtonIndexInput.value, 10),
-                times: parseInt(clickerTimesInput.value, 10)
-            };
-            apiCall('/api/toggle_auto_clicker', 'POST', payload);
-        });
-
-        // Chạy lần đầu khi load trang và cập nhật định kỳ
+        // Chạy lần đầu khi load trang
         document.addEventListener('DOMContentLoaded', () => {
             fetchStatus();
             fetchPanels();
-            fetchAutoClickerStatus();
-            setInterval(fetchStatus, 5000);
-            setInterval(fetchPanels, 2000);
-            setInterval(fetchAutoClickerStatus, 2000);
         });
     </script>
 </body>
 </html>
 """
-
-# ===================================================================
-# API Endpoints
-# ===================================================================
 @app.route("/")
 def index():
     return render_template_string(HTML_TEMPLATE)
@@ -463,7 +437,6 @@ def toggle_hourly_loop():
         else:
             print("[CONTROL] Vòng lặp ĐÃ TẮT.", flush=True)
     return jsonify({"status": "ok"})
-
 @app.route("/api/panels")
 def get_panels():
     with lock:
@@ -496,65 +469,6 @@ def delete_panel():
     with lock:
         spam_panels[:] = [p for p in spam_panels if p['id'] != data['id']]
     return jsonify({"status": "ok"})
-
-# --- API ENDPOINTS MỚI CHO AUTO CLICKER ---
-@app.route("/api/auto_clicker_status")
-def api_auto_clicker_status():
-    with lock:
-        return jsonify({
-            "is_running": is_auto_clicker_running,
-            "clicks_left": auto_clicker_clicks_left
-        })
-
-@app.route("/api/toggle_auto_clicker", methods=['POST'])
-def api_toggle_auto_clicker():
-    global is_auto_clicker_running, auto_clicker_message_id, auto_clicker_button_index, auto_clicker_clicks_left, bot_thread
-    with lock:
-        if is_auto_clicker_running:
-            is_auto_clicker_running = False
-            auto_clicker_clicks_left = 0
-            msg = "Auto Clicker DISABLED."
-        else:
-            # Sửa lỗi: Luồng bot chính PHẢI chạy để lắng nghe sự kiện
-            if bot_thread is None or not bot_thread.is_alive():
-                print("[Auto Clicker] Luồng bot chính chưa chạy. Tự động khởi động...", flush=True)
-                is_bot_running = True
-                bot_thread = threading.Thread(target=run_event_bot_thread, daemon=True)
-                bot_thread.start()
-                time.sleep(7) # Chờ bot kết nối
-            
-            data = request.get_json()
-            button_index = data.get('button_index', 0)
-            times = data.get('times', 1)
-
-            if times <= 0:
-                return jsonify({'status': 'error', 'message': 'Số lần click phải lớn hơn 0.'})
-
-            if bot_instance:
-                try:
-                    recent_messages = bot_instance.getMessages(CHANNEL_ID, num=25).json()
-                    last_karuta_message = next((m for m in recent_messages if m.get("author", {}).get("id") == KARUTA_ID and m.get("components")), None)
-                    
-                    if last_karuta_message:
-                        auto_clicker_message_id = last_karuta_message.get("id")
-                        auto_clicker_button_index = button_index
-                        auto_clicker_clicks_left = times
-                        is_auto_clicker_running = True
-                        msg = f"Auto Clicker ENABLED. Bắt đầu click nút {button_index}."
-                        
-                        # Kích hoạt cú click đầu tiên
-                        threading.Thread(target=click_button_by_index, args=(last_karuta_message, auto_clicker_button_index)).start()
-                        auto_clicker_clicks_left -= 1
-                    else:
-                        msg = "LỖI: Không tìm thấy tin nhắn nào có button của Karuta trong kênh."
-                except Exception as e:
-                    msg = f"LỖI khi tìm tin nhắn: {e}"
-            else:
-                msg = "LỖI: Bot chính chưa được khởi động."
-            
-    return jsonify({'status': 'success', 'message': msg})
-
-
 # ===================================================================
 # KHỞI CHẠY WEB SERVER
 # ===================================================================
