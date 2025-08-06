@@ -151,7 +151,23 @@ def run_event_bot_thread():
         if not is_bot_running:
             bot.gateway.close()
             return
+# DÁN KHỐI CODE MỚI NÀY VÀO ĐÂY
+# --- LOGIC MỚI CHO AUTO CLICKER ---
+        with lock:
+            # Chỉ xử lý nếu tính năng đang bật và tin nhắn khớp
+            if is_auto_clicker_running and m.get("id") == auto_clicker_message_id:
+                if auto_clicker_clicks_left > 0:
+                    print(f"[Auto Clicker] Còn lại {auto_clicker_clicks_left} lần click. Thực hiện click nút {auto_clicker_button_index}...", flush=True)
+                    # Thực hiện click trong một luồng riêng để không block gateway
+                    threading.Thread(target=click_button_by_index, args=(m, auto_clicker_button_index)).start()
+                    auto_clicker_clicks_left -= 1 # Giảm số lần click còn lại
         
+                if auto_clicker_clicks_left <= 0:
+                    print("[Auto Clicker] Đã hoàn thành chuỗi click.", flush=True)
+                    is_auto_clicker_running = False # Tự động tắt sau khi xong
+        
+                return # Rất quan trọng: Thoát khỏi hàm để không chạy logic chơi event
+                
         if not (resp.event.message or resp.event.message_updated): return
         m = resp.parsed.auto()
         if not (m.get("author", {}).get("id") == KARUTA_ID and m.get("channel_id") == CHANNEL_ID): return
@@ -291,6 +307,19 @@ HTML_TEMPLATE = """
 <body>
     <div class="container">
         <div class="panel">
+            <h2><i class="fas fa-mouse-pointer"></i> Auto Clicker</h2>
+            <div class="input-group">
+                <label for="clicker-button-index">Button Index</label>
+                <input type="number" id="clicker-button-index" value="0" placeholder="Vị trí nút (từ 0)">
+            </div>
+            <div class="input-group">
+                <label for="clicker-times">Số lần click</label>
+                <input type="number" id="clicker-times" value="10" placeholder="Nhập số lần click">
+            </div>
+            <div id="auto-clicker-status" class="status">Trạng thái: ĐÃ DỪNG</div>
+            <button id="toggle-auto-clicker-btn">BẬT</button>
+        </div>
+        <div class="panel">
             <h1>Bot Event Solis-Fair</h1>
             <div id="bot-status" class="status">Trạng thái: Đang tải...</div>
             <button id="toggleBotBtn">Bắt đầu</button>
@@ -392,6 +421,32 @@ HTML_TEMPLATE = """
             fetchStatus();
             fetchPanels();
         });
+        // --- JS cho Auto Clicker ---
+        const autoClickerStatus = document.getElementById('auto-clicker-status');
+        const toggleAutoClickerBtn = document.getElementById('toggle-auto-clicker-btn');
+        const clickerButtonIndexInput = document.getElementById('clicker-button-index');
+        const clickerTimesInput = document.getElementById('clicker-times');
+        
+        async function fetchAutoClickerStatus() {
+            try {
+                const r = await fetch('/api/auto_clicker_status');
+                const data = await r.json();
+                autoClickerStatus.textContent = `Trạng thái: ${data.is_running ? `ĐANG CHẠY (${data.clicks_left} lần còn lại)` : 'ĐÃ DỪNG'}`;
+                autoClickerStatus.style.color = data.is_running ? 'var(--status-on)' : 'var(--status-off)';
+                toggleAutoClickerBtn.textContent = data.is_running ? 'DỪNG' : 'BẬT';
+            } catch(e) {}
+        }
+        
+        toggleAutoClickerBtn.addEventListener('click', () => {
+            const payload = {
+                button_index: parseInt(clickerButtonIndexInput.value, 10),
+                times: parseInt(clickerTimesInput.value, 10)
+            };
+            apiCall('/api/toggle_auto_clicker', 'POST', payload);
+        });
+        
+        setInterval(fetchAutoClickerStatus, 2000);
+        fetchAutoClickerStatus();
     </script>
 </body>
 </html>
@@ -469,6 +524,56 @@ def delete_panel():
     with lock:
         spam_panels[:] = [p for p in spam_panels if p['id'] != data['id']]
     return jsonify({"status": "ok"})
+@app.route("/api/auto_clicker_status")
+def api_auto_clicker_status():
+    with lock:
+        return jsonify({
+            "is_running": is_auto_clicker_running,
+            "clicks_left": auto_clicker_clicks_left
+        })
+
+@app.route("/api/toggle_auto_clicker", methods=['POST'])
+def api_toggle_auto_clicker():
+    global is_auto_clicker_running, auto_clicker_message_id, auto_clicker_button_index, auto_clicker_clicks_left
+    
+    with lock:
+        if is_auto_clicker_running:
+            is_auto_clicker_running = False
+            auto_clicker_clicks_left = 0
+            msg = "Auto Clicker DISABLED."
+        else:
+            data = request.get_json()
+            button_index = data.get('button_index', 0)
+            times = data.get('times', 1)
+
+            if times <= 0:
+                return jsonify({'status': 'error', 'message': 'Số lần click phải lớn hơn 0.'})
+
+            # Tìm tin nhắn cuối cùng trong kênh để bắt đầu click
+            if bot_instance:
+                try:
+                    recent_messages = bot_instance.getMessages(CHANNEL_ID, num=25).json()
+                    last_karuta_message = next((m for m in recent_messages if m.get("author", {}).get("id") == KARUTA_ID and m.get("components")), None)
+                    
+                    if last_karuta_message:
+                        auto_clicker_message_id = last_karuta_message.get("id")
+                        auto_clicker_button_index = button_index
+                        auto_clicker_clicks_left = times
+                        is_auto_clicker_running = True
+                        msg = f"Auto Clicker ENABLED. Bắt đầu click nút {button_index} trên tin nhắn {auto_clicker_message_id}."
+                        
+                        # Kích hoạt cú click đầu tiên
+                        print("[Auto Clicker] Kích hoạt cú click đầu tiên...", flush=True)
+                        threading.Thread(target=click_button_by_index, args=(last_karuta_message, auto_clicker_button_index)).start()
+                        auto_clicker_clicks_left -= 1
+                    else:
+                        msg = "LỖI: Không tìm thấy tin nhắn nào có button của Karuta trong kênh."
+                except Exception as e:
+                    msg = f"LỖI khi tìm tin nhắn: {e}"
+            else:
+                msg = "LỖI: Bot chính chưa được khởi động."
+            
+    return jsonify({'status': 'success', 'message': msg})
 # ===================================================================
 # KHỞI CHẠY WEB SERVER
 # ===================================================================
@@ -478,3 +583,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     print(f"[SERVER] Khởi động Web Server tại http://0.0.0.0:{port}", flush=True)
     app.run(host="0.0.0.0", port=port, debug=False)
+
