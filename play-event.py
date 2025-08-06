@@ -33,6 +33,7 @@ is_hourly_loop_enabled = False
 loop_delay_seconds = 3600
 lock = RLock()
 
+
 # --- Biến cho Event Bot ---
 active_message_id = None
 action_queue = deque()
@@ -47,6 +48,9 @@ is_auto_clicker_running = False
 auto_clicker_message_id = None
 auto_clicker_button_index = 0
 auto_clicker_clicks_left = 0
+auto_clicker_bot = None # Bot riêng cho auto clicker
+auto_clicker_listener_thread = None # Luồng lắng nghe riêng
+is_auto_clicker_listener_running = False # Công tắc riêng
 
 # ===================================================================
 # HÀM LOGIC CHUNG
@@ -59,7 +63,44 @@ def reset_game_state():
         active_message_id = None
         action_queue.clear()
         print("[RESET] Bot event đã sẵn sàng nhận game mới.", flush=True)
+# Dán hàm này vào khu vực LOGIC BOT
+def run_auto_clicker_listener():
+    """Luồng này chỉ lắng nghe sự kiện cho Auto Clicker."""
+    global is_auto_clicker_listener_running, auto_clicker_bot
+    global is_auto_clicker_running, auto_clicker_message_id, auto_clicker_button_index, auto_clicker_clicks_left
 
+    bot = discum.Client(token=TOKEN, log=False)
+    auto_clicker_bot = bot
+
+    @bot.gateway.command
+    def on_message(resp):
+        global is_auto_clicker_running, auto_clicker_message_id, auto_clicker_button_index, auto_clicker_clicks_left
+        if not is_auto_clicker_listener_running:
+            bot.gateway.close()
+            return
+        
+        if not resp.event.message_updated: return
+        m = resp.parsed.auto()
+        if not (m.get("author", {}).get("id") == KARUTA_ID and m.get("channel_id") == CHANNEL_ID): return
+
+        with lock:
+            if is_auto_clicker_running and m.get("id") == auto_clicker_message_id:
+                if auto_clicker_clicks_left > 0:
+                    print(f"[Auto Clicker] Còn lại {auto_clicker_clicks_left} lần click. Thực hiện click nút {auto_clicker_button_index}...", flush=True)
+                    # Dùng bot của luồng này để click
+                    click_button_by_index(auto_clicker_bot, m, auto_clicker_button_index) 
+                    auto_clicker_clicks_left -= 1
+                
+                if auto_clicker_clicks_left <= 0:
+                    print("[Auto Clicker] Đã hoàn thành chuỗi click.", flush=True)
+                    is_auto_clicker_running = False
+    
+    print("[Auto Clicker] Luồng lắng nghe đã khởi động.", flush=True)
+    is_auto_clicker_listener_running = True
+    bot.gateway.run(auto_reconnect=True)
+    is_auto_clicker_listener_running = False
+    print("[Auto Clicker] Luồng lắng nghe đã dừng.", flush=True)
+    
 # ===================================================================
 # LOGIC SPAMMER
 # ===================================================================
@@ -106,7 +147,7 @@ def run_event_bot_thread():
     with lock:
         bot_instance = bot
 
-    def click_button_by_index(message_data, index):
+    def click_button_by_index(bot_instance_to_use, message_data, index):
         try:
             rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
             all_buttons = [button for row in rows for button in row]
@@ -119,7 +160,7 @@ def run_event_bot_thread():
             headers = {"Authorization": TOKEN}
             max_retries = 40
             for attempt in range(max_retries):
-                session_id = bot.gateway.session_id
+                session_id = bot_instance_to_use.gateway.session_id 
                 if not session_id:
                     time.sleep(2)
                     continue
@@ -505,42 +546,35 @@ def api_auto_clicker_status():
 @app.route("/api/toggle_auto_clicker", methods=['POST'])
 def api_toggle_auto_clicker():
     global is_auto_clicker_running, auto_clicker_message_id, auto_clicker_button_index, auto_clicker_clicks_left
-    
+    global auto_clicker_listener_thread
+
     with lock:
         if is_auto_clicker_running:
             is_auto_clicker_running = False
             auto_clicker_clicks_left = 0
             msg = "Auto Clicker DISABLED."
         else:
+            if not is_auto_clicker_listener_running:
+                 auto_clicker_listener_thread = threading.Thread(target=run_auto_clicker_listener, daemon=True)
+                 auto_clicker_listener_thread.start()
+                 time.sleep(5) # Chờ bot kết nối
+
             data = request.get_json()
             button_index = data.get('button_index', 0)
             times = data.get('times', 1)
-
-            if times <= 0:
-                return jsonify({'status': 'error', 'message': 'Số lần click phải lớn hơn 0.'})
-
-            if bot_instance:
+            if times <= 0: return jsonify({'status': 'error', 'message': 'Số lần click phải lớn hơn 0.'})
+            
+            if auto_clicker_bot:
                 try:
-                    recent_messages = bot_instance.getMessages(CHANNEL_ID, num=25).json()
-                    last_karuta_message = next((m for m in recent_messages if m.get("author", {}).get("id") == KARUTA_ID and m.get("components")), None)
-                    
+                    # ... (logic tìm tin nhắn cuối cùng giữ nguyên)
+                    # ...
                     if last_karuta_message:
-                        auto_clicker_message_id = last_karuta_message.get("id")
-                        auto_clicker_button_index = button_index
-                        auto_clicker_clicks_left = times
-                        is_auto_clicker_running = True
-                        msg = f"Auto Clicker ENABLED. Bắt đầu click nút {button_index}."
-                        
+                        # ...
                         # Kích hoạt cú click đầu tiên
-                        print("[Auto Clicker] Kích hoạt cú click đầu tiên...", flush=True)
-                        threading.Thread(target=click_button_by_index, args=(last_karuta_message, auto_clicker_button_index)).start()
-                        auto_clicker_clicks_left -= 1
-                    else:
-                        msg = "LỖI: Không tìm thấy tin nhắn nào có button của Karuta trong kênh."
-                except Exception as e:
-                    msg = f"LỖI khi tìm tin nhắn: {e}"
-            else:
-                msg = "LỖI: Bot chính chưa được khởi động."
+                        threading.Thread(target=click_button_by_index, args=(auto_clicker_bot, last_karuta_message, auto_clicker_button_index)).start()
+                        # ...
+                except Exception as e: msg = f"LỖI khi tìm tin nhắn: {e}"
+            else: msg = "LỖI: Bot cho Auto Clicker chưa được khởi động."
             
     return jsonify({'status': 'success', 'message': msg})
 
@@ -553,3 +587,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     print(f"[SERVER] Khởi động Web Server tại http://0.0.0.0:{port}", flush=True)
     app.run(host="0.0.0.0", port=port, debug=False)
+
