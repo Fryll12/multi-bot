@@ -58,6 +58,7 @@ spam_thread = None
 def click_button_by_index(bot, message_data, index, source=""):
     """
     Hàm chung để click vào một button trên tin nhắn dựa vào vị trí (index).
+    FIX: Đã khôi phục vòng lặp thử lại 40 lần.
     """
     try:
         if not bot or not bot.gateway.session_id:
@@ -77,35 +78,43 @@ def click_button_by_index(bot, message_data, index, source=""):
         if not custom_id: return False
 
         headers = {"Authorization": TOKEN}
-        session_id = bot.gateway.session_id
-        payload = {
-            "type": 3, "guild_id": message_data.get("guild_id"),
-            "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
-            "application_id": application_id,
-            "session_id": session_id,
-            "data": {"component_type": 2, "custom_id": custom_id}
-        }
+        
+        # FIX: Khôi phục vòng lặp thử lại 40 lần
+        max_retries = 40
+        for attempt in range(max_retries):
+            session_id = bot.gateway.session_id
+            payload = {
+                "type": 3, "guild_id": message_data.get("guild_id"),
+                "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
+                "application_id": application_id,
+                "session_id": session_id,
+                "data": {"component_type": 2, "custom_id": custom_id}
+            }
 
-        emoji_name = button_to_click.get('emoji', {}).get('name', 'Không có')
-        print(f"[{source}] INFO: Chuẩn bị click button ở vị trí {index} (Emoji: {emoji_name})", flush=True)
+            emoji_name = button_to_click.get('emoji', {}).get('name', 'Không có')
+            print(f"[{source}] INFO (Lần {attempt + 1}/{max_retries}): Chuẩn bị click button ở vị trí {index} (Emoji: {emoji_name})", flush=True)
 
-        try:
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
-            if 200 <= r.status_code < 300:
-                print(f"[{source}] INFO: Click thành công! (Status: {r.status_code})", flush=True)
-                time.sleep(random.uniform(2.5, 3.5))
-                return True
-            elif r.status_code == 429:
-                retry_after = r.json().get("retry_after", 1.5)
-                print(f"[{source}] WARN: Bị rate limit! Sẽ thử lại sau {retry_after:.2f} giây...", flush=True)
-                time.sleep(retry_after)
-            else:
-                print(f"[{source}] LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})", flush=True)
-        except requests.exceptions.RequestException as e:
-            print(f"[{source}] LỖI KẾT NỐI: {e}. Sẽ thử lại sau 3 giây...", flush=True)
-            time.sleep(3)
-
-        return False
+            try:
+                r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+                if 200 <= r.status_code < 300:
+                    print(f"[{source}] INFO: Click thành công! (Status: {r.status_code})", flush=True)
+                    time.sleep(random.uniform(2.5, 3.5))
+                    return True # Thoát khỏi hàm nếu thành công
+                elif r.status_code == 429:
+                    retry_after = r.json().get("retry_after", 1.5)
+                    print(f"[{source}] WARN: Bị rate limit! Sẽ thử lại sau {retry_after:.2f} giây...", flush=True)
+                    time.sleep(retry_after)
+                else:
+                    print(f"[{source}] LỖI: Click thất bại! (Status: {r.status_code}, Response: {r.text})", flush=True)
+                    # Không thoát ngay, để vòng lặp thử lại
+                    time.sleep(2) # Chờ 1 chút trước khi thử lại
+            except requests.exceptions.RequestException as e:
+                print(f"[{source}] LỖI KẾT NỐI: {e}. Sẽ thử lại sau 3 giây...", flush=True)
+                time.sleep(3)
+        
+        print(f"[{source}] LỖI: Đã thử click {max_retries} lần mà không thành công.", flush=True)
+        return False # Trả về False sau khi hết số lần thử
+        
     except Exception as e:
         print(f"[{source}] LỖI NGOẠI LỆ trong hàm click_button_by_index: {e}", flush=True)
         return False
@@ -240,19 +249,14 @@ def run_autoclick_bot_thread():
             target_data = autoclick_target_message_data
 
         if target_data:
-            try:
-                print(f"[AUTO CLICK] INFO: Bắt đầu click lần {autoclick_clicks_done + 1}/{autoclick_count or '∞'}", flush=True)
-                
-                if click_button_by_index(bot, target_data, autoclick_button_index, "AUTO CLICK"):
-                    with lock:
-                        autoclick_clicks_done += 1
-                else:
-                    print("[AUTO CLICK] WARN: Click thất bại, sẽ thử lại sau giây lát.", flush=True)
-                    time.sleep(3)
-
-            except Exception as e:
-                print(f"[AUTO CLICK] LỖI: Gặp lỗi trong vòng lặp: {e}", flush=True)
-                time.sleep(3)
+            # Không cần try/except ở đây vì hàm click đã xử lý rồi
+            if click_button_by_index(bot, target_data, autoclick_button_index, "AUTO CLICK"):
+                with lock:
+                    autoclick_clicks_done += 1
+            else:
+                # Nếu hàm click trả về False sau 40 lần thử, có thể dừng hoặc báo lỗi
+                print("[AUTO CLICK] LỖI NGHIÊM TRỌNG: Không thể click sau nhiều lần thử. Dừng auto click.", flush=True)
+                break # Thoát khỏi vòng lặp while
         else:
             print("[AUTO CLICK] WARN: Chưa có tin nhắn event nào được phát hiện. Đang chờ...", flush=True)
             time.sleep(5)
@@ -580,7 +584,7 @@ def toggle_hourly_loop():
     return jsonify({"status": "ok"})
 
 # ===================================================================
-# API CHO SPAM PANEL (FIX)
+# API CHO SPAM PANEL
 # ===================================================================
 @app.route("/api/panels", methods=['GET'])
 def get_panels():
@@ -619,7 +623,6 @@ def delete_panel():
 # KHỞI CHẠY WEB SERVER
 # ===================================================================
 if __name__ == "__main__":
-    # FIX: Khởi động lại luồng spam
     spam_thread = threading.Thread(target=spam_loop, daemon=True)
     spam_thread.start()
     
