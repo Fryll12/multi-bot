@@ -43,7 +43,7 @@ is_autoclick_running = False
 autoclick_button_index = 0
 autoclick_count = 0
 autoclick_clicks_done = 0
-autoclick_target_message_data = None # FIX: Lưu toàn bộ dữ liệu tin nhắn
+autoclick_target_message_data = None
 
 # Spam
 spam_panels = []
@@ -64,11 +64,7 @@ def click_button_by_index(bot, message_data, index, source=""):
             print(f"[{source}] LỖI: Bot chưa kết nối hoặc không có session_id. Không thể click.", flush=True)
             return False
 
-        # Lấy application_id trực tiếp từ tin nhắn để đảm bảo chính xác
-        application_id = message_data.get("application_id")
-        if not application_id:
-            print(f"[{source}] WARN: Không tìm thấy 'application_id' trong dữ liệu tin nhắn. Sử dụng KARUTA_ID mặc định.", flush=True)
-            application_id = KARUTA_ID
+        application_id = message_data.get("application_id", KARUTA_ID)
 
         rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
         all_buttons = [button for row in rows for button in row]
@@ -85,7 +81,7 @@ def click_button_by_index(bot, message_data, index, source=""):
         payload = {
             "type": 3, "guild_id": message_data.get("guild_id"),
             "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
-            "application_id": application_id, # FIX: Sử dụng application_id từ tin nhắn
+            "application_id": application_id,
             "session_id": session_id,
             "data": {"component_type": 2, "custom_id": custom_id}
         }
@@ -217,13 +213,13 @@ def run_autoclick_bot_thread():
                 bot.gateway.close()
                 return
 
-        if resp.event.message or resp.event.message_updated: # FIX: Lắng nghe cả update
+        if resp.event.message or resp.event.message_updated:
             m = resp.parsed.auto()
             if (m.get("author", {}).get("id") == KARUTA_ID and
                 m.get("channel_id") == CHANNEL_ID and
                 "Takumi's Solisfair Stand" in m.get("embeds", [{}])[0].get("title", "")):
                 with lock:
-                    autoclick_target_message_data = m # FIX: Lưu toàn bộ object
+                    autoclick_target_message_data = m
                 print(f"[AUTO CLICK] INFO: Đã phát hiện/cập nhật tin nhắn game. Mục tiêu mới: {m.get('id')}", flush=True)
 
     @bot.gateway.command
@@ -231,11 +227,9 @@ def run_autoclick_bot_thread():
         if resp.event.ready:
             print("[AUTO CLICK] Gateway đã sẵn sàng. Đang chờ bạn gõ 'kevent'...", flush=True)
 
-    # Chạy gateway trong một luồng riêng
     threading.Thread(target=bot.gateway.run, daemon=True, name="AutoClickGatewayThread").start()
     print("[AUTO CLICK] Luồng auto click đã khởi động.", flush=True)
     
-    # Vòng lặp chính để thực hiện click
     while True:
         with lock:
             if not is_autoclick_running: break
@@ -249,7 +243,6 @@ def run_autoclick_bot_thread():
             try:
                 print(f"[AUTO CLICK] INFO: Bắt đầu click lần {autoclick_clicks_done + 1}/{autoclick_count or '∞'}", flush=True)
                 
-                # FIX: Sử dụng trực tiếp dữ liệu từ gateway, không fetch lại
                 if click_button_by_index(bot, target_data, autoclick_button_index, "AUTO CLICK"):
                     with lock:
                         autoclick_clicks_done += 1
@@ -315,7 +308,7 @@ def spam_loop():
                                 for p in spam_panels:
                                     if p['id'] == panel['id']: p['last_spam_time'] = time.time(); break
                         except Exception as e:
-                            print(f"LỖI SPAM: {e}", flush=True)
+                            print(f"LỖI SPAM: Không thể gửi tin nhắn tới kênh {panel['channel_id']}. Lỗi: {e}", flush=True)
             time.sleep(1)
         except Exception as e:
             print(f"LỖI NGOẠI LỆ trong vòng lặp spam: {e}", flush=True)
@@ -344,9 +337,16 @@ HTML_TEMPLATE = """
         button:disabled { background-color: #444; color: #888; cursor: not-allowed; }
         .input-group { display: flex; } .input-group label { white-space: nowrap; padding: 10px; background-color: #333; border-radius: 5px 0 0 5px; }
         .input-group input { width:100%; border: 1px solid #333; background-color: #222; color: #eee; padding: 10px; border-radius: 0 5px 5px 0; }
-        .spam-controls { display: flex; flex-direction: column; gap: 20px; width: auto; max-width: 840px; }
+        .spam-controls { display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 840px; background-color: #1e1e1e; padding: 20px; border-radius: 10px; }
         #panel-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; width: 100%; }
+        .spam-panel { background-color: #2a2a2a; padding: 20px; border-radius: 10px; display: flex; flex-direction: column; gap: 15px; border-left: 5px solid #333; }
+        .spam-panel.active { border-left-color: #03dac6; }
+        .spam-panel input, .spam-panel textarea { width: 100%; box-sizing: border-box; border: 1px solid #444; background-color: #333; color: #eee; padding: 10px; border-radius: 5px; font-size: 1em; }
+        .spam-panel textarea { resize: vertical; min-height: 80px; }
+        .spam-panel-controls { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .delete-btn { background-color: #cf6679 !important; }
         .add-panel-btn { width: 100%; padding: 15px; font-size: 1.2em; background-color: rgba(3, 218, 198, 0.2); border: 2px dashed #03dac6; color: #03dac6; cursor: pointer; border-radius: 10px;}
+        .timer { font-size: 0.9em; color: #888; text-align: right; }
     </style>
 </head>
 <body>
@@ -385,7 +385,7 @@ HTML_TEMPLATE = """
             <button id="toggleLoopBtn">Bật Vòng lặp</button>
         </div>
     </div>
-    <div class="panel spam-controls">
+    <div class="spam-controls">
         <h2>Tiện ích: Spam Tin Nhắn</h2>
         <div id="panel-container"></div>
         <button class="add-panel-btn" onclick="addPanel()">+ Thêm Bảng Spam</button>
@@ -431,7 +431,7 @@ HTML_TEMPLATE = """
             eventBotStatusDiv.textContent = data.is_event_bot_running ? 'Trạng thái: ĐANG CHẠY' : 'Trạng thái: ĐÃ DỪNG';
             eventBotStatusDiv.className = data.is_event_bot_running ? 'status status-on' : 'status status-off';
             toggleEventBotBtn.textContent = data.is_event_bot_running ? 'Dừng Auto Play' : 'Bật Auto Play';
-            toggleEventBotBtn.disabled = data.is_autoclick_running; // Vô hiệu hóa nếu auto click đang chạy
+            toggleEventBotBtn.disabled = data.is_autoclick_running;
             eventBotPanel.classList.toggle('active-mode', data.is_event_bot_running);
 
 
@@ -442,14 +442,14 @@ HTML_TEMPLATE = """
             toggleAutoclickBtn.textContent = data.is_autoclick_running ? 'Dừng Auto Click' : 'Bật Auto Click';
             buttonIndexInput.disabled = data.is_autoclick_running;
             clickCountInput.disabled = data.is_autoclick_running;
-            toggleAutoclickBtn.disabled = data.is_event_bot_running; // Vô hiệu hóa nếu event bot đang chạy
+            toggleAutoclickBtn.disabled = data.is_event_bot_running;
             autoclickPanel.classList.toggle('active-mode', data.is_autoclick_running);
 
             // Vòng lặp
             loopStatusDiv.textContent = data.is_hourly_loop_enabled ? 'Trạng thái: ĐANG CHẠY' : 'Trạng thái: ĐÃ DỪNG';
             loopStatusDiv.className = data.is_hourly_loop_enabled ? 'status status-on' : 'status status-off';
             toggleLoopBtn.textContent = data.is_hourly_loop_enabled ? 'TẮT VÒNG LẶP' : 'BẬT VÒNG LẶP';
-            toggleLoopBtn.disabled = !data.is_event_bot_running && !data.is_hourly_loop_enabled; // Chỉ bật được khi event bot chạy
+            toggleLoopBtn.disabled = !data.is_event_bot_running && !data.is_hourly_loop_enabled;
         }
         
         // --- EVENT LISTENERS ---
@@ -466,11 +466,41 @@ HTML_TEMPLATE = """
             apiCall('/api/toggle_hourly_loop', 'POST', { enabled: !currentStatus, delay: parseInt(delayInput.value, 10) }).then(fetchStatus);
         });
 
+        // --- SCRIPT CHO SPAMMER ---
+        function createPanelElement(panel) {
+            const div = document.createElement('div');
+            div.className = `spam-panel ${panel.is_active ? 'active' : ''}`;
+            div.dataset.id = panel.id;
+            let countdown = panel.is_active ? panel.delay - (Date.now() / 1000 - panel.last_spam_time) : panel.delay;
+            countdown = Math.max(0, Math.ceil(countdown));
+            div.innerHTML = `<textarea class="message-input" placeholder="Nội dung spam...">${panel.message}</textarea><input type="text" class="channel-input" placeholder="ID Kênh..." value="${panel.channel_id}"><input type="number" class="delay-input" placeholder="Delay (giây)..." value="${panel.delay}"><div class="spam-panel-controls"><button class="toggle-btn">${panel.is_active ? 'TẮT' : 'BẬT'}</button><button class="delete-btn">XÓA</button></div><div class="timer">Hẹn giờ: ${countdown}s</div>`;
+            const updatePanelData = () => { const updatedPanel = { ...panel, message: div.querySelector('.message-input').value, channel_id: div.querySelector('.channel-input').value, delay: parseInt(div.querySelector('.delay-input').value, 10) || 60 }; apiCall('/api/panel/update', 'POST', updatedPanel); };
+            div.querySelector('.toggle-btn').addEventListener('click', () => {
+                const updatedPanel = { ...panel, message: div.querySelector('.message-input').value, channel_id: div.querySelector('.channel-input').value, delay: parseInt(div.querySelector('.delay-input').value, 10) || 60, is_active: !panel.is_active };
+                apiCall('/api/panel/update', 'POST', updatedPanel).then(fetchPanels);
+            });
+            div.querySelector('.delete-btn').addEventListener('click', () => { if (confirm('Xóa bảng này?')) apiCall('/api/panel/delete', 'POST', { id: panel.id }).then(fetchPanels); });
+            div.querySelector('.message-input').addEventListener('change', updatePanelData);
+            div.querySelector('.channel-input').addEventListener('change', updatePanelData);
+            div.querySelector('.delay-input').addEventListener('change', updatePanelData);
+            return div;
+        }
+        async function fetchPanels() {
+            const focusedElement = document.activeElement;
+            if (focusedElement && (focusedElement.tagName === 'INPUT' || focusedElement.tagName === 'TEXTAREA') && focusedElement.closest('.spam-panel')) { return; }
+            const data = await apiCall('/api/panels', 'GET');
+            const container = document.getElementById('panel-container');
+            container.innerHTML = '';
+            if (data.panels) data.panels.forEach(panel => container.appendChild(createPanelElement(panel)));
+        }
+        async function addPanel() { await apiCall('/api/panel/add', 'POST'); fetchPanels(); }
+
         // --- KHỞI CHẠY ---
         document.addEventListener('DOMContentLoaded', () => {
             fetchStatus();
+            fetchPanels();
             setInterval(fetchStatus, 2000);
-            // Spam script can be added here if needed
+            setInterval(fetchPanels, 2000);
         });
     </script>
 </body>
@@ -527,7 +557,7 @@ def toggle_autoclick():
             autoclick_button_index = int(data.get('button_index', 0))
             autoclick_count = int(data.get('count', 1))
             autoclick_clicks_done = 0
-            autoclick_target_message_data = None # Reset target
+            autoclick_target_message_data = None
             print(f"[CONTROL] Nhận lệnh BẬT Auto Click: {autoclick_count or 'vô hạn'} lần vào button {autoclick_button_index}.", flush=True)
             autoclick_bot_thread = threading.Thread(target=run_autoclick_bot_thread, daemon=True)
             autoclick_bot_thread.start()
@@ -549,14 +579,51 @@ def toggle_hourly_loop():
             print("[CONTROL] Vòng lặp ĐÃ TẮT.", flush=True)
     return jsonify({"status": "ok"})
 
-# Các API cho Spam Panel giữ nguyên...
+# ===================================================================
+# API CHO SPAM PANEL (FIX)
+# ===================================================================
+@app.route("/api/panels", methods=['GET'])
+def get_panels():
+    with lock:
+        return jsonify({"panels": spam_panels})
+
+@app.route("/api/panel/add", methods=['POST'])
+def add_panel():
+    global panel_id_counter
+    with lock:
+        new_panel = { "id": panel_id_counter, "message": "", "channel_id": "", "delay": 60, "is_active": False, "last_spam_time": 0 }
+        spam_panels.append(new_panel)
+        panel_id_counter += 1
+    return jsonify({"status": "ok", "new_panel": new_panel})
+
+@app.route("/api/panel/update", methods=['POST'])
+def update_panel():
+    data = request.get_json()
+    with lock:
+        for panel in spam_panels:
+            if panel['id'] == data['id']:
+                if data.get('is_active') and not panel.get('is_active'):
+                    data['last_spam_time'] = 0
+                panel.update(data)
+                break
+    return jsonify({"status": "ok"})
+
+@app.route("/api/panel/delete", methods=['POST'])
+def delete_panel():
+    data = request.get_json()
+    with lock:
+        spam_panels[:] = [p for p in spam_panels if p['id'] != data['id']]
+    return jsonify({"status": "ok"})
 
 # ===================================================================
 # KHỞI CHẠY WEB SERVER
 # ===================================================================
 if __name__ == "__main__":
-    # spam_thread = threading.Thread(target=spam_loop, daemon=True)
-    # spam_thread.start()
+    # FIX: Khởi động lại luồng spam
+    spam_thread = threading.Thread(target=spam_loop, daemon=True)
+    spam_thread.start()
+    
     port = int(os.environ.get("PORT", 10000))
     print(f"[SERVER] Khởi động Web Server tại http://0.0.0.0:{port}", flush=True)
     app.run(host="0.0.0.0", port=port, debug=False)
+
