@@ -43,7 +43,7 @@ is_autoclick_running = False
 autoclick_button_index = 0
 autoclick_count = 0
 autoclick_clicks_done = 0
-autoclick_target_message_id = None # ID tin nhắn mục tiêu của AutoClick
+autoclick_target_message_data = None # FIX: Lưu toàn bộ dữ liệu tin nhắn
 
 # Spam
 spam_panels = []
@@ -64,6 +64,12 @@ def click_button_by_index(bot, message_data, index, source=""):
             print(f"[{source}] LỖI: Bot chưa kết nối hoặc không có session_id. Không thể click.", flush=True)
             return False
 
+        # Lấy application_id trực tiếp từ tin nhắn để đảm bảo chính xác
+        application_id = message_data.get("application_id")
+        if not application_id:
+            print(f"[{source}] WARN: Không tìm thấy 'application_id' trong dữ liệu tin nhắn. Sử dụng KARUTA_ID mặc định.", flush=True)
+            application_id = KARUTA_ID
+
         rows = [comp['components'] for comp in message_data.get('components', []) if 'components' in comp]
         all_buttons = [button for row in rows for button in row]
         if index >= len(all_buttons):
@@ -79,7 +85,8 @@ def click_button_by_index(bot, message_data, index, source=""):
         payload = {
             "type": 3, "guild_id": message_data.get("guild_id"),
             "channel_id": message_data.get("channel_id"), "message_id": message_data.get("id"),
-            "application_id": KARUTA_ID, "session_id": session_id,
+            "application_id": application_id, # FIX: Sử dụng application_id từ tin nhắn
+            "session_id": session_id,
             "data": {"component_type": 2, "custom_id": custom_id}
         }
 
@@ -90,7 +97,7 @@ def click_button_by_index(bot, message_data, index, source=""):
             r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
             if 200 <= r.status_code < 300:
                 print(f"[{source}] INFO: Click thành công! (Status: {r.status_code})", flush=True)
-                time.sleep(random.uniform(2.5, 3.5)) # Thêm random delay
+                time.sleep(random.uniform(2.5, 3.5))
                 return True
             elif r.status_code == 429:
                 retry_after = r.json().get("retry_after", 1.5)
@@ -195,7 +202,7 @@ def run_event_bot_thread():
 # ===================================================================
 def run_autoclick_bot_thread():
     """Chạy bot chỉ để auto click, tách biệt hoàn toàn."""
-    global is_autoclick_running, autoclick_bot_instance, autoclick_clicks_done, autoclick_target_message_id
+    global is_autoclick_running, autoclick_bot_instance, autoclick_clicks_done, autoclick_target_message_data
 
     bot = discum.Client(token=TOKEN, log=False)
     with lock:
@@ -203,21 +210,21 @@ def run_autoclick_bot_thread():
 
     @bot.gateway.command
     def on_message(resp):
-        """Chỉ lắng nghe tin nhắn game mới để lấy ID."""
-        global autoclick_target_message_id
+        """Lắng nghe và LƯU TRỮ toàn bộ dữ liệu tin nhắn game mới."""
+        global autoclick_target_message_data
         with lock:
             if not is_autoclick_running:
                 bot.gateway.close()
                 return
 
-        if resp.event.message:
+        if resp.event.message or resp.event.message_updated: # FIX: Lắng nghe cả update
             m = resp.parsed.auto()
             if (m.get("author", {}).get("id") == KARUTA_ID and
                 m.get("channel_id") == CHANNEL_ID and
                 "Takumi's Solisfair Stand" in m.get("embeds", [{}])[0].get("title", "")):
                 with lock:
-                    autoclick_target_message_id = m.get("id")
-                print(f"[AUTO CLICK] INFO: Đã phát hiện/cập nhật tin nhắn game. Mục tiêu mới: {autoclick_target_message_id}", flush=True)
+                    autoclick_target_message_data = m # FIX: Lưu toàn bộ object
+                print(f"[AUTO CLICK] INFO: Đã phát hiện/cập nhật tin nhắn game. Mục tiêu mới: {m.get('id')}", flush=True)
 
     @bot.gateway.command
     def on_ready(resp):
@@ -236,22 +243,14 @@ def run_autoclick_bot_thread():
                 print("[AUTO CLICK] INFO: Đã hoàn thành số lần click được yêu cầu.", flush=True)
                 break
             
-            target_id = autoclick_target_message_id
+            target_data = autoclick_target_message_data
 
-        if target_id:
+        if target_data:
             try:
-                # Lấy dữ liệu tin nhắn mới nhất
-                message_response = bot.getMessage(CHANNEL_ID, target_id)
-                if not message_response.json():
-                    print(f"[AUTO CLICK] WARN: Không thể lấy dữ liệu cho tin nhắn ID {target_id}. Chờ...", flush=True)
-                    time.sleep(3)
-                    continue
-                
-                message_data = message_response.json()[0]
-                
                 print(f"[AUTO CLICK] INFO: Bắt đầu click lần {autoclick_clicks_done + 1}/{autoclick_count or '∞'}", flush=True)
                 
-                if click_button_by_index(bot, message_data, autoclick_button_index, "AUTO CLICK"):
+                # FIX: Sử dụng trực tiếp dữ liệu từ gateway, không fetch lại
+                if click_button_by_index(bot, target_data, autoclick_button_index, "AUTO CLICK"):
                     with lock:
                         autoclick_clicks_done += 1
                 else:
@@ -514,7 +513,7 @@ def toggle_event_bot():
 @app.route("/api/toggle_autoclick", methods=['POST'])
 def toggle_autoclick():
     global autoclick_bot_thread, is_autoclick_running, is_event_bot_running
-    global autoclick_button_index, autoclick_count, autoclick_clicks_done, autoclick_target_message_id
+    global autoclick_button_index, autoclick_count, autoclick_clicks_done, autoclick_target_message_data
     data = request.get_json()
     with lock:
         if is_event_bot_running:
@@ -528,7 +527,7 @@ def toggle_autoclick():
             autoclick_button_index = int(data.get('button_index', 0))
             autoclick_count = int(data.get('count', 1))
             autoclick_clicks_done = 0
-            autoclick_target_message_id = None # Reset target
+            autoclick_target_message_data = None # Reset target
             print(f"[CONTROL] Nhận lệnh BẬT Auto Click: {autoclick_count or 'vô hạn'} lần vào button {autoclick_button_index}.", flush=True)
             autoclick_bot_thread = threading.Thread(target=run_autoclick_bot_thread, daemon=True)
             autoclick_bot_thread.start()
@@ -551,42 +550,13 @@ def toggle_hourly_loop():
     return jsonify({"status": "ok"})
 
 # Các API cho Spam Panel giữ nguyên...
-@app.route("/api/panels")
-def get_panels():
-    with lock: return jsonify({"panels": spam_panels})
-
-@app.route("/api/panel/add", methods=['POST'])
-def add_panel():
-    global panel_id_counter
-    with lock:
-        new_panel = { "id": panel_id_counter, "message": "", "channel_id": "", "delay": 60, "is_active": False, "last_spam_time": 0 }
-        spam_panels.append(new_panel)
-        panel_id_counter += 1
-    return jsonify({"status": "ok", "new_panel": new_panel})
-
-@app.route("/api/panel/update", methods=['POST'])
-def update_panel():
-    data = request.get_json()
-    with lock:
-        for panel in spam_panels:
-            if panel['id'] == data['id']:
-                if data.get('is_active') and not panel.get('is_active'): data['last_spam_time'] = 0
-                panel.update(data); break
-    return jsonify({"status": "ok"})
-
-@app.route("/api/panel/delete", methods=['POST'])
-def delete_panel():
-    data = request.get_json()
-    with lock: spam_panels[:] = [p for p in spam_panels if p['id'] != data['id']]
-    return jsonify({"status": "ok"})
 
 # ===================================================================
 # KHỞI CHẠY WEB SERVER
 # ===================================================================
 if __name__ == "__main__":
-    spam_thread = threading.Thread(target=spam_loop, daemon=True)
-    spam_thread.start()
+    # spam_thread = threading.Thread(target=spam_loop, daemon=True)
+    # spam_thread.start()
     port = int(os.environ.get("PORT", 10000))
     print(f"[SERVER] Khởi động Web Server tại http://0.0.0.0:{port}", flush=True)
     app.run(host="0.0.0.0", port=port, debug=False)
-
