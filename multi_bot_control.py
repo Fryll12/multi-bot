@@ -390,7 +390,7 @@ def handle_farm_grab(bot, msg, bot_num):
             thresh_map = {1: 'heart_threshold_1', 2: 'heart_threshold_2', 3: 'heart_threshold_3', 4: 'heart_threshold_4'}
             heart_threshold = int(target_server.get(thresh_map[bot_num], 50))
             def read_yoru_bot():
-                time.sleep(0.5)
+                time.sleep(0.6)
                 try:
                     messages = bot.getMessages(channel_id, num=5).json()
                     for msg_item in messages:
@@ -402,7 +402,7 @@ def handle_farm_grab(bot, msg, bot_num):
                             max_num = max(heart_numbers)
                             if max_num >= heart_threshold:
                                 max_index = heart_numbers.index(max_num)
-                                delays = {1: [0.3, 1.3, 2.1], 2: [0.6, 1.6, 2.3], 3: [0.6, 1.6, 2.3], 4: [0.6, 1.6, 2.3]}
+                                delays = {1: [0.2, 1.2, 2.0], 2: [0.7, 1.7, 2.5], 3: [0.7, 1.7, 2.5], 4: [0.7, 1.7, 2.5]}
                                 emojis = ["1️⃣", "2️⃣", "3️⃣"]
                                 emoji = emojis[max_index]
                                 delay = delays.get(bot_num, [0.7, 1.7, 2.4])[max_index]
@@ -508,7 +508,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                     # Luồng nhặt thẻ (độc lập)
                     if auto_grab_enabled:
                         def read_yoru_bot():
-                            time.sleep(0.5)
+                            time.sleep(0.6)
                             try:
                                 messages = bot.getMessages(main_channel_id, num=5).json()
                                 for msg_item in messages:
@@ -519,7 +519,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                         max_num = max(heart_numbers)
                                         if sum(heart_numbers) > 0 and max_num >= heart_threshold:
                                             max_index = heart_numbers.index(max_num)
-                                            emoji, delay = [("1️⃣", 0.3), ("2️⃣", 1.3), ("3️⃣", 2)][max_index]
+                                            emoji, delay = [("1️⃣", 0.2), ("2️⃣", 1.2), ("3️⃣", 2)][max_index]
                                             print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                             def grab():
                                                 bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
@@ -570,7 +570,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             if auto_grab_enabled_2 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                 last_drop_msg_id = msg["id"]
                 def read_yoru_bot_2():
-                    time.sleep(0.5)
+                    time.sleep(0.6)
                     try:
                         messages = bot.getMessages(main_channel_id, num=5).json()
                         for msg_item in messages:
@@ -585,7 +585,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                 max_num = max(heart_numbers)
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_2:
                                     max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 0.6), ("2️⃣", 1.6), ("3️⃣", 2.2)][max_index]
+                                    emoji, delay = [("1️⃣", 0.7), ("2️⃣", 1.7), ("3️⃣", 2.5)][max_index]
                                     print(f"[Bot 2] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                     def grab_2():
                                         bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
@@ -617,7 +617,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             if auto_grab_enabled_3 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                 last_drop_msg_id = msg["id"]
                 def read_yoru_bot_3():
-                    time.sleep(0.5)
+                    time.sleep(0.6)
                     try:
                         messages = bot.getMessages(main_channel_id, num=5).json()
                         for msg_item in messages:
@@ -632,7 +632,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                 max_num = max(heart_numbers)
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_3:
                                     max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 0.6), ("2️⃣", 1.6), ("3️⃣", 2.2)][max_index]
+                                    emoji, delay = [("1️⃣", 0.7), ("2️⃣", 1.7), ("3️⃣", 2.5)][max_index]
                                     print(f"[Bot 3] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                     def grab_3():
                                         bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
@@ -662,7 +662,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             if auto_grab_enabled_4 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                 last_drop_msg_id = msg["id"]
                 def read_yoru_bot_4():
-                    time.sleep(0.5)
+                    time.sleep(0.6)
                     try:
                         messages = bot.getMessages(main_channel_id, num=5).json()
                         for msg_item in messages:
@@ -677,7 +677,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                 max_num = max(heart_numbers)
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_4:
                                     max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 0.6), ("2️⃣", 1.6), ("3️⃣", 2.2)][max_index]
+                                    emoji, delay = [("1️⃣", 0.7), ("2️⃣", 1.7), ("3️⃣", 2.5)][max_index]
                                     print(f"[Bot 4] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                     def grab_4():
                                         bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
