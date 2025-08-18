@@ -698,76 +698,33 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
     return bot
     
 # HÀM RUN_WORK_BOT PHIÊN BẢN SỬA LỖI GỬI KJN
-import time
-import threading
-import re
-import requests
-
-def run_work_bot(token, acc_name, shared_resource=None, delay_start=0):
+def run_work_bot(token, acc_name, shared_resource=None):
     ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     bot = discum.Client(token=token, log=False, user_agent=ua)
     headers = {"Authorization": token, "Content-Type": "application/json"}
     found_resource = None
     step = {"value": 0}
-    last_message_sent = {"content": None, "timestamp": None}
-    is_first_bot = shared_resource is None  # Bot đầu tiên sẽ không có shared_resource
+    is_first_bot = shared_resource is None
+    button_clicked = {"value": False}
 
     def send_karuta_command(): 
         bot.sendMessage(work_channel_id, "kc o:ef")
-        last_message_sent["content"] = "kc o:ef"
-        last_message_sent["timestamp"] = time.time()
+        print(f"[{acc_name}] ➡️ Gửi: kc o:ef", flush=True)
 
     def send_kn_command(): 
         bot.sendMessage(work_channel_id, "kn")
-        last_message_sent["content"] = "kn"
-        last_message_sent["timestamp"] = time.time()
+        print(f"[{acc_name}] ➡️ Gửi: kn", flush=True)
 
     def send_kw_command(): 
         bot.sendMessage(work_channel_id, "kw")
-        last_message_sent["content"] = "kw"
-        last_message_sent["timestamp"] = time.time()
+        print(f"[{acc_name}] ➡️ Gửi: kw", flush=True)
         step["value"] = 2
     
     def send_kjn_command(resource):
         cmd = f"kjn `{resource}` a b c d e"
         bot.sendMessage(work_channel_id, cmd)
-        last_message_sent["content"] = cmd
-        last_message_sent["timestamp"] = time.time()
+        print(f"[{acc_name}] ➡️ Gửi: {cmd}", flush=True)
 
-    def check_message_sent_successfully(expected_content, timeout=5):
-        """Kiểm tra xem tin nhắn có được gửi thành công không"""
-        if not last_message_sent["timestamp"]:
-            return False
-        
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            try:
-                messages = bot.getMessages(work_channel_id, num=10).json()
-                for msg in messages:
-                    if (msg.get("author", {}).get("id") == bot.user_id and 
-                        msg.get("content", "").strip() == expected_content.strip() and
-                        msg.get("timestamp", 0) > last_message_sent["timestamp"] - 2):
-                        return True
-                time.sleep(0.5)
-            except Exception as e:
-                print(f"[{acc_name}] Lỗi khi kiểm tra tin nhắn: {e}", flush=True)
-                time.sleep(0.5)
-        return False
-
-    def ensure_message_sent(send_func, expected_content, max_retries=3):
-        """Đảm bảo tin nhắn được gửi thành công"""
-        for attempt in range(max_retries):
-            send_func()
-            if check_message_sent_successfully(expected_content):
-                print(f"[{acc_name}] ✅ Tin nhắn '{expected_content}' đã được gửi thành công", flush=True)
-                return True
-            else:
-                print(f"[{acc_name}] ❌ Lần thử {attempt + 1}: Tin nhắn '{expected_content}' chưa được gửi, thử lại...", flush=True)
-                time.sleep(1)
-        
-        print(f"[{acc_name}] ⚠️ Không thể gửi tin nhắn '{expected_content}' sau {max_retries} lần thử", flush=True)
-        return False
-    
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
             session_id_thuc = bot.gateway.session_id or "aaa"
@@ -778,77 +735,30 @@ def run_work_bot(token, acc_name, shared_resource=None, delay_start=0):
                 "data": {"component_type": 2,"custom_id": custom_id}
             }
             r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
-            print(f"[Work][{acc_name}] Click tick: Status {r.status_code}", flush=True)
-            return r.status_code == 200 or r.status_code == 204
+            success = r.status_code == 200 or r.status_code == 204
+            if success:
+                button_clicked["value"] = True
+                print(f"[{acc_name}] ✅ Click button thành công: {custom_id}", flush=True)
+            else:
+                print(f"[{acc_name}] ❌ Click button thất bại: Status {r.status_code}", flush=True)
+            return success
         except Exception as e: 
-            print(f"[Work][{acc_name}] Lỗi click tick: {e}", flush=True)
+            print(f"[{acc_name}] ❌ Lỗi click button: {e}", flush=True)
             return False
 
     def check_work_completion():
-        """Kiểm tra xem work đã hoàn thành chưa bằng cách đọc embed gần nhất của Karuta"""
+        """Kiểm tra work đã hoàn thành chưa"""
         try:
-            messages = bot.getMessages(work_channel_id, num=20).json()
+            messages = bot.getMessages(work_channel_id, num=15).json()
             for msg in messages:
                 if (msg.get("author", {}).get("id") == karuta_id and 
                     "embeds" in msg and len(msg["embeds"]) > 0):
                     desc = msg["embeds"][0].get("description", "")
                     if "**Your workers have finished their tasks.**" in desc:
-                        print(f"[{acc_name}] ✅ Phát hiện work đã hoàn thành!", flush=True)
                         return True
-                    break
             return False
-        except Exception as e:
-            print(f"[{acc_name}] Lỗi khi kiểm tra work completion: {e}", flush=True)
+        except:
             return False
-
-    def final_work_verification():
-        """Kiểm tra cuối cùng và thực hiện lại kw + click nếu cần"""
-        max_attempts = 3
-        for attempt in range(max_attempts):
-            if check_work_completion():
-                return True
-            
-            print(f"[{acc_name}] 🔄 Lần thử {attempt + 1}: Work chưa hoàn thành, thực hiện lại kw...", flush=True)
-            
-            # Gửi lại lệnh kw
-            if not ensure_message_sent(send_kw_command, "kw"):
-                continue
-            
-            time.sleep(3)  # Đợi button xuất hiện
-            
-            # Tìm và click button
-            try:
-                messages = bot.getMessages(work_channel_id, num=5).json()
-                for msg in messages:
-                    if (msg.get("author", {}).get("id") == karuta_id and 
-                        "components" in msg and msg["components"]):
-                        
-                        message_id = msg['id']
-                        guild_id = msg.get('guild_id')
-                        application_id = msg.get('application_id', karuta_id)
-                        
-                        # Tìm button cuối cùng
-                        last_custom_id = None
-                        for comp in msg['components']:
-                            if comp['type'] == 1:
-                                for btn in comp['components']:
-                                    if btn['type'] == 2:
-                                        last_custom_id = btn['custom_id']
-                        
-                        if last_custom_id:
-                            print(f"[{acc_name}] 🎯 Click button: {last_custom_id}", flush=True)
-                            if click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id):
-                                time.sleep(5)  # Đợi xử lý
-                                if check_work_completion():
-                                    return True
-                        break
-            except Exception as e:
-                print(f"[{acc_name}] Lỗi khi thực hiện lại work: {e}", flush=True)
-            
-            time.sleep(2)
-        
-        print(f"[{acc_name}] ❌ Không thể hoàn thành work sau {max_attempts} lần thử", flush=True)
-        return False
 
     @bot.gateway.command
     def on_message(resp):
@@ -866,65 +776,44 @@ def run_work_bot(token, acc_name, shared_resource=None, delay_start=0):
         author_id = str(m.get("author", {}).get("id", ""))
         guild_id = m.get("guild_id")
         
-        # Chỉ xử lý kc o:ef response khi step = 0
+        # Xử lý kc o:ef response
         if step["value"] == 0 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
             desc = m["embeds"][0].get("description", "")
             card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc)
             
             if len(card_codes) >= 10:
-                print(f"[{acc_name}] Phát hiện {len(card_codes)} card, bắt đầu pick...", flush=True)
+                print(f"[{acc_name}] 🎯 Phát hiện {len(card_codes)} card, bắt đầu pick nhanh...", flush=True)
+                
+                # Pick cards nhanh không delay
                 first_5 = card_codes[:5]
                 last_5 = card_codes[-5:]
                 
-                def pick_cards_thread():
-                    # Pick cards với retry logic
-                    all_picks_successful = True
-                    
-                    # Thêm delay nhỏ để tránh spam
-                    base_delay = 1.8
-                    for i, code in enumerate(last_5):
-                        pick_cmd = f"kjw {code} {chr(97+i)}"
-                        if not ensure_message_sent(lambda: bot.sendMessage(work_channel_id, pick_cmd), pick_cmd):
-                            all_picks_successful = False
-                        time.sleep(base_delay)
-                    
-                    for i, code in enumerate(first_5):
-                        pick_cmd = f"kjw {code} {chr(97+i)}"
-                        if not ensure_message_sent(lambda: bot.sendMessage(work_channel_id, pick_cmd), pick_cmd):
-                            all_picks_successful = False
-                        time.sleep(base_delay)
-                    
-                    if not all_picks_successful:
-                        print(f"[{acc_name}] ⚠️ Một số lệnh pick có thể chưa được gửi thành công", flush=True)
-                    
-                    time.sleep(2)
-                    
-                    # Logic khác nhau cho bot đầu tiên và các bot sau
-                    if is_first_bot:
-                        # Bot đầu tiên: gửi kn để lấy tài nguyên
-                        print(f"[{acc_name}] Bot đầu tiên, đang tìm tài nguyên...", flush=True)
-                        if ensure_message_sent(send_kn_command, "kn"):
-                            step["value"] = 1
-                        else:
-                            print(f"[{acc_name}] ❌ Không thể gửi lệnh kn", flush=True)
-                    else:
-                        # Các bot sau: dùng tài nguyên đã có
-                        print(f"[{acc_name}] Bot phụ, sử dụng tài nguyên đã có: '{shared_resource}'", flush=True)
-                        
-                        def send_kjn_kw_thread(resource_to_use):
-                            time.sleep(2)
-                            # Đảm bảo kjn được gửi thành công
-                            kjn_cmd = f"kjn `{resource_to_use}` a b c d e"
-                            if ensure_message_sent(lambda: send_kjn_command(resource_to_use), kjn_cmd):
-                                time.sleep(2)
-                                # Đảm bảo kw được gửi thành công
-                                ensure_message_sent(send_kw_command, "kw")
-                        
-                        threading.Thread(target=send_kjn_kw_thread, args=(shared_resource,)).start()
+                # Pick last 5 trước
+                for i, code in enumerate(last_5):
+                    bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+                    time.sleep(0.8)  # Delay ngắn hơn
                 
-                threading.Thread(target=pick_cards_thread).start()
+                # Pick first 5 sau
+                for i, code in enumerate(first_5):
+                    bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+                    time.sleep(0.8)
+                
+                print(f"[{acc_name}] ✅ Đã pick xong tất cả cards", flush=True)
+                
+                # Chuyển sang bước tiếp theo
+                if is_first_bot:
+                    print(f"[{acc_name}] 🔍 Bot đầu tiên, tìm tài nguyên...", flush=True)
+                    time.sleep(1.5)
+                    send_kn_command()
+                    step["value"] = 1
+                else:
+                    print(f"[{acc_name}] 🚀 Bot phụ, dùng tài nguyên: '{shared_resource}'", flush=True)
+                    time.sleep(1.5)
+                    send_kjn_command(shared_resource)
+                    time.sleep(1.5)
+                    send_kw_command()
 
-        # Chỉ bot đầu tiên xử lý kn response
+        # Xử lý kn response (chỉ bot đầu tiên)
         elif step["value"] == 1 and is_first_bot and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
             desc = m["embeds"][0].get("description", "")
             lines = desc.split("\n")
@@ -935,18 +824,14 @@ def run_work_bot(token, acc_name, shared_resource=None, delay_start=0):
                     nonlocal found_resource
                     resource = match.group(1)
                     found_resource = resource
-                    print(f"[{acc_name}] Resource tìm được: {resource}", flush=True)
+                    print(f"[{acc_name}] 💎 Tìm được tài nguyên: {resource}", flush=True)
                     
-                    def send_kjn_kw_thread():
-                        time.sleep(2)
-                        kjn_cmd = f"kjn `{resource}` a b c d e"
-                        if ensure_message_sent(lambda: send_kjn_command(resource), kjn_cmd):
-                            time.sleep(2)
-                            ensure_message_sent(send_kw_command, "kw")
-                    
-                    threading.Thread(target=send_kjn_kw_thread).start()
+                    time.sleep(1.5)
+                    send_kjn_command(resource)
+                    time.sleep(1.5)
+                    send_kw_command()
         
-        # Tất cả bot đều xử lý kw button
+        # Xử lý kw button
         elif step["value"] == 2 and author_id == karuta_id and "components" in m:
             message_id = m['id']
             application_id = m.get('application_id', karuta_id)
@@ -959,97 +844,85 @@ def run_work_bot(token, acc_name, shared_resource=None, delay_start=0):
                             last_custom_id = btn['custom_id']
             
             if last_custom_id:
-                print(f"[{acc_name}] Tìm thấy nút cuối cùng: '{last_custom_id}'. Bắt đầu click...", flush=True)
-                if click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id):
-                    step["value"] = 3
-                else:
-                    print(f"[{acc_name}] ❌ Click button thất bại, thử lại...", flush=True)
-                    time.sleep(2)
-                    click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
-                    step["value"] = 3
+                print(f"[{acc_name}] 🎯 Tìm thấy button: '{last_custom_id}', click ngay...", flush=True)
+                click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
+                step["value"] = 3
 
-    print(f"[{acc_name}] Khởi động sau {delay_start}s delay...", flush=True)
-    
-    # Thêm delay để tránh conflict
-    if delay_start > 0:
-        time.sleep(delay_start)
-    
+    # Khởi động bot
+    print(f"[{acc_name}] 🚀 Khởi động bot...", flush=True)
     threading.Thread(target=bot.gateway.run, daemon=True).start()
+    time.sleep(5)
     
-    time.sleep(7)
+    # Gửi lệnh đầu tiên
+    send_karuta_command()
     
-    # Bắt đầu với lệnh kc o:ef với retry
-    if not ensure_message_sent(send_karuta_command, "kc o:ef"):
-        print(f"[{acc_name}] ❌ Không thể gửi lệnh khởi tạo", flush=True)
-        bot.gateway.close()
-        return found_resource
+    # Chờ hoàn thành với timeout 90s
+    timeout = time.time() + 90
+    while step["value"] < 3 and time.time() < timeout:
+        time.sleep(0.5)
     
-    timeout = time.time() + 120  # Tăng timeout lên 120s
-    while step["value"] != 3 and time.time() < timeout:
-        time.sleep(1)
-    
-    # Thực hiện kiểm tra cuối cùng
-    if step["value"] == 3:
-        print(f"[{acc_name}] 🔍 Đang kiểm tra kết quả cuối cùng...", flush=True)
-        time.sleep(3)  # Đợi một chút để đảm bảo kết quả được xử lý
+    # Kiểm tra kết quả
+    if step["value"] == 3 and button_clicked["value"]:
+        print(f"[{acc_name}] ✅ ĐÃ HOÀN THÀNH - Button đã được click!", flush=True)
         
-        if final_work_verification():
-            print(f"[{acc_name}] ✅ Đã hoàn thành thành công.", flush=True)
+        # Kiểm tra thêm work completion
+        time.sleep(3)
+        if check_work_completion():
+            print(f"[{acc_name}] 🎉 XÁC NHẬN: Work đã hoàn thành!", flush=True)
         else:
-            print(f"[{acc_name}] ⚠️ Hoàn thành nhưng không chắc chắn về kết quả.", flush=True)
+            print(f"[{acc_name}] ⚠️ Hoàn thành nhưng chưa thấy thông báo kết thúc", flush=True)
     else:
-        print(f"[{acc_name}] ❌ KHÔNG hoàn thành (hết 120s timeout).", flush=True)
+        print(f"[{acc_name}] ❌ KHÔNG HOÀN THÀNH (timeout hoặc chưa click được button)", flush=True)
     
     bot.gateway.close()
     return found_resource
 
 
-# Hàm helper để chạy nhiều bot TUẦN TỰ
 def run_multiple_work_bots(token_list, acc_names):
     """
-    Chạy nhiều bot work TUẦN TỰ:
-    - Bot đầu tiên hoàn thành 100% -> Bot thứ 2 bắt đầu
-    - Bot thứ 2 hoàn thành 100% -> Bot thứ 3 bắt đầu
-    - Và cứ thế...
+    Chạy nhiều bot work TUẦN TỰ thật sự:
+    - Bot 1 hoàn thành 100% -> chờ 3s -> Bot 2 bắt đầu
+    - Bot 2 hoàn thành 100% -> chờ 3s -> Bot 3 bắt đầu
     """
     if not token_list or not acc_names:
         print("❌ Cần có ít nhất 1 token và tên account")
         return
     
-    print(f"🚀 Bắt đầu chạy {len(token_list)} bot work TUẦN TỰ")
+    print(f"🚀 BẮT ĐẦU CHẠY {len(token_list)} BOT WORK TUẦN TỰ\n")
     
     shared_resource = None
     
     for i, (token, acc_name) in enumerate(zip(token_list, acc_names)):
-        print(f"\n🎯 === BẮT ĐẦU {acc_name} (Bot {i+1}/{len(token_list)}) ===")
+        print(f"🎯 === BẮT ĐẦU {acc_name} (Bot {i+1}/{len(token_list)}) ===")
+        
+        start_time = time.time()
         
         if i == 0:
-            # Bot đầu tiên: tìm tài nguyên
-            print(f"[{acc_name}] Bot đầu tiên - sẽ tìm tài nguyên mới")
-            resource = run_work_bot(token, acc_name, shared_resource=None, delay_start=0)
+            # Bot đầu tiên
+            resource = run_work_bot(token, acc_name, shared_resource=None)
             if resource:
                 shared_resource = resource
-                print(f"✅ {acc_name} HOÀN THÀNH và tìm được tài nguyên: {resource}")
+                print(f"✅ {acc_name} HOÀN THÀNH - Tài nguyên: {resource}")
             else:
-                print(f"❌ {acc_name} HOÀN THÀNH nhưng không tìm được tài nguyên")
-                # Vẫn tiếp tục với các bot sau, có thể dùng tài nguyên cũ
+                print(f"✅ {acc_name} HOÀN THÀNH - Không có tài nguyên mới")
         else:
-            # Các bot sau: dùng tài nguyên có sẵn
+            # Các bot sau
             if shared_resource:
-                print(f"[{acc_name}] Bot phụ - sử dụng tài nguyên: {shared_resource}")
-                run_work_bot(token, acc_name, shared_resource=shared_resource, delay_start=0)
+                run_work_bot(token, acc_name, shared_resource=shared_resource)
                 print(f"✅ {acc_name} HOÀN THÀNH")
             else:
-                print(f"❌ {acc_name} BỎ QUA - không có tài nguyên để sử dụng")
+                print(f"⚠️ {acc_name} BỎ QUA - Không có tài nguyên")
         
+        elapsed = time.time() - start_time
+        print(f"⏱️ Thời gian: {elapsed:.1f}s")
         print(f"🏁 === KẾT THÚC {acc_name} ===\n")
         
-        # Nghỉ 2 giây giữa các bot để tránh rate limit
-        if i < len(token_list) - 1:  # Không nghỉ sau bot cuối cùng
-            print("⏳ Nghỉ 2 giây trước khi chạy bot tiếp theo...\n")
-            time.sleep(2)
+        # Nghỉ 3s giữa các bot (trừ bot cuối)
+        if i < len(token_list) - 1:
+            print("⏳ Nghỉ 3 giây trước khi chạy bot tiếp theo...\n")
+            time.sleep(3)
     
-    print("🎉 TẤT CẢ BOT ĐÃ HOÀN THÀNH TUẦN TỰ!")
+    print("🎉 TẤT CẢ BOT ĐÃ HOÀN THÀNH!")
     
 def run_daily_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
