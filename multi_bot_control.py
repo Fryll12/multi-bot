@@ -704,8 +704,6 @@ def run_work_bot(token, acc_name, shared_resource=None):
     headers = {"Authorization": token, "Content-Type": "application/json"}
     found_resource = None
     step = {"value": 0}
-    retry_count = {"value": 0}
-    max_retries = 3  # Số lần retry tối đa
 
     def send_karuta_command(): bot.sendMessage(work_channel_id, "kc o:ef")
     def send_kn_command(): bot.sendMessage(work_channel_id, "kn")
@@ -723,44 +721,6 @@ def run_work_bot(token, acc_name, shared_resource=None):
             r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
             print(f"[Work][{acc_name}] Click tick: Status {r.status_code}", flush=True)
         except Exception as e: print(f"[Work][{acc_name}] Lỗi click tick: {e}", flush=True)
-
-    def check_work_completion():
-        """Kiểm tra xem công việc đã hoàn thành chưa bằng cách đọc embed của tin nhắn work gần nhất"""
-        try:
-            time.sleep(4)  # Đợi để embed được cập nhật
-            messages = bot.getMessages(work_channel_id, num=5).json()
-            
-            # Tìm tin nhắn work gần nhất của Karuta
-            for msg_item in messages:
-                if (msg_item.get("author", {}).get("id") == karuta_id and 
-                    "embeds" in msg_item and len(msg_item["embeds"]) > 0):
-                    
-                    embed = msg_item["embeds"][0]
-                    title = embed.get("title", "")
-                    description = embed.get("description", "")
-                    
-                    # Kiểm tra xem có phải tin nhắn work không
-                    if title == "Work" and ("after node taxes" in description):
-                        if "Your workers have finished their tasks." in description:
-                            print(f"[Work][{acc_name}] ✅ Embed đã cập nhật - Công việc hoàn thành!", flush=True)
-                            return True
-                        else:
-                            print(f"[Work][{acc_name}] ⚠️ Embed chưa cập nhật - Công việc chưa hoàn thành", flush=True)
-                            return False
-            
-            print(f"[Work][{acc_name}] ⚠️ Không tìm thấy tin nhắn work của Karuta", flush=True)
-            return False
-            
-        except Exception as e:
-            print(f"[Work][{acc_name}] Lỗi khi kiểm tra hoàn thành: {e}", flush=True)
-            return False
-
-    def retry_kw_and_click():
-        """Thực hiện lại lệnh kw và click button"""
-        print(f"[Work][{acc_name}] 🔄 Retry lần {retry_count['value'] + 1}/{max_retries}...", flush=True)
-        retry_count["value"] += 1
-        step["value"] = 2  # Reset về bước click button
-        send_kw_command()
 
     @bot.gateway.command
     def on_message(resp):
@@ -811,6 +771,7 @@ def run_work_bot(token, acc_name, shared_resource=None):
                     found_resource = resource
                     print(f"[{acc_name}] Resource: {resource}", flush=True)
                     
+                    # --- SỬA LỖI GỬI LỆNH KHÔNG ĐÁNG TIN CẬY ---
                     def send_kjn_kw_thread():
                         time.sleep(2)
                         bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
@@ -819,45 +780,30 @@ def run_work_bot(token, acc_name, shared_resource=None):
                     threading.Thread(target=send_kjn_kw_thread).start()
         
         elif step["value"] == 2 and author_id == karuta_id and "components" in m:
-            message_id = m['id']
-            application_id = m.get('application_id', karuta_id)
-            last_custom_id = None
-            for comp in m['components']:
-                if comp['type'] == 1:
-                    for btn in comp['components']:
-                        if btn['type'] == 2:
-                            last_custom_id = btn['custom_id']
-            
-            if last_custom_id:
-                print(f"[{acc_name}] Tìm thấy nút cuối cùng: '{last_custom_id}'. Bắt đầu click...", flush=True)
-                click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
+                message_id = m['id']
+                application_id = m.get('application_id', karuta_id)
+                last_custom_id = None
+                for comp in m['components']:
+                    if comp['type'] == 1:
+                        for btn in comp['components']:
+                            if btn['type'] == 2:
+                                last_custom_id = btn['custom_id']
                 
-                # Sau khi click, chờ và kiểm tra kết quả
-                def check_and_handle_result():
-                    time.sleep(5)  # Đợi để tin nhắn được cập nhật
-                    
-                    if check_work_completion():
-                        print(f"[{acc_name}] ✅ Công việc hoàn thành thành công!", flush=True)
-                        step["value"] = 3
-                        bot.gateway.close()
-                    else:
-                        if retry_count["value"] < max_retries:
-                            print(f"[{acc_name}] ⚠️ Công việc chưa hoàn thành, thử lại...", flush=True)
-                            retry_kw_and_click()
-                        else:
-                            print(f"[{acc_name}] ❌ Đã thử {max_retries} lần nhưng vẫn không thành công, bỏ qua...", flush=True)
-                            step["value"] = 3
-                            bot.gateway.close()
-                
-                threading.Thread(target=check_and_handle_result).start()
+                if last_custom_id:
+                    print(f"[{acc_name}] Tìm thấy nút cuối cùng: '{last_custom_id}'. Bắt đầu click...", flush=True)
+                    click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
+                    step["value"] = 3
+                    bot.gateway.close()
+                    return
 
+    # Khối chạy chính
     print(f"[{acc_name}] Bắt đầu...", flush=True)
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     
     time.sleep(7) 
     send_karuta_command()
     
-    timeout = time.time() + 180  # Tăng timeout lên 3 phút để có thời gian retry
+    timeout = time.time() + 90
     while step["value"] != 3 and time.time() < timeout:
         time.sleep(1)
         
@@ -865,9 +811,8 @@ def run_work_bot(token, acc_name, shared_resource=None):
     if step["value"] == 3:
         print(f"[{acc_name}] Đã hoàn thành.", flush=True)
     else:
-        print(f"[{acc_name}] KHÔNG hoàn thành (hết timeout).", flush=True)
+        print(f"[{acc_name}] KHÔNG hoàn thành (hết 90s timeout).", flush=True)
     return found_resource
-
     
 def run_daily_bot(token, acc_name):
     bot = discum.Client(token=token, log={"console": False, "file": False})
