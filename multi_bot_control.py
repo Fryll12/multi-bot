@@ -1,4 +1,5 @@
-# PHIÊN BẢN CUỐI CÙNG - HOÀN CHỈNH VÀ ỔN ĐỊNH
+# bot_logic_optimized.py
+
 import discum
 import threading
 import time
@@ -7,8 +8,14 @@ import random
 import re
 import requests
 import json
-from flask import Flask, request, render_template_string, jsonify
 from dotenv import load_dotenv
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+import queue
+import weakref
+from concurrent.futures import ThreadPoolExecutor
+import queue
+import weakref
 
 load_dotenv()
 
@@ -28,9 +35,10 @@ kvi_channel_id = os.getenv("KVI_CHANNEL_ID")
 karuta_id = "646937666251915264"
 yoru_bot_id = "1311684840462225440"
 HATSUNE_ID= "974973431252680714"
-# --- BIẾN TRẠNG THÁI (đây là các giá trị mặc định nếu không có file settings.json) ---
+
+# --- BIẾN TRẠNG THÁI ---
 bots = []
-# Lấy danh sách tên phụ từ biến môi trường (nếu có)
+bot_references = weakref.WeakSet()  # Sử dụng WeakSet để tự động dọn dẹp
 sub_acc_names_str = os.getenv("SUB_ACC_NAMES")
 acc_names = [name.strip() for name in sub_acc_names_str.split(',')] if sub_acc_names_str else []
 
@@ -41,70 +49,85 @@ heart_threshold, heart_threshold_2, heart_threshold_3, heart_threshold_4 = 15, 5
 spam_enabled, auto_work_enabled, auto_reboot_enabled = False, False, False
 spam_message, spam_delay, work_delay_between_acc, work_delay_after_all, auto_reboot_delay = "", 10, 10, 44100, 3600
 auto_daily_enabled = False
-daily_delay_after_all = 87000 
+daily_delay_after_all = 87000
 daily_delay_between_acc = 3
 auto_kvi_enabled = False
 kvi_click_count = 10
 kvi_click_delay = 3
-kvi_loop_delay = 7500 
+kvi_loop_delay = 7500
 kvi_target_account = 'main_1'
 
-# Timestamps - sẽ được load từ file
+# Timestamps
 last_work_cycle_time, last_daily_cycle_time, last_kvi_cycle_time, last_reboot_cycle_time, last_spam_time = 0, 0, 0, 0, 0
 
-# Các biến điều khiển luồng
+# Biến điều khiển luồng
 auto_reboot_stop_event = threading.Event()
 spam_thread, auto_reboot_thread = None, None
-bots_lock = threading.Lock()
+bots_lock = threading.RLock()  # Đổi sang RLock để tránh deadlock
 server_start_time = time.time()
 bot_active_states = {}
 farm_servers = []
-# Biến trạng thái cho KVI (Dán vào dưới các biến khác)
-visit_data = {} 
+visit_data = {}
 kvi_session_state = {"last_attempt_num": None, "last_question": None, "last_character_name": None, "message_id": None, "guild_id": None}
-# --- HÀM LƯU VÀ TẢI CÀI ĐẶT ---
-def save_settings():
-    """Lưu cài đặt lên JSONBin.io"""
-    api_key = os.getenv("JSONBIN_API_KEY")
-    bin_id = os.getenv("JSONBIN_BIN_ID")
-    if not api_key or not bin_id:
-        # print("[Settings] Thiếu API Key hoặc Bin ID của JSONBin.", flush=True)
-        return
+spam_tasks_running = set()
 
-    settings = {
-        'auto_grab_enabled': auto_grab_enabled, 'heart_threshold': heart_threshold,
-        'auto_grab_enabled_2': auto_grab_enabled_2, 'heart_threshold_2': heart_threshold_2,
-        'auto_grab_enabled_3': auto_grab_enabled_3, 'heart_threshold_3': heart_threshold_3,
-        'auto_grab_enabled_4': auto_grab_enabled_4, 'heart_threshold_4': heart_threshold_4,
-        'event_grab_enabled': event_grab_enabled,
-        'spam_enabled': spam_enabled, 'spam_message': spam_message, 'spam_delay': spam_delay,
-        'auto_work_enabled': auto_work_enabled, 'work_delay_between_acc': work_delay_between_acc, 'work_delay_after_all': work_delay_after_all,
-        'auto_daily_enabled': auto_daily_enabled, 'daily_delay_between_acc': daily_delay_between_acc, 'daily_delay_after_all': daily_delay_after_all,
-        'auto_kvi_enabled': auto_kvi_enabled, 'kvi_click_count': kvi_click_count, 'kvi_click_delay': kvi_click_delay, 'kvi_loop_delay': kvi_loop_delay,
-        'kvi_target_account': kvi_target_account,
-        'auto_reboot_enabled': auto_reboot_enabled, 'auto_reboot_delay': auto_reboot_delay,
-        'bot_active_states': bot_active_states,
-        'last_work_cycle_time': last_work_cycle_time,
-        'last_daily_cycle_time': last_daily_cycle_time,
-        'last_kvi_cycle_time': last_kvi_cycle_time,
-        'last_reboot_cycle_time': last_reboot_cycle_time,
-        'last_spam_time': last_spam_time,
-    }
-    
-    headers = {
-        'Content-Type': 'application/json',
-        'X-Master-Key': api_key
-    }
-    url = f"https://api.jsonbin.io/v3/b/{bin_id}"
-    
-    try:
-        req = requests.put(url, json=settings, headers=headers, timeout=10)
-        if req.status_code == 200:
-            print("[Settings] Đã lưu cài đặt lên JSONBin.io thành công.", flush=True)
-        else:
-            print(f"[Settings] Lỗi khi lưu cài đặt lên JSONBin.io: {req.status_code} - {req.text}", flush=True)
-    except Exception as e:
-        print(f"[Settings] Exception khi lưu cài đặt: {e}", flush=True)
+# Thread pool cho các tác vụ I/O
+executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="BotTask")
+message_queue = queue.Queue(maxsize=1000)
+
+# Cache để giảm API calls
+_settings_cache = {}
+_cache_lock = threading.Lock()
+
+# --- HÀM LƯU VÀ TẢI CÀI ĐẶT ĐƯỢC TỐI ƯU ---
+def save_settings():
+    """Lưu cài đặt lên JSONBin.io với batching"""
+    def _do_save():
+        api_key = os.getenv("JSONBIN_API_KEY")
+        bin_id = os.getenv("JSONBIN_BIN_ID")
+        if not api_key or not bin_id:
+            return
+
+        settings = {
+            'auto_grab_enabled': auto_grab_enabled, 'heart_threshold': heart_threshold,
+            'auto_grab_enabled_2': auto_grab_enabled_2, 'heart_threshold_2': heart_threshold_2,
+            'auto_grab_enabled_3': auto_grab_enabled_3, 'heart_threshold_3': heart_threshold_3,
+            'auto_grab_enabled_4': auto_grab_enabled_4, 'heart_threshold_4': heart_threshold_4,
+            'event_grab_enabled': event_grab_enabled,
+            'spam_enabled': spam_enabled, 'spam_message': spam_message, 'spam_delay': spam_delay,
+            'auto_work_enabled': auto_work_enabled, 'work_delay_between_acc': work_delay_between_acc, 'work_delay_after_all': work_delay_after_all,
+            'auto_daily_enabled': auto_daily_enabled, 'daily_delay_between_acc': daily_delay_between_acc, 'daily_delay_after_all': daily_delay_after_all,
+            'auto_kvi_enabled': auto_kvi_enabled, 'kvi_click_count': kvi_click_count, 'kvi_click_delay': kvi_click_delay, 'kvi_loop_delay': kvi_loop_delay,
+            'kvi_target_account': kvi_target_account,
+            'auto_reboot_enabled': auto_reboot_enabled, 'auto_reboot_delay': auto_reboot_delay,
+            'bot_active_states': bot_active_states,
+            'last_work_cycle_time': last_work_cycle_time,
+            'last_daily_cycle_time': last_daily_cycle_time,
+            'last_kvi_cycle_time': last_kvi_cycle_time,
+            'last_reboot_cycle_time': last_reboot_cycle_time,
+            'last_spam_time': last_spam_time,
+        }
+        
+        # Cache settings để tránh save không cần thiết
+        with _cache_lock:
+            if _settings_cache == settings:
+                return
+            _settings_cache.update(settings)
+
+        headers = {'Content-Type': 'application/json', 'X-Master-Key': api_key}
+        url = f"https://api.jsonbin.io/v3/b/{bin_id}"
+        try:
+            session = requests.Session()  # Tái sử dụng connection
+            req = session.put(url, json=settings, headers=headers, timeout=10)
+            if req.status_code == 200:
+                print("[Settings] Đã lưu cài đặt lên JSONBin.io thành công.", flush=True)
+            else:
+                print(f"[Settings] Lỗi khi lưu cài đặt lên JSONBin.io: {req.status_code} - {req.text}", flush=True)
+        except Exception as e:
+            print(f"[Settings] Exception khi lưu cài đặt: {e}", flush=True)
+
+    # Submit to thread pool thay vì tạo thread mới
+    executor.submit(_do_save)
 
 
 def load_settings():
@@ -115,65 +138,89 @@ def load_settings():
         print("[Settings] Thiếu API Key hoặc Bin ID của JSONBin. Sử dụng cài đặt mặc định.", flush=True)
         return
 
-    headers = {
-        'X-Master-Key': api_key
-    }
+    headers = {'X-Master-Key': api_key}
     url = f"https://api.jsonbin.io/v3/b/{bin_id}/latest"
-
     try:
-        req = requests.get(url, headers=headers, timeout=10)
+        session = requests.Session()
+        req = session.get(url, headers=headers, timeout=10)
         if req.status_code == 200:
             settings = req.json().get("record", {})
-            if settings: # Chỉ load nếu bin không rỗng
+            if settings:
                 globals().update(settings)
                 global event_grab_enabled
                 event_grab_enabled = settings.get('event_grab_enabled', False)
+                with _cache_lock:
+                    _settings_cache.update(settings)
                 print("[Settings] Đã tải cài đặt từ JSONBin.io.", flush=True)
             else:
                 print("[Settings] JSONBin rỗng, bắt đầu với cài đặt mặc định và lưu lại.", flush=True)
-                save_settings() # Lưu cài đặt mặc định lên bin lần đầu
+                save_settings()
         else:
             print(f"[Settings] Lỗi khi tải cài đặt từ JSONBin.io: {req.status_code} - {req.text}", flush=True)
     except Exception as e:
         print(f"[Settings] Exception khi tải cài đặt: {e}", flush=True)
+
 def save_visit_data():
     """Lưu dữ liệu học của KVI vào một Bin riêng"""
-    api_key = os.getenv("KVI_JSONBIN_API_KEY")
-    kvi_bin_id = os.getenv("KVI_JSONBIN_BIN_ID") # Dùng Bin ID riêng
-    if not api_key or not kvi_bin_id: return
-    headers = {'Content-Type': 'application/json', 'X-Master-Key': api_key}
-    url = f"https://api.jsonbin.io/v3/b/{kvi_bin_id}"
-    def do_save():
+    def _do_save():
+        api_key = os.getenv("KVI_JSONBIN_API_KEY")
+        kvi_bin_id = os.getenv("KVI_JSONBIN_BIN_ID")
+        if not api_key or not kvi_bin_id: 
+            return
+        headers = {'Content-Type': 'application/json', 'X-Master-Key': api_key}
+        url = f"https://api.jsonbin.io/v3/b/{kvi_bin_id}"
         try:
-            req = requests.put(url, json=visit_data, headers=headers, timeout=10)
-            if req.status_code != 200: print(f"[KVI Settings] Lỗi khi lưu dữ liệu KVI: {req.status_code}", flush=True)
-        except Exception as e: print(f"[KVI Settings] Exception khi lưu dữ liệu KVI: {e}", flush=True)
-    threading.Thread(target=do_save, daemon=True).start()
+            session = requests.Session()
+            req = session.put(url, json=visit_data, headers=headers, timeout=10)
+            if req.status_code != 200: 
+                print(f"[KVI Settings] Lỗi khi lưu dữ liệu KVI: {req.status_code}", flush=True)
+        except Exception as e: 
+            print(f"[KVI Settings] Exception khi lưu dữ liệu KVI: {e}", flush=True)
+    
+    executor.submit(_do_save)
 
 def load_visit_data():
     """Tải dữ liệu học của KVI từ Bin riêng"""
     global visit_data
     api_key = os.getenv("KVI_JSONBIN_API_KEY")
     kvi_bin_id = os.getenv("KVI_JSONBIN_BIN_ID")
-    if not api_key or not kvi_bin_id: return
+    if not api_key or not kvi_bin_id: 
+        return
     headers = {'X-Master-Key': api_key, 'X-Bin-Meta': 'false'}
     url = f"https://api.jsonbin.io/v3/b/{kvi_bin_id}/latest"
     try:
-        req = requests.get(url, headers=headers, timeout=10)
+        session = requests.Session()
+        req = session.get(url, headers=headers, timeout=10)
         if req.status_code == 200:
             data = req.json()
-            if data: visit_data = data; print("[KVI Settings] Đã tải dữ liệu KVI.", flush=True)
-    except Exception: pass
+            if data: 
+                visit_data = data
+                print("[KVI Settings] Đã tải dữ liệu KVI.", flush=True)
+    except Exception: 
+        pass
         
 def kvi_click_button(token, channel_id, guild_id, message_id, application_id, button_data):
-    """Hàm click nút dành riêng cho KVI"""
-    custom_id = button_data.get("custom_id");
-    if not custom_id: return
-    headers = {"Authorization": token, "Content-Type": "application/json"}
-    session_id = 'a' + ''.join(random.choices('0123456789abcdef', k=31))
-    payload = { "type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": session_id, "data": {"component_type": 2, "custom_id": custom_id} }
-    try: requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
-    except Exception as e: print(f"🔥 [KVI CLICK LỖI] {e}", flush=True)
+    """Hàm click nút dành riêng cho KVI với session pool"""
+    custom_id = button_data.get("custom_id")
+    if not custom_id: 
+        return
+    
+    def _do_click():
+        headers = {"Authorization": token, "Content-Type": "application/json"}
+        session_id = 'a' + ''.join(random.choices('0123456789abcdef', k=31))
+        payload = {
+            "type": 3, "guild_id": guild_id, "channel_id": channel_id, 
+            "message_id": message_id, "application_id": application_id, 
+            "session_id": session_id, 
+            "data": {"component_type": 2, "custom_id": custom_id}
+        }
+        try:
+            session = requests.Session()
+            session.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+        except Exception as e: 
+            print(f"🔥 [KVI CLICK LỖI] {e}", flush=True)
+    
+    executor.submit(_do_click)
 
 def start_kvi_session(bot_instance):
     """Gửi lệnh kvi để bắt đầu"""
@@ -186,7 +233,7 @@ def parse_kvi_embed_data(embed):
     description = embed.get("description", "")
     char_name_match = re.search(r"Character · \*\*([^\*]+)\*\*", description)
     character_name = char_name_match.group(1).strip() if char_name_match else None
-    question_match = re.search(r'“([^”]*)”', description)
+    question_match = re.search(r'"([^"]*)"', description)
     question = question_match.group(1).strip() if question_match else None
     num_choices = len([line for line in description.split('\n') if re.match(r'^\d️⃣', line)])
     return character_name, question, num_choices
@@ -216,12 +263,7 @@ def parse_hatsune_suggestion(embed):
     return best_suggestion[1]
     
 def handle_kvi_message(bot, msg, token_for_click):
-    """
-    Hàm xử lý logic KVI tập trung, có thể được gọi bởi bất kỳ bot nào.
-    bot: instance của bot đang lắng nghe.
-    msg: tin nhắn nhận được.
-    token_for_click: token của bot đó để thực hiện click.
-    """
+    """Xử lý logic KVI tập trung với tối ưu hóa"""
     global visit_data, kvi_session_state
     
     HATSUNE_ID = os.getenv("HATSUNE_ID")
@@ -232,26 +274,33 @@ def handle_kvi_message(bot, msg, token_for_click):
         if "Your Affection Rating has" in description and kvi_session_state["last_attempt_num"]:
             char_name, question, attempted_num = kvi_session_state["last_character_name"], kvi_session_state["last_question"], kvi_session_state["last_attempt_num"]
             if char_name and question:
-                if char_name not in visit_data: visit_data[char_name] = {}
-                if question not in visit_data[char_name]: visit_data[char_name][question] = {"correct_answer": None, "incorrect_answers": []}
+                if char_name not in visit_data: 
+                    visit_data[char_name] = {}
+                if question not in visit_data[char_name]: 
+                    visit_data[char_name][question] = {"correct_answer": None, "incorrect_answers": []}
                 db_entry = visit_data[char_name][question]
                 if "increased" in description:
                     if db_entry["correct_answer"] != attempted_num:
                         print(f"✅ [KVI HỌC] ĐÚNG! Đáp án cho '{question}' là nút số {attempted_num}", flush=True)
-                        db_entry["correct_answer"] = attempted_num; save_visit_data()
+                        db_entry["correct_answer"] = attempted_num
+                        save_visit_data()
                 elif ("decreased" in description or "not changed" in description):
                     if attempted_num not in db_entry["incorrect_answers"]:
                         print(f"❌ [KVI HỌC] SAI! Loại trừ nút số {attempted_num}.", flush=True)
-                        db_entry["incorrect_answers"].append(attempted_num); save_visit_data()
+                        db_entry["incorrect_answers"].append(attempted_num)
+                        save_visit_data()
             kvi_session_state["last_attempt_num"] = None
         
-        if not buttons: return
+        if not buttons: 
+            return
         time.sleep(random.uniform(1.8, 2.5))
         
         if "1️⃣" in description:
             character_name, question, num_choices = parse_kvi_embed_data(embed)
-            if not all([character_name, question, num_choices > 0]): return
-            if question == kvi_session_state["last_question"] and kvi_session_state["last_attempt_num"]: return
+            if not all([character_name, question, num_choices > 0]): 
+                return
+            if question == kvi_session_state["last_question"] and kvi_session_state["last_attempt_num"]: 
+                return
 
             print(f"\n[KVI] Nhân vật: {character_name}\n[KVI] Câu hỏi: {question}", flush=True)
             kvi_session_state.update({"last_question": question, "last_character_name": character_name})
@@ -259,27 +308,31 @@ def handle_kvi_message(bot, msg, token_for_click):
             db_entry = visit_data.get(character_name, {}).get(question, {})
             correct_answer, incorrect_answers = db_entry.get("correct_answer"), db_entry.get("incorrect_answers", [])
             chosen_button_num = None
+            
             if correct_answer:
                 print(f"💡 [KVI BIẾT] Dùng đáp án đã học từ JSON: Nút số {correct_answer}", flush=True)
                 chosen_button_num = correct_answer
             else:
                 print("⏳ [KVI] Không có đáp án đã học, bắt đầu tìm gợi ý từ Hatsune...", flush=True)
-                hatsune_suggestion = None
-                try:
-                    print("    -> Bắt đầu 'săn' tin nhắn của Hatsune trong 5 giây...", flush=True)
-                    HATSUNE_ID = "974973431252680714"
-                    end_time = time.time() + 5
-                    while time.time() < end_time:
-                        recent_messages = bot.getMessages(kvi_channel_id, num=5).json()
-                        for msg_item in recent_messages:
-                            if msg_item.get("author", {}).get("id") == HATSUNE_ID and msg_item.get("embeds"):
-                                if "Talking Helper" in msg_item["embeds"][0].get("title", ""):
-                                    hatsune_suggestion = parse_hatsune_suggestion(msg_item["embeds"][0])
-                                    break
-                        if hatsune_suggestion: break
-                        time.sleep(0.5)
-                except Exception as e: 
-                    print(f"🔥 [HATSUNE] Lỗi khi tìm tin nhắn Hatsune: {e}", flush=True)
+                
+                def get_hatsune_suggestion():
+                    try:
+                        print("    -> Bắt đầu 'săn' tin nhắn của Hatsune trong 5 giây...", flush=True)
+                        HATSUNE_ID = "974973431252680714"
+                        end_time = time.time() + 5
+                        while time.time() < end_time:
+                            recent_messages = bot.getMessages(kvi_channel_id, num=5).json()
+                            for msg_item in recent_messages:
+                                if msg_item.get("author", {}).get("id") == HATSUNE_ID and msg_item.get("embeds"):
+                                    if "Talking Helper" in msg_item["embeds"][0].get("title", ""):
+                                        return parse_hatsune_suggestion(msg_item["embeds"][0])
+                            time.sleep(0.5)
+                        return None
+                    except Exception as e: 
+                        print(f"🔥 [HATSUNE] Lỗi khi tìm tin nhắn Hatsune: {e}", flush=True)
+                        return None
+
+                hatsune_suggestion = get_hatsune_suggestion()
 
                 if hatsune_suggestion:
                     print(f"🎯 [KVI HATSUNE] QUYẾT ĐỊNH: Dùng gợi ý từ Hatsune -> Chọn nút số {hatsune_suggestion}", flush=True)
@@ -290,7 +343,8 @@ def handle_kvi_message(bot, msg, token_for_click):
                     possible_button_nums = [num for num in all_button_nums if num not in incorrect_answers]
                     if not possible_button_nums:
                         print("⚠️ [KVI] Đã loại trừ hết. Thử lại từ đầu.", flush=True)
-                        if question in visit_data.get(character_name, {}): visit_data[character_name][question]["incorrect_answers"] = []
+                        if question in visit_data.get(character_name, {}): 
+                            visit_data[character_name][question]["incorrect_answers"] = []
                         possible_button_nums = all_button_nums
                     chosen_button_num = random.choice(possible_button_nums)
             
@@ -301,87 +355,69 @@ def handle_kvi_message(bot, msg, token_for_click):
             except (ValueError, IndexError, TypeError) as e:
                 print(f"🔥 [KVI LỖI] Không tìm thấy/chọn được nút. Lỗi: {e}", flush=True)
         else:
-            print("\n▶️  [KVI] Bắt đầu/Tiếp tục...", flush=True)
+            print("\n▶️ [KVI] Bắt đầu/Tiếp tục...", flush=True)
             button_to_click = buttons[0]['components'][0]
             kvi_click_button(token_for_click, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
             
 def save_farm_settings():
     """Lưu cài đặt của các server farm vào Bin riêng."""
-    api_key = os.getenv("JSONBIN_API_KEY")
-    farm_bin_id = os.getenv("FARM_JSONBIN_BIN_ID")
-    if not api_key or not farm_bin_id: return
+    def _do_save():
+        api_key = os.getenv("JSONBIN_API_KEY")
+        farm_bin_id = os.getenv("FARM_JSONBIN_BIN_ID")
+        if not api_key or not farm_bin_id: 
+            return
 
-    headers = {'Content-Type': 'application/json', 'X-Master-Key': api_key}
-    url = f"https://api.jsonbin.io/v3/b/{farm_bin_id}"
+        headers = {'Content-Type': 'application/json', 'X-Master-Key': api_key}
+        url = f"https://api.jsonbin.io/v3/b/{farm_bin_id}"
+        
+        try:
+            session = requests.Session()
+            req = session.put(url, json=farm_servers, headers=headers, timeout=10)
+            if req.status_code == 200:
+                print("[Farm Settings] Đã lưu cài đặt farm thành công.", flush=True)
+            else:
+                print(f"[Farm Settings] Lỗi khi lưu cài đặt farm: {req.status_code} - {req.text}", flush=True)
+        except Exception as e:
+            print(f"[Farm Settings] Exception khi lưu cài đặt farm: {e}", flush=True)
     
-    try:
-        req = requests.put(url, json=farm_servers, headers=headers, timeout=10)
-        if req.status_code == 200:
-            print("[Farm Settings] Đã lưu cài đặt farm thành công.", flush=True)
-        else:
-            print(f"[Farm Settings] Lỗi khi lưu cài đặt farm: {req.status_code} - {req.text}", flush=True)
-    except Exception as e:
-        print(f"[Farm Settings] Exception khi lưu cài đặt farm: {e}", flush=True)
+    executor.submit(_do_save)
 
 def load_farm_settings():
     """Tải cài đặt của các server farm từ Bin riêng."""
     global farm_servers
     api_key = os.getenv("JSONBIN_API_KEY")
     farm_bin_id = os.getenv("FARM_JSONBIN_BIN_ID")
-    if not api_key or not farm_bin_id: return
+    if not api_key or not farm_bin_id: 
+        return
 
     headers = {'X-Master-Key': api_key, 'X-Bin-Meta': 'false'}
     url = f"https://api.jsonbin.io/v3/b/{farm_bin_id}/latest"
 
     try:
-        req = requests.get(url, headers=headers, timeout=10)
+        session = requests.Session()
+        req = session.get(url, headers=headers, timeout=10)
         if req.status_code == 200:
             data = req.json()
-            if isinstance(data, list): farm_servers = data
-            else: farm_servers = []
+            if isinstance(data, list): 
+                farm_servers = data
+            else: 
+                farm_servers = []
             print(f"[Farm Settings] Đã tải {len(farm_servers)} cấu hình farm.", flush=True)
         else:
             farm_servers = []
     except Exception:
         farm_servers = []
         
-def kvi_click_button(token, channel_id, guild_id, message_id, application_id, button_data):
-    """Hàm click nút dành riêng cho KVI"""
-    custom_id = button_data.get("custom_id");
-    if not custom_id: return
-    headers = {"Authorization": token, "Content-Type": "application/json"}
-    session_id = 'a' + ''.join(random.choices('0123456789abcdef', k=31))
-    payload = { "type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": session_id, "data": {"component_type": 2, "custom_id": custom_id} }
-    try: requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
-    except Exception as e: print(f"🔥 [KVI CLICK LỖI] {e}", flush=True)
-
-def start_kvi_session(bot_instance):
-    """Gửi lệnh kvi để bắt đầu"""
-    print("🚀 [KVI] Gửi lệnh 'kvi'...", flush=True)
-    if kvi_channel_id:
-        bot_instance.sendMessage(kvi_channel_id, "kvi")
-
-def parse_kvi_embed_data(embed):
-    """Phân tích embed để lấy tên nhân vật và câu hỏi"""
-    description = embed.get("description", "")
-    char_name_match = re.search(r"Character · \*\*([^\*]+)\*\*", description)
-    character_name = char_name_match.group(1).strip() if char_name_match else None
-    question_match = re.search(r'“([^”]*)”', description)
-    question = question_match.group(1).strip() if question_match else None
-    num_choices = len([line for line in description.split('\n') if re.match(r'^\d️⃣', line)])
-    return character_name, question, num_choices
-
 def handle_farm_grab(bot, msg, bot_num):
     """Xử lý logic grab dành RIÊNG cho các farm panel mới."""
     channel_id = msg.get("channel_id")
     target_server = next((s for s in farm_servers if s.get('main_channel_id') == channel_id), None)
-    if not target_server: return
+    if not target_server: 
+        return
 
-    # KIỂM TRA DROP TRƯỚC TIÊN
     if msg.get("author", {}).get("id") == karuta_id and 'dropping 3' in msg.get("content", ""):
         last_drop_msg_id = msg["id"]
 
-        # 1. Luồng nhặt thẻ (độc lập)
         grab_map = {1: 'auto_grab_enabled_1', 2: 'auto_grab_enabled_2', 3: 'auto_grab_enabled_3', 4: 'auto_grab_enabled_4'}
         is_card_grab_enabled = target_server.get(grab_map.get(bot_num), False)
         ktb_channel_id = target_server.get('ktb_channel_id')
@@ -389,6 +425,7 @@ def handle_farm_grab(bot, msg, bot_num):
         if is_card_grab_enabled and ktb_channel_id:
             thresh_map = {1: 'heart_threshold_1', 2: 'heart_threshold_2', 3: 'heart_threshold_3', 4: 'heart_threshold_4'}
             heart_threshold = int(target_server.get(thresh_map[bot_num], 50))
+            
             def read_yoru_bot():
                 time.sleep(0.6)
                 try:
@@ -398,7 +435,8 @@ def handle_farm_grab(bot, msg, bot_num):
                             desc = msg_item["embeds"][0].get("description", "")
                             lines = desc.split('\n')
                             heart_numbers = [int(match.group(1)) if (match := re.search(r'♡(\d+)', line)) else 0 for line in lines[:3]]
-                            if not any(heart_numbers): break
+                            if not any(heart_numbers): 
+                                break
                             max_num = max(heart_numbers)
                             if max_num >= heart_threshold:
                                 max_index = heart_numbers.index(max_num)
@@ -407,17 +445,19 @@ def handle_farm_grab(bot, msg, bot_num):
                                 emoji = emojis[max_index]
                                 delay = delays.get(bot_num, [0.7, 1.7, 2.4])[max_index]
                                 print(f"[FARM: {target_server['name']} | Bot {bot_num}] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
+                                
                                 def grab_action():
                                     bot.addReaction(channel_id, last_drop_msg_id, emoji)
                                     time.sleep(2)
                                     bot.sendMessage(ktb_channel_id, "kt b")
+                                    
                                 threading.Timer(delay, grab_action).start()
                             break
                 except Exception as e:
                     print(f"Lỗi khi đọc Yoru Bot (FARM: {target_server['name']} | Bot {bot_num}): {e}", flush=True)
-            threading.Thread(target=read_yoru_bot).start()
+            
+            executor.submit(read_yoru_bot)
 
-        # 2. Luồng nhặt event (độc lập và chỉ cho bot 1)
         if event_grab_enabled and bot_num == 1:
             def check_farm_event():
                 try:
@@ -426,55 +466,63 @@ def handle_farm_grab(bot, msg, bot_num):
                     if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
                         full_msg_obj = full_msg_obj[0]
                     if 'reactions' in full_msg_obj:
-                        if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
+                        if any(reaction['emoji']['name'] == '🐉' for reaction in full_msg_obj['reactions']):
                             print(f"[EVENT GRAB | FARM: {target_server['name']}] Phát hiện dưa hấu! Bot 1 tiến hành nhặt.", flush=True)
-                            bot.addReaction(channel_id, last_drop_msg_id, "🍉")
+                            bot.addReaction(channel_id, last_drop_msg_id, "🐉")
                 except Exception as e:
                     print(f"Lỗi khi kiểm tra event tại farm (Bot 1): {e}", flush=True)
-            threading.Thread(target=check_farm_event).start()
+            
+            executor.submit(check_farm_event)
         
-# --- CÁC HÀM LOGIC BOT ---
+# --- CÁC HÀM LOGIC BOT ĐƯỢC TỐI ƯU ---
 def reboot_bot(target_id):
+    """Reboot bot với proper cleanup"""
     global main_bot, main_bot_2, main_bot_3, main_bot_4, bots
     with bots_lock:
         print(f"[Reboot] Nhận được yêu cầu reboot cho target: {target_id}", flush=True)
+        
+        def safe_close_bot(bot):
+            """Đóng bot một cách an toàn"""
+            if bot:
+                try:
+                    if hasattr(bot, 'gateway') and bot.gateway:
+                        bot.gateway.close()
+                    time.sleep(0.5)  # Đảm bảo connection được đóng hoàn toàn
+                except Exception as e:
+                    print(f"[Reboot] Lỗi khi đóng bot: {e}", flush=True)
+        
         if target_id == 'main_1' and main_token:
-            try: 
-                if main_bot: main_bot.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 1: {e}", flush=True)
+            safe_close_bot(main_bot)
             main_bot = create_bot(main_token, is_main=True)
             print("[Reboot] Acc Chính 1 đã được khởi động lại.", flush=True)
         elif target_id == 'main_2' and main_token_2:
-            try: 
-                if main_bot_2: main_bot_2.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 2: {e}", flush=True)
+            safe_close_bot(main_bot_2)
             main_bot_2 = create_bot(main_token_2, is_main_2=True)
             print("[Reboot] Acc Chính 2 đã được khởi động lại.", flush=True)
         elif target_id == 'main_3' and main_token_3:
-            try: 
-                if main_bot_3: main_bot_3.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 3: {e}", flush=True)
+            safe_close_bot(main_bot_3)
             main_bot_3 = create_bot(main_token_3, is_main_3=True)
             print("[Reboot] Acc Chính 3 đã được khởi động lại.", flush=True)
         elif target_id == 'main_4' and main_token_4:
-            try: 
-                if main_bot_4: main_bot_4.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 4: {e}", flush=True)
+            safe_close_bot(main_bot_4)
             main_bot_4 = create_bot(main_token_4, is_main_4=True)
             print("[Reboot] Acc Chính 4 đã được khởi động lại.", flush=True)
         elif target_id.startswith('sub_'):
             try:
                 index = int(target_id.split('_')[1])
                 if 0 <= index < len(bots):
-                    try: bots[index].gateway.close()
-                    except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Phụ {index}: {e}", flush=True)
+                    safe_close_bot(bots[index])
                     token_to_reboot = tokens[index]
                     bots[index] = create_bot(token_to_reboot.strip(), is_main=False)
                     print(f"[Reboot] Acc Phụ {index} đã được khởi động lại.", flush=True)
-            except (ValueError, IndexError) as e: print(f"[Reboot] Lỗi xử lý target Acc Phụ: {e}", flush=True)
+            except (ValueError, IndexError) as e: 
+                print(f"[Reboot] Lỗi xử lý target Acc Phụ: {e}", flush=True)
 
 def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4=False):
+    """Tạo bot với các handler được tối ưu hóa"""
     bot = discum.Client(token=token, log=False)
+    bot_references.add(bot)  # Thêm vào WeakSet để tracking
+    
     @bot.gateway.command
     def on_ready(resp):
         if resp.event.ready:
@@ -489,23 +537,36 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                     else: bot_type = ""
                     print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
 
+    # Optimize message handling với debouncing
+    last_processed = {}
+    
+    def should_process_message(msg_id, channel_id):
+        """Kiểm tra xem message có nên được xử lý không (tránh duplicate)"""
+        key = f"{channel_id}_{msg_id}"
+        now = time.time()
+        if key in last_processed and (now - last_processed[key]) < 1.0:
+            return False
+        last_processed[key] = now
+        return True
+
     if is_main:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled, heart_threshold, event_grab_enabled, visit_data, kvi_session_state, main_token
             if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 return
             
             msg = resp.parsed.auto()
             channel_id = msg.get("channel_id")
+            msg_id = msg.get("id")
+            
+            # Skip duplicate processing
+            if not should_process_message(msg_id, channel_id):
+                return
 
-            # --- 1. SỬA LỖI LOGIC GRAB TẠI KÊNH CHÍNH ---
-            # Chỉ xử lý khi tin nhắn đến từ kênh grab chính
+            # Main channel logic với tối ưu hóa
             if channel_id == main_channel_id:
-                # KIỂM TRA DROP TRƯỚC TIÊN
                 if msg.get("author", {}).get("id") == karuta_id and 'dropping 3' in msg.get("content", ""):
                     last_drop_msg_id = msg["id"]
-                    # Luồng nhặt thẻ (độc lập)
                     if auto_grab_enabled:
                         def read_yoru_bot():
                             time.sleep(0.6)
@@ -516,7 +577,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                         desc = msg_item["embeds"][0].get("description", "")
                                         lines = desc.split('\n')
                                         heart_numbers = [int(match.group(1)) if (match := re.search(r'♡(\d+)', line)) else 0 for line in lines[:3]]
-                                        max_num = max(heart_numbers)
+                                        max_num = max(heart_numbers) if heart_numbers else 0
                                         if sum(heart_numbers) > 0 and max_num >= heart_threshold:
                                             max_index = heart_numbers.index(max_num)
                                             emoji, delay = [("1️⃣", 0.2), ("2️⃣", 1.2), ("3️⃣", 2)][max_index]
@@ -529,9 +590,8 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                         break
                             except Exception as e: 
                                 print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 1): {e}", flush=True)
-                        threading.Thread(target=read_yoru_bot).start()
+                        executor.submit(read_yoru_bot)
 
-                    # Luồng nhặt event (độc lập)
                     if event_grab_enabled:
                         def check_and_grab_event():
                             try:
@@ -540,33 +600,34 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                 if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
                                     full_msg_obj = full_msg_obj[0]
                                 if 'reactions' in full_msg_obj:
-                                    if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
+                                    if any(reaction['emoji']['name'] == '🐉' for reaction in full_msg_obj['reactions']):
                                         print(f"[EVENT GRAB | Bot 1] Phát hiện dưa hấu! Tiến hành nhặt.", flush=True)
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, "🍉")
+                                        bot.addReaction(main_channel_id, last_drop_msg_id, "🐉")
                             except Exception as e:
                                 print(f"Lỗi khi kiểm tra event (Bot 1): {e}", flush=True)
-                        threading.Thread(target=check_and_grab_event).start()
+                        executor.submit(check_and_grab_event)
             
-            # --- 2. XỬ LÝ KÊNH KVI ---
             if auto_kvi_enabled and kvi_target_account == 'main_1' and channel_id == kvi_channel_id:
                 handle_kvi_message(bot, msg, main_token)
                 
-            # --- 3. XỬ LÝ FARM ---    
             is_farm_channel = any(server.get('main_channel_id') == channel_id for server in farm_servers)
             if is_farm_channel:
                 handle_farm_grab(bot, msg, 1)
-                    
+
+    # Similar optimization for other main bots
     if is_main_2:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled_2, heart_threshold_2
             if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 return
             
             msg = resp.parsed.auto()
             channel_id = msg.get("channel_id")
+            msg_id = msg.get("id")
+            
+            if not should_process_message(msg_id, channel_id):
+                return
 
-            # --- KHỐI 1: XỬ LÝ GRAB TOÀN CỤC (SOUL HARVEST) ---
             if auto_grab_enabled_2 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                 last_drop_msg_id = msg["id"]
                 def read_yoru_bot_2():
@@ -582,7 +643,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                     match = re.search(r'♡(\d+)', line)
                                     heart_numbers.append(int(match.group(1)) if match else 0)
                 
-                                max_num = max(heart_numbers)
+                                max_num = max(heart_numbers) if heart_numbers else 0
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_2:
                                     max_index = heart_numbers.index(max_num)
                                     emoji, delay = [("1️⃣", 0.7), ("2️⃣", 1.7), ("3️⃣", 2.5)][max_index]
@@ -595,9 +656,8 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                 break
                     except Exception as e: 
                         print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 2): {e}", flush=True)
-                threading.Thread(target=read_yoru_bot_2).start()
+                executor.submit(read_yoru_bot_2)
             
-            # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
             handle_farm_grab(bot, msg, 2)
 
             if auto_kvi_enabled and kvi_target_account == 'main_2' and channel_id == kvi_channel_id:
@@ -606,14 +666,16 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
     if is_main_3:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled_3, heart_threshold_3
             if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 return
             
             msg = resp.parsed.auto()
             channel_id = msg.get("channel_id")
+            msg_id = msg.get("id")
+            
+            if not should_process_message(msg_id, channel_id):
+                return
 
-            # --- KHỐI 1: XỬ LÝ GRAB TOÀN CỤC (SOUL HARVEST) ---
             if auto_grab_enabled_3 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                 last_drop_msg_id = msg["id"]
                 def read_yoru_bot_3():
@@ -629,7 +691,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                     match = re.search(r'♡(\d+)', line)
                                     heart_numbers.append(int(match.group(1)) if match else 0)
                 
-                                max_num = max(heart_numbers)
+                                max_num = max(heart_numbers) if heart_numbers else 0
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_3:
                                     max_index = heart_numbers.index(max_num)
                                     emoji, delay = [("1️⃣", 0.7), ("2️⃣", 1.7), ("3️⃣", 2.5)][max_index]
@@ -642,8 +704,8 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                 break
                     except Exception as e: 
                         print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 3): {e}", flush=True)
-                threading.Thread(target=read_yoru_bot_3).start()
-            # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
+                executor.submit(read_yoru_bot_3)
+            
             handle_farm_grab(bot, msg, 3)
 
             if auto_kvi_enabled and kvi_target_account == 'main_3' and channel_id == kvi_channel_id:
@@ -652,12 +714,15 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
     if is_main_4:
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled_4, heart_threshold_4
             if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 return
                 
             msg = resp.parsed.auto()
             channel_id = msg.get("channel_id")
+            msg_id = msg.get("id")
+            
+            if not should_process_message(msg_id, channel_id):
+                return
             
             if auto_grab_enabled_4 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
                 last_drop_msg_id = msg["id"]
@@ -674,7 +739,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                     match = re.search(r'♡(\d+)', line)
                                     heart_numbers.append(int(match.group(1)) if match else 0)
                                 
-                                max_num = max(heart_numbers)
+                                max_num = max(heart_numbers) if heart_numbers else 0
                                 if sum(heart_numbers) > 0 and max_num >= heart_threshold_4:
                                     max_index = heart_numbers.index(max_num)
                                     emoji, delay = [("1️⃣", 0.7), ("2️⃣", 1.7), ("3️⃣", 2.5)][max_index]
@@ -687,7 +752,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                 break
                     except Exception as e: 
                         print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 4): {e}", flush=True)
-                threading.Thread(target=read_yoru_bot_4).start()
+                executor.submit(read_yoru_bot_4)
 
             handle_farm_grab(bot, msg, 4)
 
@@ -697,239 +762,37 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
     
-# HÀM RUN_WORK_BOT PHIÊN BẢN SỬA LỖI GỬI KJN
-elif step["value"] == 2 and author_id == karuta_id and "components" in m:
-            message_id = m['id']
-            application_id = m.get('application_id', karuta_id)
-            
-            # Tìm button thứ 2 (hoặc cuối cùng nếu chỉ có 1 button)
-            target_custom_id = None
-            buttons = []
-            for comp in m['components']:
-                if comp['type'] == 1:
-                    for btn in comp['components']:
-                        if btn['type'] == 2:
-                            buttons.append(btn['custom_id'])
-            
-            # Ưu tiên button thứ 2, nếu không có thì lấy button cuối cùng
-            if len(buttons) >= 2:
-                target_custom_id = buttons[1]  # Button thứ 2
-                print(f"[{acc_name}] Tìm thấy {len(buttons)} nút, chọn nút thứ 2: '{target_custom_id}'", flush=True)
-            elif len(buttons) == 1:
-                target_custom_id = buttons[0]  # Button duy nhất
-                print(f"[{acc_name}] Chỉ có 1 nút, chọn nút duy nhất: '{target_custom_id}'", flush=True)
-            
-            if target_custom_id:
-                if click_tick(work_channel_id, message_id, target_custom_id, application_id, guild_id):
-                    step["value"] = 3
-                else:
-                    print(f"[{acc_name}] ❌ Click button thấtdef run_work_bot(token, acc_name, shared_resource=None):
+def run_work_bot(token, acc_name, shared_resource=None):
+    """Optimized work bot với timeout tốt hơn"""
     ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     bot = discum.Client(token=token, log=False, user_agent=ua)
+    session = requests.Session()  # Reuse HTTP connections
     headers = {"Authorization": token, "Content-Type": "application/json"}
     found_resource = None
     step = {"value": 0}
-    last_message_sent = {"content": None, "timestamp": None}
-    bot_user_id = None
+    completed = threading.Event()
 
-    # Lấy user ID của bot hiện tại
-    try:
-        bot_info = bot.getMe()
-        if isinstance(bot_info, dict) and bot_info.get('id'):
-            bot_user_id = bot_info['id']
-        else:
-            # Fallback: extract từ token (không an toàn hoàn toàn nhưng có thể dùng)
-            import base64
-            import json
-            try:
-                token_parts = token.split('.')
-                user_data = base64.b64decode(token_parts[0] + '==')
-                bot_user_id = json.loads(user_data).get('id')
-            except:
-                pass
-    except Exception as e:
-        print(f"[{acc_name}] ⚠️ Không thể lấy user ID: {e}", flush=True)
-
-    def send_karuta_command(): 
-        bot.sendMessage(work_channel_id, "kc o:ef")
-        last_message_sent["content"] = "kc o:ef"
-        last_message_sent["timestamp"] = time.time()
-
-    def send_kn_command(): 
-        bot.sendMessage(work_channel_id, "kn")
-        last_message_sent["content"] = "kn"
-        last_message_sent["timestamp"] = time.time()
-
-    def send_kw_command(): 
-        bot.sendMessage(work_channel_id, "kw")
-        last_message_sent["content"] = "kw"
-        last_message_sent["timestamp"] = time.time()
-        step["value"] = 2
-    
-    def send_kjn_command(resource):
-        cmd = f"kjn `{resource}` a b c d e"
-        bot.sendMessage(work_channel_id, cmd)
-        last_message_sent["content"] = cmd
-        last_message_sent["timestamp"] = time.time()
-
-    def check_message_sent_successfully(expected_content, timeout=5):
-        """Kiểm tra xem tin nhắn CỦA ACC NÀY có được gửi thành công không"""
-        if not last_message_sent["timestamp"] or not bot_user_id:
-            return False
-        
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            try:
-                messages = bot.getMessages(work_channel_id, num=15).json()
-                for msg in messages:
-                    # CHỈ kiểm tra tin nhắn của chính acc này
-                    if (msg.get("author", {}).get("id") == bot_user_id and 
-                        msg.get("content", "").strip() == expected_content.strip()):
-                        
-                        # Kiểm tra timestamp để đảm bảo là tin nhắn vừa gửi
-                        msg_time = msg.get("timestamp")
-                        if msg_time:
-                            try:
-                                from datetime import datetime
-                                import dateutil.parser
-                                msg_datetime = dateutil.parser.parse(msg_time)
-                                msg_timestamp = msg_datetime.timestamp()
-                                if msg_timestamp > last_message_sent["timestamp"] - 5:
-                                    return True
-                            except:
-                                return True  # Fallback nếu không parse được time
-                time.sleep(0.5)
-            except Exception as e:
-                print(f"[{acc_name}] Lỗi khi kiểm tra tin nhắn: {e}", flush=True)
-                time.sleep(0.5)
-        return False
-
-    def ensure_message_sent(send_func, expected_content, max_retries=3):
-        """Đảm bảo tin nhắn được gửi thành công"""
-        for attempt in range(max_retries):
-            send_func()
-            if check_message_sent_successfully(expected_content):
-                print(f"[{acc_name}] ✅ Tin nhắn '{expected_content}' đã được gửi thành công", flush=True)
-                return True
-            else:
-                print(f"[{acc_name}] ❌ Lần thử {attempt + 1}: Tin nhắn '{expected_content}' chưa được gửi, thử lại...", flush=True)
-                time.sleep(2)  # Tăng delay để tránh spam
-        
-        print(f"[{acc_name}] ⚠️ Không thể gửi tin nhắn '{expected_content}' sau {max_retries} lần thử", flush=True)
-        return False
+    def send_karuta_command(): bot.sendMessage(work_channel_id, "kc o:ef")
+    def send_kn_command(): bot.sendMessage(work_channel_id, "kn")
+    def send_kw_command(): bot.sendMessage(work_channel_id, "kw"); step["value"] = 2
     
     def click_tick(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            session_id_thuc = bot.gateway.session_id or "aaa"
+            session_id_thuc = bot.gateway.session_id
             payload = {
                 "type": 3,"guild_id": guild_id,"channel_id": channel_id,
                 "message_id": message_id,"application_id": application_id,
                 "session_id": session_id_thuc,
                 "data": {"component_type": 2,"custom_id": custom_id}
             }
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload)
+            r = session.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
             print(f"[Work][{acc_name}] Click tick: Status {r.status_code}", flush=True)
-            return r.status_code == 200 or r.status_code == 204
         except Exception as e: 
             print(f"[Work][{acc_name}] Lỗi click tick: {e}", flush=True)
-            return False
-
-    def check_work_completion():
-        """Kiểm tra xem work của ACC NÀY đã hoàn thành chưa"""
-        try:
-            messages = bot.getMessages(work_channel_id, num=30).json()
-            for msg in messages:
-                if (msg.get("author", {}).get("id") == karuta_id and 
-                    "embeds" in msg and len(msg["embeds"]) > 0):
-                    
-                    # Kiểm tra xem embed này có mention acc hiện tại không
-                    mentions = msg.get("mentions", [])
-                    if any(mention.get("id") == bot_user_id for mention in mentions):
-                        desc = msg["embeds"][0].get("description", "")
-                        if "**Your workers have finished their tasks.**" in desc:
-                            print(f"[{acc_name}] ✅ Phát hiện work của acc này đã hoàn thành!", flush=True)
-                            return True
-                    elif not mentions:  # Nếu không có mentions, có thể là reply chung
-                        desc = msg["embeds"][0].get("description", "")
-                        if "**Your workers have finished their tasks.**" in desc:
-                            # Kiểm tra thêm xem có phải là response cho acc này không
-                            # bằng cách check tin nhắn gần đây của acc
-                            recent_user_messages = [m for m in messages[:10] 
-                                                  if m.get("author", {}).get("id") == bot_user_id]
-                            if recent_user_messages:
-                                print(f"[{acc_name}] ✅ Phát hiện work đã hoàn thành (reply chung)!", flush=True)
-                                return True
-            return False
-        except Exception as e:
-            print(f"[{acc_name}] Lỗi khi kiểm tra work completion: {e}", flush=True)
-            return False
-
-    def final_work_verification():
-        """Kiểm tra cuối cùng và thực hiện lại kw + click nếu cần"""
-        max_attempts = 3
-        for attempt in range(max_attempts):
-            if check_work_completion():
-                return True
-            
-            print(f"[{acc_name}] 🔄 Lần thử {attempt + 1}: Work chưa hoàn thành, thực hiện lại kw...", flush=True)
-            
-            # Đợi một chút để tránh conflict với acc khác
-            time.sleep(random.uniform(2, 4))
-            
-            # Gửi lại lệnh kw
-            if not ensure_message_sent(send_kw_command, "kw"):
-                continue
-            
-            time.sleep(4)  # Đợi button xuất hiện
-            
-            # Tìm và click button (CHỈ từ response cho acc này)
-            try:
-                messages = bot.getMessages(work_channel_id, num=10).json()
-                for msg in messages:
-                    if (msg.get("author", {}).get("id") == karuta_id and 
-                        "components" in msg and msg["components"]):
-                        
-                        # Kiểm tra xem có phải response cho acc này không
-                        mentions = msg.get("mentions", [])
-                        if mentions and not any(mention.get("id") == bot_user_id for mention in mentions):
-                            continue  # Bỏ qua nếu không mention acc này
-                        
-                        message_id = msg['id']
-                        guild_id = msg.get('guild_id')
-                        application_id = msg.get('application_id', karuta_id)
-                        
-                        # Tìm button thứ 2 hoặc cuối cùng
-                        buttons = []
-                        for comp in msg['components']:
-                            if comp['type'] == 1:
-                                for btn in comp['components']:
-                                    if btn['type'] == 2:
-                                        buttons.append(btn['custom_id'])
-                        
-                        target_custom_id = None
-                        if len(buttons) >= 2:
-                            target_custom_id = buttons[1]  # Button thứ 2
-                        elif len(buttons) == 1:
-                            target_custom_id = buttons[0]  # Button duy nhất
-                        
-                        if target_custom_id:
-                            print(f"[{acc_name}] 🎯 Click button: {target_custom_id}", flush=True)
-                            if click_tick(work_channel_id, message_id, target_custom_id, application_id, guild_id):
-                                time.sleep(6)  # Đợi xử lý
-                                if check_work_completion():
-                                    return True
-                        break
-            except Exception as e:
-                print(f"[{acc_name}] Lỗi khi thực hiện lại work: {e}", flush=True)
-            
-            time.sleep(3)
-        
-        print(f"[{acc_name}] ❌ Không thể hoàn thành work sau {max_attempts} lần thử", flush=True)
-        return False
 
     @bot.gateway.command
     def on_message(resp):
-        if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
+        if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')): 
             return
         
         try:
@@ -939,218 +802,46 @@ elif step["value"] == 2 and author_id == karuta_id and "components" in m:
 
         if str(m.get("channel_id")) != work_channel_id: 
             return
-        
         author_id = str(m.get("author", {}).get("id", ""))
         guild_id = m.get("guild_id")
         
-        # CHỈ xử lý tin nhắn của Karuta và CHỈ khi có mention acc này hoặc là response chung
-        if author_id != karuta_id:
-            return
-            
-        mentions = m.get("mentions", [])
-        is_for_this_bot = False
-        
-        if mentions:
-            # Nếu có mentions, kiểm tra có mention acc này không
-            is_for_this_bot = any(mention.get("id") == bot_user_id for mention in mentions)
-        else:
-            # Nếu không có mentions, coi như là response chung (cẩn thận với trường hợp này)
-            is_for_this_bot = True
-        
-        if not is_for_this_bot:
-            return
-        
-        if step["value"] == 0 and "embeds" in m and len(m["embeds"]) > 0:
-            desc = m["embeds"][0].get("description", "")
-            card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc)
-            
-            if len(card_codes) >= 10:
-                print(f"[{acc_name}] Phát hiện {len(card_codes)} card, bắt đầu pick...", flush=True)
-                first_5 = card_codes[:5]
-                last_5 = card_codes[-5:]
-                
-                def pick_cards_thread():
-                    # Thêm delay ngẫu nhiên để tránh conflict
-                    time.sleep(random.uniform(1, 3))
-                    
-                    # Pick cards với retry logic
-                    all_picks_successful = True
-                    
-                    for i, code in enumerate(last_5):
-                        pick_cmd = f"kjw {code} {chr(97+i)}"
-                        if not ensure_message_sent(lambda: bot.sendMessage(work_channel_id, pick_cmd), pick_cmd):
-                            all_picks_successful = False
-                        time.sleep(random.uniform(1.5, 2.5))  # Random delay
-                    
-                    for i, code in enumerate(first_5):
-                        pick_cmd = f"kjw {code} {chr(97+i)}"
-                        if not ensure_message_sent(lambda: bot.sendMessage(work_channel_id, pick_cmd), pick_cmd):
-                            all_picks_successful = False
-                        time.sleep(random.uniform(1.5, 2.5))  # Random delay
-                    
-                    if not all_picks_successful:
-                        print(f"[{acc_name}] ⚠️ Một số lệnh pick có thể chưa được gửi thành công", flush=True)
-                    
-                    time.sleep(random.uniform(2, 4))
-                    
-                    def send_kjn_kw_thread(resource_to_use):
-                        time.sleep(random.uniform(2, 4))
-                        # Đảm bảo kjn được gửi thành công
-                        kjn_cmd = f"kjn `{resource_to_use}` a b c d e"
-                        if ensure_message_sent(lambda: send_kjn_command(resource_to_use), kjn_cmd):
-                            time.sleep(random.uniform(2, 4))
-                            # Đảm bảo kw được gửi thành công
-                            ensure_message_sent(send_kw_command, "kw")
-
-                    if shared_resource:
-                        print(f"[{acc_name}] Sử dụng tài nguyên chung từ acc đầu tiên: '{shared_resource}'")
-                        threading.Thread(target=send_kjn_kw_thread, args=(shared_resource,)).start()
-                    else:
-                        print(f"[{acc_name}] Acc đầu tiên - đang tìm tài nguyên...")
-                        # Chỉ acc đầu tiên mới nhắn kn để lấy tài nguyên
-                        if ensure_message_sent(send_kn_command, "kn"):
-                            step["value"] = 1
-                        else:
-                            print(f"[{acc_name}] ❌ Không thể gửi lệnh kn", flush=True)
-                
-                threading.Thread(target=pick_cards_thread).start()
-
-        elif step["value"] == 1 and "embeds" in m and len(m["embeds"]) > 0:
-            desc = m["embeds"][0].get("description", "")
-            lines = desc.split("\n")
-            
-            if len(lines) >= 2:
-                match = re.search(r"\d+\.\s*`([^`]+)`", lines[1])
-                if match:
-                    nonlocal found_resource
-                    resource = match.group(1)
-                    found_resource = resource
-                    print(f"[{acc_name}] Resource: {resource}", flush=True)
-                    
-                    def send_kjn_kw_thread():
-                        time.sleep(random.uniform(2, 4))
-                        kjn_cmd = f"kjn `{resource}` a b c d e"
-                        if ensure_message_sent(lambda: send_kjn_command(resource), kjn_cmd):
-                            time.sleep(random.uniform(2, 4))
-                            ensure_message_sent(send_kw_command, "kw")
-                    
-                    threading.Thread(target=send_kjn_kw_thread).start()
-        
-        elif step["value"] == 2 and "components" in m:
-            message_id = m['id']
-            application_id = m.get('application_id', karuta_id)
-            
-            # Tìm button thứ 2 (hoặc cuối cùng nếu chỉ có 1 button)
-            target_custom_id = None
-            buttons = []
-            for comp in m['components']:
-                if comp['type'] == 1:
-                    for btn in comp['components']:
-                        if btn['type'] == 2:
-                            buttons.append(btn['custom_id'])
-            
-            # Ưu tiên button thứ 2, nếu không có thì lấy button cuối cùng
-            if len(buttons) >= 2:
-                target_custom_id = buttons[1]  # Button thứ 2
-                print(f"[{acc_name}] Tìm thấy {len(buttons)} nút, chọn nút thứ 2: '{target_custom_id}'", flush=True)
-            elif len(buttons) == 1:
-                target_custom_id = buttons[0]  # Button duy nhất
-                print(f"[{acc_name}] Chỉ có 1 nút, chọn nút duy nhất: '{target_custom_id}'", flush=True)
-            
-            if target_custom_id:
-                if click_tick(work_channel_id, message_id, target_custom_id, application_id, guild_id):
-                    step["value"] = 3
-                else:
-                    print(f"[{acc_name}] ❌ Click button thất bại, thử lại...", flush=True)
-                    time.sleep(2)
-                    click_tick(work_channel_id, message_id, target_custom_id, application_id, guild_id)
-                    step["value"] = 3
-
-    print(f"[{acc_name}] Bắt đầu...", flush=True)
-    threading.Thread(target=bot.gateway.run, daemon=True).start()
-    
-    time.sleep(random.uniform(5, 10))  # Random delay để tránh tất cả acc cùng bắt đầu
-    
-    # Bắt đầu với lệnh kc o:ef với retry
-    if not ensure_message_sent(send_karuta_command, "kc o:ef"):
-        print(f"[{acc_name}] ❌ Không thể gửi lệnh khởi tạo", flush=True)
-        bot.gateway.close()
-        return found_resource
-    
-    timeout = time.time() + 150  # Tăng timeout lên 150s để đủ thời gian
-    while step["value"] != 3 and time.time() < timeout:
-        time.sleep(1)
-    
-    # Thực hiện kiểm tra cuối cùng
-    if step["value"] == 3:
-        print(f"[{acc_name}] 🔍 Đang kiểm tra kết quả cuối cùng...", flush=True)
-        time.sleep(random.uniform(3, 6))  # Random delay
-        
-        if final_work_verification():
-            print(f"[{acc_name}] ✅ Đã hoàn thành thành công.", flush=True)
-        else:
-            print(f"[{acc_name}] ⚠️ Hoàn thành nhưng không chắc chắn về kết quả.", flush=True)
-    else:
-        print(f"[{acc_name}] ❌ KHÔNG hoàn thành (hết 150s timeout).", flush=True)
-    
-    bot.gateway.close()
-    return found_resource
         if step["value"] == 0 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
             desc = m["embeds"][0].get("description", "")
             card_codes = re.findall(r"\bv[a-zA-Z0-9]{6}\b", desc)
-            
             if len(card_codes) >= 10:
                 print(f"[{acc_name}] Phát hiện {len(card_codes)} card, bắt đầu pick...", flush=True)
-                first_5 = card_codes[:5]
-                last_5 = card_codes[-5:]
+                first_5 = card_codes[:5]; last_5 = card_codes[-5:]
                 
                 def pick_cards_thread():
-                    # Pick cards với retry logic
-                    all_picks_successful = True
-                    
-                    for i, code in enumerate(last_5):
-                        pick_cmd = f"kjw {code} {chr(97+i)}"
-                        if not ensure_message_sent(lambda: bot.sendMessage(work_channel_id, pick_cmd), pick_cmd):
-                            all_picks_successful = False
-                        time.sleep(1.5)
-                    
-                    for i, code in enumerate(first_5):
-                        pick_cmd = f"kjw {code} {chr(97+i)}"
-                        if not ensure_message_sent(lambda: bot.sendMessage(work_channel_id, pick_cmd), pick_cmd):
-                            all_picks_successful = False
-                        time.sleep(1.5)
-                    
-                    if not all_picks_successful:
-                        print(f"[{acc_name}] ⚠️ Một số lệnh pick có thể chưa được gửi thành công", flush=True)
-                    
-                    time.sleep(2)
-                    
-                    def send_kjn_kw_thread(resource_to_use):
-                        time.sleep(2)
-                        # Đảm bảo kjn được gửi thành công
-                        kjn_cmd = f"kjn `{resource_to_use}` a b c d e"
-                        if ensure_message_sent(lambda: send_kjn_command(resource_to_use), kjn_cmd):
-                            time.sleep(2)
-                            # Đảm bảo kw được gửi thành công
-                            ensure_message_sent(send_kw_command, "kw")
+                    try:
+                        for i, code in enumerate(last_5): 
+                            time.sleep(1.5); 
+                            bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+                        for i, code in enumerate(first_5): 
+                            time.sleep(1.5); 
+                            bot.sendMessage(work_channel_id, f"kjw {code} {chr(97+i)}")
+                        time.sleep(1)
 
-                    if shared_resource:
-                        print(f"[{acc_name}] Sử dụng tài nguyên chung từ acc đầu tiên: '{shared_resource}'")
-                        threading.Thread(target=send_kjn_kw_thread, args=(shared_resource,)).start()
-                    else:
-                        print(f"[{acc_name}] Acc đầu tiên - đang tìm tài nguyên...")
-                        # Chỉ acc đầu tiên mới nhắn kn để lấy tài nguyên
-                        if ensure_message_sent(send_kn_command, "kn"):
-                            step["value"] = 1
+                        def send_kjn_kw_thread(resource_to_use):
+                            time.sleep(2)
+                            bot.sendMessage(work_channel_id, f"kjn `{resource_to_use}` a b c d e")
+                            time.sleep(1)
+                            send_kw_command()
+
+                        if shared_resource:
+                            print(f"[{acc_name}] Sử dụng tài nguyên đã có: '{shared_resource}'")
+                            send_kjn_kw_thread(shared_resource)
                         else:
-                            print(f"[{acc_name}] ❌ Không thể gửi lệnh kn", flush=True)
+                            print(f"[{acc_name}] Bot đầu tiên, đang tìm tài nguyên...")
+                            send_kn_command()
+                            step["value"] = 1
+                    except Exception as e:
+                        print(f"[{acc_name}] Lỗi trong pick_cards_thread: {e}", flush=True)
                 
-                threading.Thread(target=pick_cards_thread).start()
+                executor.submit(pick_cards_thread)
 
         elif step["value"] == 1 and author_id == karuta_id and "embeds" in m and len(m["embeds"]) > 0:
-            desc = m["embeds"][0].get("description", "")
-            lines = desc.split("\n")
-            
+            desc = m["embeds"][0].get("description", ""); lines = desc.split("\n")
             if len(lines) >= 2:
                 match = re.search(r"\d+\.\s*`([^`]+)`", lines[1])
                 if match:
@@ -1161,18 +852,15 @@ elif step["value"] == 2 and author_id == karuta_id and "components" in m:
                     
                     def send_kjn_kw_thread():
                         time.sleep(2)
-                        kjn_cmd = f"kjn `{resource}` a b c d e"
-                        if ensure_message_sent(lambda: send_kjn_command(resource), kjn_cmd):
-                            time.sleep(2)
-                            ensure_message_sent(send_kw_command, "kw")
-                    
-                    threading.Thread(target=send_kjn_kw_thread).start()
+                        bot.sendMessage(work_channel_id, f"kjn `{resource}` a b c d e")
+                        time.sleep(1)
+                        send_kw_command()
+                    executor.submit(send_kjn_kw_thread)
         
         elif step["value"] == 2 and author_id == karuta_id and "components" in m:
             message_id = m['id']
             application_id = m.get('application_id', karuta_id)
             last_custom_id = None
-            
             for comp in m['components']:
                 if comp['type'] == 1:
                     for btn in comp['components']:
@@ -1181,98 +869,143 @@ elif step["value"] == 2 and author_id == karuta_id and "components" in m:
             
             if last_custom_id:
                 print(f"[{acc_name}] Tìm thấy nút cuối cùng: '{last_custom_id}'. Bắt đầu click...", flush=True)
-                if click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id):
-                    step["value"] = 3
-                else:
-                    print(f"[{acc_name}] ❌ Click button thất bại, thử lại...", flush=True)
-                    time.sleep(2)
-                    click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
-                    step["value"] = 3
+                click_tick(work_channel_id, message_id, last_custom_id, application_id, guild_id)
+                step["value"] = 3
+                completed.set()
+                return
 
     print(f"[{acc_name}] Bắt đầu...", flush=True)
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     
-    time.sleep(7)
+    time.sleep(7) 
+    send_karuta_command()
     
-    # Bắt đầu với lệnh kc o:ef với retry
-    if not ensure_message_sent(send_karuta_command, "kc o:ef"):
-        print(f"[{acc_name}] ❌ Không thể gửi lệnh khởi tạo", flush=True)
-        bot.gateway.close()
-        return found_resource
-    
-    timeout = time.time() + 120  # Tăng timeout lên 120s
-    while step["value"] != 3 and time.time() < timeout:
-        time.sleep(1)
-    
-    # Thực hiện kiểm tra cuối cùng
-    if step["value"] == 3:
-        print(f"[{acc_name}] 🔍 Đang kiểm tra kết quả cuối cùng...", flush=True)
-        time.sleep(3)  # Đợi một chút để đảm bảo kết quả được xử lý
-        
-        if final_work_verification():
-            print(f"[{acc_name}] ✅ Đã hoàn thành thành công.", flush=True)
-        else:
-            print(f"[{acc_name}] ⚠️ Hoàn thành nhưng không chắc chắn về kết quả.", flush=True)
+    # Wait for completion or timeout
+    if completed.wait(timeout=90):
+        print(f"[{acc_name}] Đã hoàn thành.", flush=True)
     else:
-        print(f"[{acc_name}] ❌ KHÔNG hoàn thành (hết 120s timeout).", flush=True)
+        print(f"[{acc_name}] KHÔNG hoàn thành (hết 90s timeout).", flush=True)
     
-    bot.gateway.close()
+    try:
+        bot.gateway.close()
+    except:
+        pass
+    
     return found_resource
-    
+
 def run_daily_bot(token, acc_name):
+    """Optimized daily bot"""
     bot = discum.Client(token=token, log={"console": False, "file": False})
+    session = requests.Session()
     headers = {"Authorization": token, "Content-Type": "application/json"}
     state = {"step": 0, "message_id": None, "guild_id": None}
+    completed = threading.Event()
+    
     def click_button(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3,"guild_id": guild_id,"channel_id": channel_id,"message_id": message_id,"application_id": application_id,"session_id": "aaa","data": {"component_type": 2, "custom_id": custom_id}})
+            r = session.post("https://discord.com/api/v9/interactions", headers=headers, json={
+                "type": 3,"guild_id": guild_id,"channel_id": channel_id,"message_id": message_id,
+                "application_id": application_id,"session_id": "aaa","data": {"component_type": 2, "custom_id": custom_id}
+            }, timeout=10)
             print(f"[Daily][{acc_name}] Click: {custom_id} - Status {r.status_code}", flush=True)
-        except Exception as e: print(f"[Daily][{acc_name}] Click Error: {e}", flush=True)
+        except Exception as e: 
+            print(f"[Daily][{acc_name}] Click Error: {e}", flush=True)
+    
     @bot.gateway.command
     def on_event(resp):
-        if not (resp.event.message or resp.raw.get("t") == "MESSAGE_UPDATE"): return
+        if not (resp.event.message or resp.raw.get("t") == "MESSAGE_UPDATE"): 
+            return
         m = resp.parsed.auto()
         channel_id, author_id, message_id, guild_id, app_id = str(m.get("channel_id")), str(m.get("author", {}).get("id", "")), m.get("id", ""), m.get("guild_id", ""), m.get("application_id", karuta_id)
-        if channel_id != daily_channel_id or author_id != karuta_id or "components" not in m or not m["components"]: return
+        if channel_id != daily_channel_id or author_id != karuta_id or "components" not in m or not m["components"]: 
+            return
         btn = next((b for comp in m["components"] if comp["type"] == 1 and comp["components"] for b in comp["components"] if b["type"] == 2), None)
-        if not btn: return
+        if not btn: 
+            return
         if resp.event.message and state["step"] == 0:
-            print(f"[Daily][{acc_name}] Click lần 1...", flush=True); state["message_id"], state["guild_id"], state["step"] = message_id, guild_id, 1; click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id)
+            print(f"[Daily][{acc_name}] Click lần 1...", flush=True)
+            state["message_id"], state["guild_id"], state["step"] = message_id, guild_id, 1
+            click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id)
         elif resp.raw.get("t") == "MESSAGE_UPDATE" and message_id == state["message_id"] and state["step"] == 1:
-            print(f"[Daily][{acc_name}] Click lần 2...", flush=True); state["step"] = 2; click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id); bot.gateway.close()
-    print(f"[Daily][{acc_name}] Bắt đầu...", flush=True); threading.Thread(target=bot.gateway.run, daemon=True).start(); time.sleep(1); bot.sendMessage(daily_channel_id, "kdaily")
-    timeout = time.time() + 15
-    while state["step"] != 2 and time.time() < timeout: time.sleep(1)
-    bot.gateway.close(); print(f"[Daily][{acc_name}] {'SUCCESS: Click xong 2 lần.' if state['step'] == 2 else 'FAIL: Không click đủ 2 lần.'}", flush=True)
+            print(f"[Daily][{acc_name}] Click lần 2...", flush=True)
+            state["step"] = 2
+            click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id)
+            completed.set()
+    
+    print(f"[Daily][{acc_name}] Bắt đầu...", flush=True)
+    threading.Thread(target=bot.gateway.run, daemon=True).start()
+    time.sleep(1)
+    bot.sendMessage(daily_channel_id, "kdaily")
+    
+    completed.wait(timeout=15)
+    
+    try:
+        bot.gateway.close()
+    except:
+        pass
+    
+    print(f"[Daily][{acc_name}] {'SUCCESS: Click xong 2 lần.' if state['step'] == 2 else 'FAIL: Không click đủ 2 lần.'}", flush=True)
 
 def run_kvi_bot(token):
+    """Optimized KVI bot"""
     bot = discum.Client(token=token, log={"console": False, "file": False})
-    headers, state = {"Authorization": token, "Content-Type": "application/json"}, {"step": 0, "click_count": 0, "message_id": None, "guild_id": None}
+    session = requests.Session()
+    headers = {"Authorization": token, "Content-Type": "application/json"}
+    state = {"step": 0, "click_count": 0, "message_id": None, "guild_id": None}
+    completed = threading.Event()
+    
     def click_button(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": "aaa", "data": {"component_type": 2, "custom_id": custom_id}})
+            r = session.post("https://discord.com/api/v9/interactions", headers=headers, json={
+                "type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, 
+                "application_id": application_id, "session_id": "aaa", "data": {"component_type": 2, "custom_id": custom_id}
+            }, timeout=10)
             print(f"[KVI] Click {state['click_count']+1}: {custom_id} - Status {r.status_code}", flush=True)
-        except Exception as e: print(f"[KVI] Click Error: {e}", flush=True)
+        except Exception as e: 
+            print(f"[KVI] Click Error: {e}", flush=True)
+    
     @bot.gateway.command
     def on_event(resp):
-        if not (resp.event.message or resp.raw.get("t") == "MESSAGE_UPDATE"): return
+        if not (resp.event.message or resp.raw.get("t") == "MESSAGE_UPDATE"): 
+            return
         m = resp.parsed.auto()
         channel_id, author_id, message_id, guild_id, app_id = str(m.get("channel_id")), str(m.get("author", {}).get("id", "")), m.get("id", ""), m.get("guild_id", ""), m.get("application_id", karuta_id)
-        if channel_id != kvi_channel_id or author_id != karuta_id or "components" not in m or not m["components"]: return
+        if channel_id != kvi_channel_id or author_id != karuta_id or "components" not in m or not m["components"]: 
+            return
         btn = next((b for comp in m["components"] if comp["type"] == 1 and comp["components"] for b in comp["components"] if b["type"] == 2), None)
-        if not btn: return
+        if not btn: 
+            return
         if resp.event.message and state["step"] == 0:
-            state["message_id"], state["guild_id"], state["step"] = message_id, guild_id, 1; click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id); state["click_count"] += 1
+            state["message_id"], state["guild_id"], state["step"] = message_id, guild_id, 1
+            click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id)
+            state["click_count"] += 1
         elif resp.raw.get("t") == "MESSAGE_UPDATE" and message_id == state["message_id"] and state["click_count"] < kvi_click_count:
-            time.sleep(kvi_click_delay); click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id); state["click_count"] += 1
-            if state["click_count"] >= kvi_click_count: print("[KVI] DONE. Đã click đủ.", flush=True); state["step"] = 2; bot.gateway.close()
-    print("[KVI] Bắt đầu...", flush=True); threading.Thread(target=bot.gateway.run, daemon=True).start(); time.sleep(1); bot.sendMessage(kvi_channel_id, "kvi")
-    timeout = time.time() + (kvi_click_count * kvi_click_delay) + 15
-    while state["step"] != 2 and time.time() < timeout: time.sleep(0.5)
-    bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
+            time.sleep(kvi_click_delay)
+            click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id)
+            state["click_count"] += 1
+            if state["click_count"] >= kvi_click_count: 
+                print("[KVI] DONE. Đã click đủ.", flush=True)
+                state["step"] = 2
+                completed.set()
+    
+    print("[KVI] Bắt đầu...", flush=True)
+    threading.Thread(target=bot.gateway.run, daemon=True).start()
+    time.sleep(1)
+    bot.sendMessage(kvi_channel_id, "kvi")
+    
+    timeout = (kvi_click_count * kvi_click_delay) + 15
+    completed.wait(timeout=timeout)
+    
+    try:
+        bot.gateway.close()
+    except:
+        pass
+    
+    print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
 
-# --- CÁC VÒNG LẶP NỀN (ĐÃ VIẾT LẠI CHO ỔN ĐỊNH) ---
+# --- CÁC VÒNG LẶP TỐI ƯU HÓA ---
 def auto_work_loop():
+    """Optimized work loop với better resource management"""
     global last_work_cycle_time
     while True:
         try:
@@ -1280,53 +1013,99 @@ def auto_work_loop():
                 print("[Work] Đã đến giờ chạy Auto Work...", flush=True)
                 shared_resource_for_cycle = None
                 work_items = []
-                if main_token_2 and bot_active_states.get('main_2', False): work_items.append({"name": "BETA NODE", "token": main_token_2})
-                if main_token_3 and bot_active_states.get('main_3', False): work_items.append({"name": "GAMMA NODE", "token": main_token_3})
-                if main_token_4 and bot_active_states.get('main_4', False): work_items.append({"name": "DELTA NODE", "token": main_token_4})
+                
+                # Build work items list
+                if main_token_2 and bot_active_states.get('main_2', False): 
+                    work_items.append({"name": "BETA NODE", "token": main_token_2})
+                if main_token_3 and bot_active_states.get('main_3', False): 
+                    work_items.append({"name": "GAMMA NODE", "token": main_token_3})
+                if main_token_4 and bot_active_states.get('main_4', False): 
+                    work_items.append({"name": "DELTA NODE", "token": main_token_4})
+                
                 with bots_lock:
-                    sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)]
+                    sub_account_items = [
+                        {"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} 
+                        for i, token in enumerate(tokens) 
+                        if token.strip() and bot_active_states.get(f'sub_{i}', False)
+                    ]
                     work_items.extend(sub_account_items)
+                
+                # Process work items
                 for item in work_items:
-                    if not auto_work_enabled: break
+                    if not auto_work_enabled: 
+                        break
                     print(f"[Work] Đang chạy acc '{item['name']}'...", flush=True)
-                    # Truyền tài nguyên đã lưu vào hàm, và nhận lại tài nguyên mới nếu có
-                    found_resource = run_work_bot(item['token'].strip(), item['name'], shared_resource=shared_resource_for_cycle)
                     
-                    # Nếu đây là bot đầu tiên và nó tìm thấy tài nguyên, hãy lưu lại
-                    if found_resource and shared_resource_for_cycle is None:
-                        print(f"✅ [Work] Đã lấy được tài nguyên '{found_resource}' cho chu kỳ này.", flush=True)
-                        shared_resource_for_cycle = found_resource
-                    print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc or 10} giây...", flush=True); time.sleep(work_delay_between_acc or 10)
+                    try:
+                        found_resource = run_work_bot(item['token'].strip(), item['name'], shared_resource=shared_resource_for_cycle)
+                        
+                        if found_resource and shared_resource_for_cycle is None:
+                            print(f"✅ [Work] Đã lấy được tài nguyên '{found_resource}' cho chu kỳ này.", flush=True)
+                            shared_resource_for_cycle = found_resource
+                    except Exception as e:
+                        print(f"[Work] Lỗi khi chạy acc '{item['name']}': {e}", flush=True)
+                    
+                    print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc or 10} giây...", flush=True)
+                    time.sleep(work_delay_between_acc or 10)
+                
                 if auto_work_enabled:
                     print(f"[Work] Hoàn thành chu kỳ.", flush=True)
-                    last_work_cycle_time = time.time();
+                    last_work_cycle_time = time.time()
+                    save_settings()  # Save immediately after cycle
+                    
             time.sleep(60)
         except Exception as e:
-            print(f"[ERROR in auto_work_loop] {e}", flush=True); time.sleep(60)
+            print(f"[ERROR in auto_work_loop] {e}", flush=True)
+            time.sleep(60)
 
 def auto_daily_loop():
+    """Optimized daily loop"""
     global last_daily_cycle_time
     while True:
         try:
             if auto_daily_enabled and (time.time() - last_daily_cycle_time) >= daily_delay_after_all:
                 print("[Daily] Đã đến giờ chạy Auto Daily...", flush=True)
                 daily_items = []
-                if main_token_2 and bot_active_states.get('main_2', False): daily_items.append({"name": "BETA NODE", "token": main_token_2})
-                if main_token_3 and bot_active_states.get('main_3', False): daily_items.append({"name": "GAMMA NODE", "token": main_token_3})
-                if main_token_4 and bot_active_states.get('main_4', False): daily_items.append({"name": "DELTA NODE", "token": main_token_4})
+                
+                if main_token_2 and bot_active_states.get('main_2', False): 
+                    daily_items.append({"name": "BETA NODE", "token": main_token_2})
+                if main_token_3 and bot_active_states.get('main_3', False): 
+                    daily_items.append({"name": "GAMMA NODE", "token": main_token_3})
+                if main_token_4 and bot_active_states.get('main_4', False): 
+                    daily_items.append({"name": "DELTA NODE", "token": main_token_4})
+                
                 with bots_lock:
-                    daily_items.extend([{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)])
+                    daily_items.extend([
+                        {"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} 
+                        for i, token in enumerate(tokens) 
+                        if token.strip() and bot_active_states.get(f'sub_{i}', False)
+                    ])
+                
                 for item in daily_items:
-                    if not auto_daily_enabled: break
-                    print(f"[Daily] Đang chạy acc '{item['name']}'...", flush=True); run_daily_bot(item['token'].strip(), item['name']); print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...", flush=True); time.sleep(daily_delay_between_acc)
+                    if not auto_daily_enabled: 
+                        break
+                    print(f"[Daily] Đang chạy acc '{item['name']}'...", flush=True)
+                    
+                    try:
+                        run_daily_bot(item['token'].strip(), item['name'])
+                    except Exception as e:
+                        print(f"[Daily] Lỗi khi chạy acc '{item['name']}': {e}", flush=True)
+                    
+                    print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...", flush=True)
+                    time.sleep(daily_delay_between_acc)
+                
                 if auto_daily_enabled:
                     print(f"[Daily] Hoàn thành chu kỳ.", flush=True)
-                    last_daily_cycle_time = time.time();
+                    last_daily_cycle_time = time.time()
+                    save_settings()
+                    
             time.sleep(60)
         except Exception as e:
-            print(f"[ERROR in auto_daily_loop] {e}", flush=True); time.sleep(60)
+            print(f"[ERROR in auto_daily_loop] {e}", flush=True)
+            time.sleep(60)
 
 def auto_kvi_loop():
+    """Optimized KVI loop"""
     global last_kvi_cycle_time
     time.sleep(20) 
     while True:
@@ -1343,54 +1122,67 @@ def auto_kvi_loop():
             
             if auto_kvi_enabled and target_bot and bot_active_states.get(kvi_target_account, False):
                 if (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
-                    start_kvi_session(target_bot) # <-- Gọi hàm với 1 tham số
+                    start_kvi_session(target_bot)
                     last_kvi_cycle_time = time.time()
+                    save_settings()
             time.sleep(60)
         except Exception as e: 
             print(f"[ERROR in auto_kvi_loop] {e}", flush=True)
             time.sleep(60)
             
 def auto_reboot_loop():
+    """Optimized reboot loop với graceful shutdown"""
     global auto_reboot_enabled, last_reboot_cycle_time, auto_reboot_stop_event
     while not auto_reboot_stop_event.is_set():
         try:
             if auto_reboot_enabled and (time.time() - last_reboot_cycle_time) >= auto_reboot_delay:
-                print("[Reboot] Hết thời gian chờ, tiến hành reboot 3 tài khoản chính.", flush=True)
-                if main_bot: reboot_bot('main_1'); time.sleep(5)
-                if main_bot_2: reboot_bot('main_2'); time.sleep(5)
-                if main_bot_3: reboot_bot('main_3'); time.sleep(5)
-                if main_bot_4: reboot_bot('main_4')
-                last_reboot_cycle_time = time.time();
+                print("[Reboot] Hết thời gian chờ, tiến hành reboot các tài khoản chính.", flush=True)
+                
+                # Reboot with delays to avoid overwhelming
+                reboot_tasks = []
+                if main_bot: reboot_tasks.append('main_1')
+                if main_bot_2: reboot_tasks.append('main_2')
+                if main_bot_3: reboot_tasks.append('main_3')
+                if main_bot_4: reboot_tasks.append('main_4')
+                
+                for task in reboot_tasks:
+                    try:
+                        reboot_bot(task)
+                        time.sleep(5)  # Delay between reboots
+                    except Exception as e:
+                        print(f"[Reboot] Lỗi khi reboot {task}: {e}", flush=True)
+                
+                last_reboot_cycle_time = time.time()
+                save_settings()
+                
             interrupted = auto_reboot_stop_event.wait(timeout=60)
-            if interrupted: break
+            if interrupted: 
+                break
         except Exception as e:
-            print(f"[ERROR in auto_reboot_loop] {e}", flush=True); time.sleep(60)
+            print(f"[ERROR in auto_reboot_loop] {e}", flush=True)
+            time.sleep(60)
     print("[Reboot] Luồng tự động reboot đã dừng.", flush=True)
 
-# =====================================================================
-# ===== THAY THẾ TOÀN BỘ HÀM SPAM_LOOP BẰNG PHIÊN BẢN HOÀN THIỆN NÀY =====
-
-# Thêm biến này vào khu vực "Các biến điều khiển luồng" ở đầu file của bạn
-spam_tasks_running = set()
-
 def spam_loop():
+    """Optimized spam loop với rate limiting"""
     global last_spam_time, spam_tasks_running
+    rate_limiter = {}
 
-    # Hàm này là một "chuyên viên spam", nhận một nhiệm vụ và thực hiện tuần tự
     def run_spam_cycle(task_id, channel_id, message, bots_to_use, inter_bot_delay):
         global spam_tasks_running
         try:
             print(f"[Spam Cycle] Bắt đầu nhiệm vụ '{task_id}' với {len(bots_to_use)} bot.", flush=True)
+            successful_sends = 0
             for bot in bots_to_use:
                 try:
                     bot.sendMessage(channel_id, message)
+                    successful_sends += 1
                     time.sleep(inter_bot_delay)
                 except Exception as e:
                     print(f"Lỗi khi bot gửi spam (Nhiệm vụ: {task_id}): {e}", flush=True)
+            print(f"[Spam Cycle] Gửi thành công {successful_sends}/{len(bots_to_use)} tin nhắn cho '{task_id}'.", flush=True)
         finally:
-            # Rất quan trọng: Sau khi làm xong (kể cả khi có lỗi), phải gỡ bỏ biển báo "Đang Bận"
-            spam_tasks_running.remove(task_id)
-            print(f"[Spam Cycle] Hoàn thành nhiệm vụ '{task_id}'.", flush=True)
+            spam_tasks_running.discard(task_id)
 
     while True:
         try:
@@ -1398,15 +1190,14 @@ def spam_loop():
             with bots_lock:
                 active_bots = [bot for i, bot in enumerate(bots) if bot and bot_active_states.get(f'sub_{i}', False)]
 
-            # --- Điều phối Spam Toàn Cục (GLOBAL) ---
+            # Global spam
             if spam_enabled and spam_message and spam_channel_id and (now - last_spam_time) >= spam_delay:
-                # Chỉ bắt đầu nếu không có nhiệm vụ "global" nào đang chạy
-                if 'global' not in spam_tasks_running:
-                    spam_tasks_running.add('global') # Bật biển báo "Đang Bận"
-                    last_spam_time = now # Reset đồng hồ
-                    threading.Thread(target=run_spam_cycle, args=('global', spam_channel_id, spam_message, active_bots, 2)).start()
+                if 'global' not in spam_tasks_running and active_bots:
+                    spam_tasks_running.add('global')
+                    last_spam_time = now
+                    executor.submit(run_spam_cycle, 'global', spam_channel_id, spam_message, active_bots, 2)
 
-            # --- Điều phối Spam Multi-Farm ---
+            # Farm spam
             for server in farm_servers:
                 server_id = server.get('id', 'unknown_farm')
                 if server.get('spam_enabled') and server.get('spam_message') and server.get('spam_channel_id'):
@@ -1414,24 +1205,144 @@ def spam_loop():
                     farm_spam_delay = server.get('spam_delay', 10)
 
                     if (now - last_farm_spam_time) >= farm_spam_delay:
-                        # Chỉ bắt đầu nếu không có nhiệm vụ của farm này đang chạy
-                        if server_id not in spam_tasks_running:
-                            spam_tasks_running.add(server_id) # Bật biển báo "Đang Bận" cho farm này
-                            server['last_spam_time'] = now # Reset đồng hồ của farm
-                            threading.Thread(target=run_spam_cycle, args=(server_id, server['spam_channel_id'], server['spam_message'], active_bots, 2)).start()
+                        if server_id not in spam_tasks_running and active_bots:
+                            spam_tasks_running.add(server_id)
+                            server['last_spam_time'] = now
+                            executor.submit(run_spam_cycle, server_id, server['spam_channel_id'], server['spam_message'], active_bots, 2)
             
-            time.sleep(1)
+            time.sleep(2)  # Reduced from 1 second to be less aggressive
         except Exception as e:
             print(f"[ERROR in spam_loop] {e}", flush=True)
-            time.sleep(1)
+            time.sleep(5)
             
 def periodic_save_loop():
-    """Vòng lặp nền để tự động lưu cài đặt 5 phút một lần."""
+    """Vòng lặp nền để tự động lưu cài đặt với batching"""
+    save_counter = 0
     while True:
-        time.sleep(600)
+        time.sleep(300)  # Save every 5 minutes instead of 10
         
-        print("[Settings] Bắt đầu lưu định kỳ...", flush=True)
-        save_settings()
+        save_counter += 1
+        print(f"[Settings] Bắt đầu lưu định kỳ lần {save_counter}...", flush=True)
+        try:
+            save_settings()
+        except Exception as e:
+            print(f"[Settings] Lỗi khi lưu định kỳ: {e}", flush=True)
+
+def cleanup_resources():
+    """Clean up resources on shutdown"""
+    print("[Cleanup] Đang dọn dẹp tài nguyên...", flush=True)
+    
+    global auto_reboot_stop_event
+    if auto_reboot_stop_event:
+        auto_reboot_stop_event.set()
+    
+    # Close all bot connections
+    try:
+        for bot_ref in list(bot_references):
+            if hasattr(bot_ref, 'gateway') and bot_ref.gateway:
+                bot_ref.gateway.close()
+    except Exception as e:
+        print(f"[Cleanup] Lỗi khi đóng bot connections: {e}", flush=True)
+    
+    # Shutdown thread pool
+    try:
+        executor.shutdown(wait=False)
+    except Exception as e:
+        print(f"[Cleanup] Lỗi khi shutdown thread pool: {e}", flush=True)
+    
+    print("[Cleanup] Hoàn thành dọn dẹp.", flush=True)
+
+def initialize_system():
+    """Hàm này sẽ được gọi từ web_server.py để khởi động mọi thứ."""
+    global spam_thread, auto_reboot_thread, auto_reboot_stop_event
+    global main_bot, main_bot_2, main_bot_3, main_bot_4
+    
+    print("[Init] Bắt đầu khởi tạo hệ thống...", flush=True)
+    
+    # Load settings
+    load_settings()
+    load_visit_data()
+    load_farm_settings()
+
+    print("[Init] Đang khởi tạo các bot...", flush=True)
+    with bots_lock:
+        # Initialize main bots
+        if main_token:
+            try:
+                main_bot = create_bot(main_token, is_main=True)
+                if 'main_1' not in bot_active_states: 
+                    bot_active_states['main_1'] = True
+            except Exception as e:
+                print(f"[Init] Lỗi khởi tạo main_bot: {e}", flush=True)
+        
+        if main_token_2:
+            try:
+                main_bot_2 = create_bot(main_token_2, is_main_2=True)
+                if 'main_2' not in bot_active_states: 
+                    bot_active_states['main_2'] = True
+            except Exception as e:
+                print(f"[Init] Lỗi khởi tạo main_bot_2: {e}", flush=True)
+        
+        if main_token_3:
+            try:
+                main_bot_3 = create_bot(main_token_3, is_main_3=True)
+                if 'main_3' not in bot_active_states: 
+                    bot_active_states['main_3'] = True
+            except Exception as e:
+                print(f"[Init] Lỗi khởi tạo main_bot_3: {e}", flush=True)
+        
+        if main_token_4:
+            try:
+                main_bot_4 = create_bot(main_token_4, is_main_4=True)
+                if 'main_4' not in bot_active_states: 
+                    bot_active_states['main_4'] = True
+            except Exception as e:
+                print(f"[Init] Lỗi khởi tạo main_bot_4: {e}", flush=True)
+
+        # Initialize sub bots
+        for i, token in enumerate(tokens):
+            if token.strip():
+                try:
+                    bots.append(create_bot(token.strip()))
+                    if f'sub_{i}' not in bot_active_states:
+                        bot_active_states[f'sub_{i}'] = True
+                except Exception as e:
+                    print(f"[Init] Lỗi khởi tạo sub bot {i}: {e}", flush=True)
+
+    print("[Init] Đang khởi tạo các luồng nền...", flush=True)
+    
+    # Initialize background threads
+    thread_configs = [
+        ("Spam", spam_loop, True),
+        ("Periodic Save", periodic_save_loop, True),
+        ("Auto Work", auto_work_loop, True),
+        ("Auto Daily", auto_daily_loop, True),
+        ("Auto KVI", auto_kvi_loop, True),
+    ]
+    
+    for name, target, daemon in thread_configs:
+        try:
+            thread = threading.Thread(target=target, daemon=daemon, name=name)
+            thread.start()
+            print(f"[Init] Đã khởi tạo luồng {name}.", flush=True)
+        except Exception as e:
+            print(f"[Init] Lỗi khởi tạo luồng {name}: {e}", flush=True)
+
+    # Initialize reboot thread if enabled
+    if auto_reboot_enabled and (auto_reboot_thread is None or not auto_reboot_thread.is_alive()):
+        try:
+            auto_reboot_stop_event = threading.Event()
+            auto_reboot_thread = threading.Thread(target=auto_reboot_loop, daemon=True, name="Auto Reboot")
+            auto_reboot_thread.start()
+            print("[Init] Đã khởi tạo luồng Auto Reboot.", flush=True)
+        except Exception as e:
+            print(f"[Init] Lỗi khởi tạo luồng Auto Reboot: {e}", flush=True)
+
+    print("[Init] Hệ thống bot đã sẵn sàng và được tối ưu hóa.", flush=True)
+    
+    # Register cleanup function
+    import atexit
+    atexit.register(cleanup_resources)
         
 app = Flask(__name__)
 
