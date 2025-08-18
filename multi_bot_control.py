@@ -1257,6 +1257,13 @@ HTML_TEMPLATE = """
     <h2 data-text="Multi-Farm Control" style="color: #FF69B4; border-color: #FFD700; font-family: 'Nosifer', cursive; font-size: 1.4rem; margin-bottom: 20px; text-transform: uppercase; border-bottom: 2px solid; padding-bottom: 10px; position: relative;">
         <i class="fas fa-network-wired"></i> Multi-Farm Control
     </h2>
+    
+    <div style="text-align: center; margin-bottom: 20px;">
+        <button id="sync-all-farms-btn" class="btn btn-primary" style="font-size: 1rem; padding: 12px 25px;">
+            <i class="fas fa-sync-alt"></i> Đồng Bộ Cài Đặt Harvest Với Panel Chính
+        </button>
+    </div>
+    <div id="farm-grid" class="main-grid">
 
     <div id="farm-grid" class="main-grid">
         
@@ -1276,11 +1283,15 @@ HTML_TEMPLATE = """
             <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
                 <div style="display: flex; flex-direction:column; gap: 10px;">
                     {% for i in range(1, 5) %}
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 5px; background: rgba(255,255,255,0.05); border-radius: 4px;">
                         <span style="font-family: 'Orbitron';">{{ ['ALPHA', 'BETA', 'GAMMA', 'DELTA'][i-1] }}</span>
-                        <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
-                            <input type="number" class="farm-harvest-threshold" data-node="{{ i }}" value="{{ server['heart_threshold_' ~ i] or 50 }}" min="0">
-                            <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="{{ i }}">{{ 'TẮT' if server['auto_grab_enabled_' ~ i] else 'BẬT' }}</button>
+                        <div style="text-align: right;">
+                            {% if server['auto_grab_enabled_' ~ i] %}
+                                <span class="status-badge active">ON</span>
+                            {% else %}
+                                <span class="status-badge inactive">OFF</span>
+                            {% endif %}
+                            <span style="font-family: 'Courier Prime'; font-weight: 700; margin-left: 10px;">♡{{ server['heart_threshold_' ~ i] or 'N/A' }}</span>
                         </div>
                     </div>
                     {% endfor %}
@@ -1426,6 +1437,10 @@ HTML_TEMPLATE = """
 
         // --- Event Listeners for Buttons ---
 
+        document.getElementById('sync-all-farms-btn').addEventListener('click', () => {
+            // Chỉ cần gọi API mới đã tạo, không cần gửi dữ liệu gì thêm
+            postData('/api/farm/sync_harvest_all', {}); 
+        });
         // Soul Harvest
         document.getElementById('harvest-toggle-1').addEventListener('click', () => postData('/api/harvest_toggle', { node: 1, threshold: document.getElementById('heart-threshold-1').value }));
         document.getElementById('harvest-toggle-2').addEventListener('click', () => postData('/api/harvest_toggle', { node: 2, threshold: document.getElementById('heart-threshold-2').value }));
@@ -1640,6 +1655,35 @@ def api_farm_broadcast_toggle():
     save_farm_settings()
     state = "BẬT" if server['spam_enabled'] else "TẮT"
     return jsonify({'status': 'success', 'message': f"Spam đã {state} cho farm {server['name']}."})
+
+@app.route("/api/farm/sync_harvest_all", methods=['POST'])
+def api_farm_sync_harvest_all():
+    """
+    API endpoint để đồng bộ cài đặt Harvest từ panel chính
+    xuống tất cả các server farm.
+    """
+    global farm_servers
+    print("[Farm Sync] Bắt đầu đồng bộ cài đặt Harvest cho tất cả farm.", flush=True)
+
+    # Lặp qua từng server trong danh sách farm
+    for server in farm_servers:
+        # Sao chép cài đặt từ các biến global của panel chính
+        server['auto_grab_enabled_1'] = auto_grab_enabled
+        server['heart_threshold_1'] = heart_threshold
+        
+        server['auto_grab_enabled_2'] = auto_grab_enabled_2
+        server['heart_threshold_2'] = heart_threshold_2
+
+        server['auto_grab_enabled_3'] = auto_grab_enabled_3
+        server['heart_threshold_3'] = heart_threshold_3
+
+        server['auto_grab_enabled_4'] = auto_grab_enabled_4
+        server['heart_threshold_4'] = heart_threshold_4
+        
+    save_farm_settings() # Lưu lại toàn bộ thay đổi
+    
+    return jsonify({'status': 'success', 'message': 'Đã đồng bộ cài đặt Harvest cho tất cả các farm.'})
+    
 # --- API ENDPOINTS ---
 @app.route("/api/event_grab_toggle", methods=['POST'])
 def api_event_grab_toggle():
@@ -1868,6 +1912,7 @@ def status():
         'ui_states': ui_states,
         'farm_servers': farm_servers
     })
+
 
 # --- MAIN EXECUTION ---
 if __name__ == "__main__":
