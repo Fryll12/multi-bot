@@ -1283,15 +1283,11 @@ HTML_TEMPLATE = """
             <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
                 <div style="display: flex; flex-direction:column; gap: 10px;">
                     {% for i in range(1, 5) %}
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 5px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                         <span style="font-family: 'Orbitron';">{{ ['ALPHA', 'BETA', 'GAMMA', 'DELTA'][i-1] }}</span>
-                        <div style="text-align: right;">
-                            {% if server['auto_grab_enabled_' ~ i] %}
-                                <span class="status-badge active">ON</span>
-                            {% else %}
-                                <span class="status-badge inactive">OFF</span>
-                            {% endif %}
-                            <span style="font-family: 'Courier Prime'; font-weight: 700; margin-left: 10px;">♡{{ server['heart_threshold_' ~ i] or 'N/A' }}</span>
+                        <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
+                            <input type="number" class="farm-harvest-threshold" data-node="{{ i }}" value="{{ server['heart_threshold_' ~ i] or 50 }}" min="0">
+                            <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="{{ i }}">{{ 'TẮT' if server['auto_grab_enabled_' ~ i] else 'BẬT' }}</button>
                         </div>
                     </div>
                     {% endfor %}
