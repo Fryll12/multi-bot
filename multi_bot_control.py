@@ -1700,6 +1700,7 @@ def api_harvest_toggle():
     elif node == 2: auto_grab_enabled_2 = not auto_grab_enabled_2; heart_threshold_2 = threshold; msg = f"Auto Grab 2 was {'ENABLED' if auto_grab_enabled_2 else 'DISABLED'}"
     elif node == 3: auto_grab_enabled_3 = not auto_grab_enabled_3; heart_threshold_3 = threshold; msg = f"Auto Grab 3 was {'ENABLED' if auto_grab_enabled_3 else 'DISABLED'}"
     elif node == 4: auto_grab_enabled_4 = not auto_grab_enabled_4; heart_threshold_4 = threshold; msg = f"Auto Grab 4 was {'ENABLED' if auto_grab_enabled_4 else 'DISABLED'}"
+    save_settings()
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/manual_ops", methods=['POST'])
