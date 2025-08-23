@@ -576,21 +576,24 @@ def create_bot(token, bot_type='sub', bot_name='Sub Account'):
                         lines = yoru_msg_desc.split('\n')
                         heart_numbers = [int(match.group(1)) if (match := re.search(r'♡(\d+)', line)) else 0 for line in lines[:3]]
                         if not any(heart_numbers): return
-                            
-                        bots_to_check = []
-                        bots_to_check.append({
-                            "name": "Alpha", "instance": main_bot, "num": 1,
-                            "enabled": target_server.get('auto_grab_enabled_1', False),
-                            "threshold": int(target_server.get('heart_threshold_1', heart_threshold))
-                        })
-                        for i, bot_instance in enumerate(extra_main_bots):
-                            bot_num = i + 2
-                            bot_name_greek = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
+                
+                        bots_to_check = []                        
+                        # Kiểm tra cho Alpha (Node 1)
+                        if target_server.get('auto_grab_enabled_1', False):
                             bots_to_check.append({
-                                "name": bot_name_greek, "instance": bot_instance, "num": bot_num,
-                                "enabled": target_server.get(f'auto_grab_enabled_{bot_num}', False),
-                                "threshold": int(target_server.get(f'heart_threshold_{bot_num}', heart_threshold_extra))
+                                "name": "Alpha", "instance": main_bot,
+                                "threshold": int(target_server.get('heart_threshold_1', heart_threshold))
                             })
+                        
+                        # Kiểm tra cho tất cả các bot phụ bằng công tắc chung
+                        if target_server.get('auto_grab_enabled_extra', False):
+                            threshold_extra_farm = int(target_server.get('heart_threshold_extra', heart_threshold_extra))
+                            for i, bot_instance in enumerate(extra_main_bots):
+                                bot_name_greek = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {i + 2}"
+                                bots_to_check.append({
+                                    "name": bot_name_greek, "instance": bot_instance,
+                                    "threshold": threshold_extra_farm
+                                })
 
                         max_num = max(heart_numbers)
                         max_index = heart_numbers.index(max_num)
@@ -1086,18 +1089,22 @@ HTML_TEMPLATE = """
                 
             <div class="panel blood-panel">
                 <h2 data-text="Soul Harvest"><i class="fas fa-crosshairs"></i> Soul Harvest</h2>
-            
-                <div class="grab-section"><h3>ALPHA NODE <span id="harvest-status-1" class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-1" value="{{ heart_threshold }}" min="0"><button type="button" id="harvest-toggle-1" data-node="1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
-            
-                {% for panel in extra_main_panels %}
+                
                 <div class="grab-section">
-                    <h3>{{ panel.name }} NODE <span id="harvest-status-{{ panel.num }}" class="status-badge {{ panel.status }}">{{ panel.text }}</span></h3>
+                    <h3>ALPHA NODE <span id="harvest-status-1" class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3>
                     <div class="input-group">
-                        <input type="number" id="heart-threshold-{{ panel.num }}" value="{{ panel.threshold }}" min="0">
-                        <button type="button" id="harvest-toggle-{{ panel.num }}" data-node="{{ panel.num }}" class="{{ panel.btn_class }}">{{ panel.action }}</button>
+                        <input type="number" id="heart-threshold-1" value="{{ heart_threshold }}" min="0">
+                        <button type="button" id="harvest-toggle-1" data-node="1" class="btn {{ grab_button_class }}">{{ grab_action }}</button>
                     </div>
                 </div>
-                {% endfor %}
+                
+                <div class="grab-section">
+                    <h3>EXTRA NODES <span id="harvest-status-2" class="status-badge {{ status_extra }}">{{ text_extra }}</span></h3>
+                    <div class="input-group">
+                        <input type="number" id="heart-threshold-2" value="{{ threshold_extra }}" min="0">
+                        <button type="button" id="harvest-toggle-2" data-node="2" class="{{ btn_class_extra }}">{{ action_extra }}</button>
+                    </div>
+                </div>
             </div>
 
             <div class="panel ops-panel">
@@ -1228,7 +1235,7 @@ HTML_TEMPLATE = """
             </div>
             
             <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
-                <div style="display: flex; flex-direction:column; gap: 10px;">
+                  <div style="display: flex; flex-direction:column; gap: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                         <span style="font-family: 'Orbitron';">ALPHA</span>
                         <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
@@ -1236,18 +1243,14 @@ HTML_TEMPLATE = """
                             <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="1">{{ 'TẮT' if server['auto_grab_enabled_1'] else 'BẬT' }}</button>
                         </div>
                     </div>
-                    {% for bot in main_bots_list %}
-                    {% set bot_num = loop.index + 1 %}
-                    {% set bot_name = GREEK_ALPHABET[loop.index0] if loop.index0 < GREEK_ALPHABET|length else "Main " ~ bot_num %}
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <span style="font-family: 'Orbitron';">{{ bot_name.upper() }}</span>
+                        <span style="font-family: 'Orbitron';">EXTRA NODES</span>
                         <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
-                            <input type="number" class="farm-harvest-threshold" data-node="{{ bot_num }}" value="{{ server['heart_threshold_' ~ bot_num] or 10 }}" min="0">
-                            <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="{{ bot_num }}">{{ 'TẮT' if server['auto_grab_enabled_' ~ bot_num] else 'BẬT' }}</button>
+                            <input type="number" class="farm-harvest-threshold" data-node="99" value="{{ server['heart_threshold_extra'] or 10 }}" min="0">
+                            <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="99">{{ 'TẮT' if server['auto_grab_enabled_extra'] else 'BẬT' }}</button>
                         </div>
                     </div>
-                    {% endfor %}
-                </div>   
+                </div>  
             </div>
 
             <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
@@ -1389,18 +1392,8 @@ HTML_TEMPLATE = """
 
         // --- Event Listeners for Buttons ---
 
-        document.querySelector('.blood-panel').addEventListener('click', function(e) {
-            if (e.target && e.target.matches('button[id^="harvest-toggle-"]')) {
-                const nodeNum = e.target.id.split('-')[2];
-                const threshold = document.getElementById(`heart-threshold-${nodeNum}`).value;
-                postData('/api/harvest_toggle', { node: parseInt(nodeNum), threshold: threshold });
-            }
-        });
-        // Soul Harvest
         document.getElementById('harvest-toggle-1').addEventListener('click', () => postData('/api/harvest_toggle', { node: 1, threshold: document.getElementById('heart-threshold-1').value }));
         document.getElementById('harvest-toggle-2').addEventListener('click', () => postData('/api/harvest_toggle', { node: 2, threshold: document.getElementById('heart-threshold-2').value }));
-        document.getElementById('harvest-toggle-3').addEventListener('click', () => postData('/api/harvest_toggle', { node: 3, threshold: document.getElementById('heart-threshold-3').value }));
-        document.getElementById('harvest-toggle-4').addEventListener('click', () => postData('/api/harvest_toggle', { node: 4, threshold: document.getElementById('heart-threshold-4').value }));
         
         // Manual Operations
         document.getElementById('send-manual-message-btn').addEventListener('click', () => {
@@ -1517,29 +1510,9 @@ HTML_TEMPLATE = """
 def index():
     # --- Xử lý cho Bot Alpha ---
     grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
-    
-    ## --- PHẦN TỰ ĐỘNG TẠO PANEL CHO CÁC BOT MAIN PHỤ ---
-    extra_main_panels = []
-    for i, bot in enumerate(extra_main_bots):
-        bot_num = i + 2
-        bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
-        
-        # Lấy trạng thái chung của các bot main phụ. Lưu ý: các nút này sẽ BẬT/TẮT CÙNG NHAU trên UI chính.
-        # Việc BẬT/TẮT riêng lẻ cho từng bot sẽ được thực hiện trong từng farm.
-        is_enabled = auto_grab_enabled_extra
-        threshold = heart_threshold_extra
-
-        status, text, action, btn_class = ("active", "ON", "DISABLE", "btn-blood") if is_enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
-
-        extra_main_panels.append({
-            "num": bot_num,
-            "name": bot_name.upper(),
-            "status": status,
-            "text": text,
-            "action": action,
-            "btn_class": f"btn {btn_class}",
-            "threshold": threshold
-        })
+    is_enabled_extra = auto_grab_enabled_extra
+    threshold_extra = heart_threshold_extra
+    status_extra, text_extra, action_extra, btn_class_extra = ("active", "ON", "DISABLE", "btn-blood") if is_enabled_extra else ("inactive", "OFF", "ENABLE", "btn-necro")
 
     # --- Các trạng thái khác ---
     event_grab_action, event_grab_button_class = ("DISABLE", "btn-blood") if event_grab_enabled else ("ENABLE", "btn-necro")
@@ -1570,7 +1543,7 @@ def index():
         # Panel Alpha
         grab_status=grab_status, grab_text=grab_text, grab_action=grab_action, grab_button_class=grab_button_class, heart_threshold=heart_threshold,
         # Danh sách các panel main phụ
-        extra_main_panels=extra_main_panels,
+        status_extra=status_extra, text_extra=text_extra, action_extra=action_extra, btn_class_extra=f"btn {btn_class_extra}", threshold_extra=threshold_extra,
         # Các panel khác
         event_grab_action=event_grab_action,
         event_grab_button_class=event_grab_button_class,
@@ -1623,15 +1596,30 @@ def api_farm_update_channels():
 
 @app.route("/api/farm/harvest_toggle", methods=['POST'])
 def api_farm_harvest_toggle():
-    data = request.get_json(); farm_id = data.get('farm_id'); node = int(data.get('node')); threshold = int(data.get('threshold', 50))
+    data = request.get_json()
+    farm_id = data.get('farm_id')
+    node = int(data.get('node'))
+    threshold = int(data.get('threshold', 50))
+
     server = next((s for s in farm_servers if s.get('id') == farm_id), None)
     if not server: return jsonify({'status': 'error', 'message': 'Yêu cầu không hợp lệ.'}), 400
-    grab_key = f'auto_grab_enabled_{node}'; thresh_key = f'heart_threshold_{node}'
+
+    # Nếu là nút chung cho các node phụ (ta quy ước node=99)
+    if node == 99:
+        grab_key = 'auto_grab_enabled_extra'
+        thresh_key = 'heart_threshold_extra'
+        node_name = "Extra Nodes"
+    # Mặc định là các node riêng lẻ (hiện chỉ còn node 1)
+    else:
+        grab_key = f'auto_grab_enabled_{node}'
+        thresh_key = f'heart_threshold_{node}'
+        node_name = f"Node {node}"
+
     server[grab_key] = not server.get(grab_key, False)
     server[thresh_key] = threshold
     save_farm_settings()
     state = "BẬT" if server[grab_key] else "TẮT"
-    return jsonify({'status': 'success', 'message': f"Grab Node {node} đã được {state} cho farm {server['name']}."})
+    return jsonify({'status': 'success', 'message': f"Grab {node_name} đã được {state} cho farm {server['name']}."})
 
 @app.route("/api/farm/broadcast_toggle", methods=['POST'])
 def api_farm_broadcast_toggle():
