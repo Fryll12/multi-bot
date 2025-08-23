@@ -1377,7 +1377,8 @@ HTML_TEMPLATE = """
                     data.farm_servers.forEach(s => {
                         const p = document.querySelector(`.server-farm-panel[data-farm-id="${s.id}"]`);
                         if (!p) return;
-                        for(let i=1; i<=4; i++) { p.querySelector(`.farm-harvest-toggle[data-node="${i}"]`).textContent = s[`auto_grab_enabled_${i}`] ? 'TẮT' : 'BẬT'; }
+                        p.querySelector('.farm-harvest-toggle[data-node="1"]').textContent = s.auto_grab_enabled_1 ? 'TẮT' : 'BẬT';
+                        p.querySelector('.farm-harvest-toggle[data-node="99"]').textContent = s.auto_grab_enabled_extra ? 'TẮT' : 'BẬT';
                         p.querySelector('.farm-broadcast-toggle').textContent = s.spam_enabled ? 'TẮT SPAM' : 'BẬT SPAM';
                         let countdown = s.spam_enabled ? (s.last_spam_time + s.spam_delay) - (Date.now()/1000) : 0;
                         p.querySelector('.farm-spam-timer').textContent = formatTime(countdown);
@@ -1559,13 +1560,19 @@ def api_farm_add():
     data = request.get_json()
     name = data.get('name')
     if not name: return jsonify({'status': 'error', 'message': 'Tên farm là bắt buộc.'}), 400
+
+    # Sửa lại cấu trúc của farm mới
     new_server = {
         "id": f"farm_{int(time.time())}", "name": name,
         "main_channel_id": "", "ktb_channel_id": "", "spam_channel_id": "",
+
+        # Cài đặt cho ALPHA
         "auto_grab_enabled_1": False, "heart_threshold_1": 15,
-        "auto_grab_enabled_2": False, "heart_threshold_2": 50,
-        "auto_grab_enabled_3": False, "heart_threshold_3": 75,
-        "auto_grab_enabled_4": False, "heart_threshold_4": 100,
+
+        # Cài đặt chung cho EXTRA NODES
+        "auto_grab_enabled_extra": False, "heart_threshold_extra": 10,
+
+        # Cài đặt spam
         "spam_enabled": False, "spam_message": "", "spam_delay": 10, "last_spam_time": 0
     }
     farm_servers.append(new_server)
