@@ -1638,28 +1638,23 @@ def api_farm_broadcast_toggle():
 def api_farm_sync_harvest_all():
     """
     API endpoint để đồng bộ cài đặt Harvest từ panel chính
-    xuống tất cả các server farm.
+    xuống tất cả các server farm. (Đã cập nhật)
     """
-    global farm_servers
+    global farm_servers, auto_grab_enabled, heart_threshold, auto_grab_enabled_extra, heart_threshold_extra
     print("[Farm Sync] Bắt đầu đồng bộ cài đặt Harvest cho tất cả farm.", flush=True)
 
     # Lặp qua từng server trong danh sách farm
     for server in farm_servers:
-        # Sao chép cài đặt từ các biến global của panel chính
+        # Sao chép cài đặt của ALPHA NODE
         server['auto_grab_enabled_1'] = auto_grab_enabled
         server['heart_threshold_1'] = heart_threshold
-        
-        server['auto_grab_enabled_2'] = auto_grab_enabled_2
-        server['heart_threshold_2'] = heart_threshold_2
 
-        server['auto_grab_enabled_3'] = auto_grab_enabled_3
-        server['heart_threshold_3'] = heart_threshold_3
+        # Sao chép cài đặt chung của EXTRA NODES
+        server['auto_grab_enabled_extra'] = auto_grab_enabled_extra
+        server['heart_threshold_extra'] = heart_threshold_extra
 
-        server['auto_grab_enabled_4'] = auto_grab_enabled_4
-        server['heart_threshold_4'] = heart_threshold_4
-        
     save_farm_settings() # Lưu lại toàn bộ thay đổi
-    
+
     return jsonify({'status': 'success', 'message': 'Đã đồng bộ cài đặt Harvest cho tất cả các farm.'})
     
 # --- API ENDPOINTS ---
