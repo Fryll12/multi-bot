@@ -397,7 +397,7 @@ def handle_farm_grab(bot, msg, bot_num):
 
         if is_card_grab_enabled and ktb_channel_id:
             thresh_map = {1: 'heart_threshold_1', 2: 'heart_threshold_2', 3: 'heart_threshold_3', 4: 'heart_threshold_4'}
-            heart_threshold = int(target_server.get(thresh_map[bot_num], 50))
+            heart_threshold = int(target_server.get(thresh_map[bot_num], 10))
             def read_yoru_bot():
                 time.sleep(0.6)
                 try:
@@ -414,7 +414,7 @@ def handle_farm_grab(bot, msg, bot_num):
                                 delays = {1: [0.2, 1.2, 2.0], 2: [1, 2, 2.8], 3: [1, 2, 2.8], 4: [1, 2, 2.8]}
                                 emojis = ["1️⃣", "2️⃣", "3️⃣"]
                                 emoji = emojis[max_index]
-                                delay = delays.get(bot_num, [0.7, 1.7, 2.4])[max_index]
+                                delay = delays.get(bot_num, [1, 2, 2.8])[max_index]
                                 print(f"[FARM: {target_server['name']} | Bot {bot_num}] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                 def grab_action():
                                     bot.addReaction(channel_id, last_drop_msg_id, emoji)
