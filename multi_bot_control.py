@@ -883,24 +883,30 @@ def auto_reboot_loop():
     while not auto_reboot_stop_event.is_set():
         try:
             if auto_reboot_enabled and (time.time() - last_reboot_cycle_time) >= auto_reboot_delay:
-                print("[Reboot] Hết thời gian chờ, tiến hành reboot 3 tài khoản chính.", flush=True)
-                if main_bot: reboot_bot('main_1'); time.sleep(5)
-                if main_bot_2: reboot_bot('main_2'); time.sleep(5)
-                if main_bot_3: reboot_bot('main_3'); time.sleep(5)
-                if main_bot_4: reboot_bot('main_4')
-                last_reboot_cycle_time = time.time();
+                print("[Reboot] Hết thời gian chờ, tiến hành reboot tất cả các tài khoản main.", flush=True)
+                
+                # Reboot Bot Alpha
+                if main_bot:
+                    reboot_bot('main_1')
+                    time.sleep(5)
+                
+                # --- LOGIC MỚI: Reboot tất cả các bot main phụ ---
+                for i in range(len(extra_main_bots)):
+                    bot_num = i + 2
+                    reboot_bot(f'main_{bot_num}')
+                    time.sleep(5)
+
+                last_reboot_cycle_time = time.time()
+                
             interrupted = auto_reboot_stop_event.wait(timeout=60)
             if interrupted: break
         except Exception as e:
-            print(f"[ERROR in auto_reboot_loop] {e}", flush=True); time.sleep(60)
+            print(f"[ERROR in auto_reboot_loop] {e}", flush=True)
+            time.sleep(60)
     print("[Reboot] Luồng tự động reboot đã dừng.", flush=True)
-
-# =====================================================================
-# ===== THAY THẾ TOÀN BỘ HÀM SPAM_LOOP BẰNG PHIÊN BẢN HOÀN THIỆN NÀY =====
 
 # Thêm biến này vào khu vực "Các biến điều khiển luồng" ở đầu file của bạn
 spam_tasks_running = set()
-
 def spam_loop():
     global last_spam_time, spam_tasks_running
 
@@ -1502,10 +1508,19 @@ def index():
     
     acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
     if main_bot: acc_options += '<option value="main_1">ALPHA NODE (Main)</option>'
-    if main_bot_2: acc_options += '<option value="main_2">BETA NODE (Main)</option>'
-    if main_bot_3: acc_options += '<option value="main_3">GAMMA NODE (Main)</option>'
-    if main_bot_4: acc_options += '<option value="main_4">DELTA NODE (Main)</option>'
+# Tạo tùy chọn và nút bấm reboot cho các bot main phụ một cách tự động
+    for i, bot in enumerate(extra_main_bots):
+        bot_num = i + 2
+        bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
+        acc_options += f'<option value="main_{bot_num}">{bot_name.upper()} NODE (Main)</option>'
+    
     sub_account_buttons = "".join(f'<button type="button" data-reboot-target="sub_{i}" class="btn btn-necro btn-sm">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
+
+    # Thêm nút reboot cho các bot main phụ
+    for i, bot in enumerate(extra_main_bots):
+        bot_num = i + 2
+        bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
+        sub_account_buttons += f'<button type="button" data-reboot-target="main_{bot_num}" class="btn btn-necro btn-sm">{bot_name.upper()}</button>'
 
     return render_template_string(HTML_TEMPLATE, 
         grab_status=grab_status, grab_text=grab_text, grab_action=grab_action, grab_button_class=grab_button_class, heart_threshold=heart_threshold,
@@ -1803,13 +1818,24 @@ def status():
     reboot_countdown = (last_reboot_cycle_time + auto_reboot_delay - now) if auto_reboot_enabled else 0
     spam_countdown = (last_spam_time + spam_delay - now) if spam_enabled else 0
 
+    main_bots_status = []
+    # Thêm bot Alpha
+    main_bots_status.append({"name": "Alpha", "status": main_bot is not None, "reboot_id": "main_1", "is_active": bot_active_states.get('main_1', False), "type": "main"})
+    
+    # Tự động thêm các bot main phụ
+    for i, bot in enumerate(extra_main_bots):
+        bot_num = i + 2
+        bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
+        main_bots_status.append({
+            "name": bot_name, 
+            "status": bot is not None, 
+            "reboot_id": f"main_{bot_num}", 
+            "is_active": bot_active_states.get(f'main_{bot_num}', False), 
+            "type": "main"
+        })
+
     bot_statuses = {
-        "main_bots": [
-            {"name": "ALPHA", "status": main_bot is not None, "reboot_id": "main_1", "is_active": bot_active_states.get('main_1', False), "type": "main"},
-            {"name": "BETA", "status": main_bot_2 is not None, "reboot_id": "main_2", "is_active": bot_active_states.get('main_2', False), "type": "main"},
-            {"name": "GAMMA", "status": main_bot_3 is not None, "reboot_id": "main_3", "is_active": bot_active_states.get('main_3', False), "type": "main"},
-            {"name": "DELTA", "status": main_bot_4 is not None, "reboot_id": "main_4", "is_active": bot_active_states.get('main_4', True), "type": "main"}
-        ],
+        "main_bots": main_bots_status,
         "sub_accounts": []
     }
     with bots_lock:
