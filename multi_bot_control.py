@@ -1394,6 +1394,7 @@ HTML_TEMPLATE = """
 
         document.getElementById('harvest-toggle-1').addEventListener('click', () => postData('/api/harvest_toggle', { node: 1, threshold: document.getElementById('heart-threshold-1').value }));
         document.getElementById('harvest-toggle-2').addEventListener('click', () => postData('/api/harvest_toggle', { node: 2, threshold: document.getElementById('heart-threshold-2').value }));
+        document.getElementById('sync-all-farms-btn').addEventListener('click', () => postData('/api/farm/sync_harvest_all', {}));
         
         // Manual Operations
         document.getElementById('send-manual-message-btn').addEventListener('click', () => {
