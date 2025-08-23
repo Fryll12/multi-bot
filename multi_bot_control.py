@@ -397,7 +397,7 @@ def handle_farm_grab(bot, msg, bot_num):
 
         if is_card_grab_enabled and ktb_channel_id:
             thresh_map = {1: 'heart_threshold_1', 2: 'heart_threshold_2', 3: 'heart_threshold_3', 4: 'heart_threshold_4'}
-            heart_threshold = int(target_server.get(thresh_map[bot_num], 10))
+            heart_threshold = int(target_server.get(thresh_map[bot_num], 50))
             def read_yoru_bot():
                 time.sleep(0.6)
                 try:
@@ -1242,7 +1242,7 @@ HTML_TEMPLATE = """
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                         <span style="font-family: 'Orbitron';">{{ bot_name.upper() }}</span>
                         <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
-                            <input type="number" class="farm-harvest-threshold" data-node="{{ bot_num }}" value="{{ server['heart_threshold_' ~ bot_num] or 50 }}" min="0">
+                            <input type="number" class="farm-harvest-threshold" data-node="{{ bot_num }}" value="{{ server['heart_threshold_' ~ bot_num] or 10 }}" min="0">
                             <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="{{ bot_num }}">{{ 'TẮT' if server['auto_grab_enabled_' ~ bot_num] else 'BẬT' }}</button>
                         </div>
                     </div>
