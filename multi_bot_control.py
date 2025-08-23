@@ -14,9 +14,7 @@ load_dotenv()
 
 # --- CẤU HÌNH ---
 main_token = os.getenv("MAIN_TOKEN")
-main_token_2 = os.getenv("MAIN_TOKEN_2")
-main_token_3 = os.getenv("MAIN_TOKEN_3")
-main_token_4 = os.getenv("MAIN_TOKEN_4")
+extra_main_tokens = os.getenv("MAIN_TOKENS_EXTRA").split(",") if os.getenv("MAIN_TOKENS_EXTRA") else []
 tokens = os.getenv("TOKENS").split(",") if os.getenv("TOKENS") else []
 main_channel_id = os.getenv("MAIN_CHANNEL_ID")
 other_channel_id = os.getenv("OTHER_CHANNEL_ID")
@@ -34,10 +32,21 @@ bots = []
 sub_acc_names_str = os.getenv("SUB_ACC_NAMES")
 acc_names = [name.strip() for name in sub_acc_names_str.split(',')] if sub_acc_names_str else []
 
-main_bot, main_bot_2, main_bot_3, main_bot_4 = None, None, None, None
-auto_grab_enabled, auto_grab_enabled_2, auto_grab_enabled_3, auto_grab_enabled_4 = False, False, False, False
+# Danh sách tên Hy Lạp
+GREEK_ALPHABET = ["Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa", "Lambda"]
+
+# Bot Alpha
+main_bot = None
+auto_grab_enabled = False
+heart_threshold = 15
+
+# Các bot Main phụ (Beta, Gamma...)
+extra_main_bots = []
+auto_grab_enabled_extra = False # Một công tắc chung cho tất cả
+heart_threshold_extra = 10      # Một ngưỡng tim chung cho tất cả
+
+# Các trạng thái khác
 event_grab_enabled = False
-heart_threshold, heart_threshold_2, heart_threshold_3, heart_threshold_4 = 15, 50, 75, 100
 spam_enabled, auto_work_enabled, auto_reboot_enabled = False, False, False
 spam_message, spam_delay, work_delay_between_acc, work_delay_after_all, auto_reboot_delay = "", 10, 10, 44100, 3600
 auto_daily_enabled = False
@@ -435,46 +444,53 @@ def handle_farm_grab(bot, msg, bot_num):
         
 # --- CÁC HÀM LOGIC BOT ---
 def reboot_bot(target_id):
-    global main_bot, main_bot_2, main_bot_3, main_bot_4, bots
+    global main_bot, extra_main_bots, bots
     with bots_lock:
         print(f"[Reboot] Nhận được yêu cầu reboot cho target: {target_id}", flush=True)
+
+        # Xử lý Bot Alpha (main_1) - Không thay đổi
         if target_id == 'main_1' and main_token:
             try: 
                 if main_bot: main_bot.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 1: {e}", flush=True)
-            main_bot = create_bot(main_token, is_main=True)
-            print("[Reboot] Acc Chính 1 đã được khởi động lại.", flush=True)
-        elif target_id == 'main_2' and main_token_2:
-            try: 
-                if main_bot_2: main_bot_2.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 2: {e}", flush=True)
-            main_bot_2 = create_bot(main_token_2, is_main_2=True)
-            print("[Reboot] Acc Chính 2 đã được khởi động lại.", flush=True)
-        elif target_id == 'main_3' and main_token_3:
-            try: 
-                if main_bot_3: main_bot_3.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 3: {e}", flush=True)
-            main_bot_3 = create_bot(main_token_3, is_main_3=True)
-            print("[Reboot] Acc Chính 3 đã được khởi động lại.", flush=True)
-        elif target_id == 'main_4' and main_token_4:
-            try: 
-                if main_bot_4: main_bot_4.gateway.close()
-            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Chính 4: {e}", flush=True)
-            main_bot_4 = create_bot(main_token_4, is_main_4=True)
-            print("[Reboot] Acc Chính 4 đã được khởi động lại.", flush=True)
+            except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Alpha: {e}", flush=True)
+            main_bot = create_bot(main_token, bot_type='alpha', bot_name='Alpha')
+            print("[Reboot] Acc Alpha đã được khởi động lại.", flush=True)
+
+        # --- LOGIC MỚI: XỬ LÝ CÁC BOT MAIN PHỤ ĐỘNG ---
+        elif target_id.startswith('main_'): # Bắt các target như 'main_2', 'main_3'...
+            try:
+                # Chuyển 'main_2' -> index 0, 'main_3' -> index 1, ...
+                list_index = int(target_id.split('_')[1]) - 2 
+
+                if 0 <= list_index < len(extra_main_bots):
+                    # Đóng bot cũ
+                    try: extra_main_bots[list_index].gateway.close()
+                    except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Main phụ {list_index + 2}: {e}", flush=True)
+                    
+                    # Tạo lại bot mới
+                    token_to_reboot = extra_main_tokens[list_index].strip()
+                    bot_name = GREEK_ALPHABET[list_index] if list_index < len(GREEK_ALPHABET) else f"Main {list_index + 2}"
+                    
+                    extra_main_bots[list_index] = create_bot(token_to_reboot, bot_type='extra_main', bot_name=bot_name)
+                    print(f"[Reboot] Acc {bot_name} đã được khởi động lại.", flush=True)
+            except (ValueError, IndexError) as e: 
+                print(f"[Reboot] Lỗi xử lý target Acc Main phụ: {e}", flush=True)
+
+        # Xử lý các Bot phụ (sub) - Không thay đổi
         elif target_id.startswith('sub_'):
             try:
                 index = int(target_id.split('_')[1])
                 if 0 <= index < len(bots):
                     try: bots[index].gateway.close()
                     except Exception as e: print(f"[Reboot] Lỗi khi đóng Acc Phụ {index}: {e}", flush=True)
-                    token_to_reboot = tokens[index]
-                    bots[index] = create_bot(token_to_reboot.strip(), is_main=False)
+                    token_to_reboot = tokens[index].strip()
+                    bots[index] = create_bot(token_to_reboot, is_main=False)
                     print(f"[Reboot] Acc Phụ {index} đã được khởi động lại.", flush=True)
             except (ValueError, IndexError) as e: print(f"[Reboot] Lỗi xử lý target Acc Phụ: {e}", flush=True)
 
-def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4=False):
+def create_bot(token, bot_type='sub', bot_name='Sub Account'):
     bot = discum.Client(token=token, log=False)
+    
     @bot.gateway.command
     def on_ready(resp):
         if resp.event.ready:
@@ -482,32 +498,24 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
             if isinstance(user_data, dict):
                 user_id = user_data.get("id")
                 if user_id:
-                    if is_main: bot_type = "(ALPHA)"
-                    elif is_main_2: bot_type = "(BETA)"
-                    elif is_main_3: bot_type = "(GAMMA)"
-                    elif is_main_4: bot_type = "(DELTA)"
-                    else: bot_type = ""
-                    print(f"Đã đăng nhập: {user_id} {bot_type}", flush=True)
+                    print(f"Đã đăng nhập: {user_id} ({bot_name})", flush=True)
 
-    if is_main:
+    if bot_type == 'alpha':
         @bot.gateway.command
         def on_message(resp):
-            global auto_grab_enabled, heart_threshold, event_grab_enabled, visit_data, kvi_session_state, main_token
+            global auto_grab_enabled, heart_threshold, event_grab_enabled
             if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
                 return
             
             msg = resp.parsed.auto()
             channel_id = msg.get("channel_id")
-
-            # --- 1. SỬA LỖI LOGIC GRAB TẠI KÊNH CHÍNH ---
-            # Chỉ xử lý khi tin nhắn đến từ kênh grab chính
+            
+            # --- 1. ALPHA GRAB TẠI KÊNH CHÍNH ---
             if channel_id == main_channel_id:
-                # KIỂM TRA DROP TRƯỚC TIÊN
                 if msg.get("author", {}).get("id") == karuta_id and 'dropping 3' in msg.get("content", ""):
                     last_drop_msg_id = msg["id"]
-                    # Luồng nhặt thẻ (độc lập)
                     if auto_grab_enabled:
-                        def read_yoru_bot():
+                        def read_yoru_bot_alpha():
                             time.sleep(0.6)
                             try:
                                 messages = bot.getMessages(main_channel_id, num=5).json()
@@ -520,7 +528,7 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                         if sum(heart_numbers) > 0 and max_num >= heart_threshold:
                                             max_index = heart_numbers.index(max_num)
                                             emoji, delay = [("1️⃣", 0.2), ("2️⃣", 1.2), ("3️⃣", 2)][max_index]
-                                            print(f"[Bot 1] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
+                                            print(f"[ALPHA] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
                                             def grab():
                                                 bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
                                                 time.sleep(1)
@@ -528,172 +536,97 @@ def create_bot(token, is_main=False, is_main_2=False, is_main_3=False, is_main_4
                                             threading.Timer(delay, grab).start()
                                         break
                             except Exception as e: 
-                                print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 1): {e}", flush=True)
-                        threading.Thread(target=read_yoru_bot).start()
+                                print(f"Lỗi khi đọc Yoru Bot (ALPHA): {e}", flush=True)
+                        threading.Thread(target=read_yoru_bot_alpha).start()
+                        
+                    if event_grab_enabled:
+                        def check_and_grab_event():
+                            try:
+                                time.sleep(5) 
+                                full_msg_obj = bot.getMessage(main_channel_id, last_drop_msg_id).json()
+                                if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
+                                    full_msg_obj = full_msg_obj[0]
+                                if 'reactions' in full_msg_obj:
+                                    if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
+                                        print(f"[EVENT GRAB | Bot 1] Phát hiện dưa hấu! Tiến hành nhặt.", flush=True)
+                                        bot.addReaction(main_channel_id, last_drop_msg_id, "🍉")
+                            except Exception as e:
+                                print(f"Lỗi khi kiểm tra event (Bot 1): {e}", flush=True)
+                        threading.Thread(target=check_and_grab_event).start()            
 
-                    # Luồng nhặt event (độc lập)
-                    if event_grab_enabled:
-                        def check_and_grab_event():
-                            try:
-                                time.sleep(5) 
-                                full_msg_obj = bot.getMessage(main_channel_id, last_drop_msg_id).json()
-                                if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
-                                    full_msg_obj = full_msg_obj[0]
-                                if 'reactions' in full_msg_obj:
-                                    if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
-                                        print(f"[EVENT GRAB | Bot 1] Phát hiện dưa hấu! Tiến hành nhặt.", flush=True)
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, "🍉")
-                            except Exception as e:
-                                print(f"Lỗi khi kiểm tra event (Bot 1): {e}", flush=True)
-                        threading.Thread(target=check_and_grab_event).start()
-            
             # --- 2. XỬ LÝ KÊNH KVI ---
-            if auto_kvi_enabled and kvi_target_account == 'main_1' and channel_id == kvi_channel_id:
+            # Lưu ý: kvi_target_account giờ sẽ dùng tên như 'Alpha', 'Beta'...
+            if auto_kvi_enabled and kvi_target_account == 'Alpha' and channel_id == kvi_channel_id:
                 handle_kvi_message(bot, msg, main_token)
                 
-            # --- 3. XỬ LÝ FARM ---    
-            is_farm_channel = any(server.get('main_channel_id') == channel_id for server in farm_servers)
-            if is_farm_channel:
-                handle_farm_grab(bot, msg, 1)
-                    
-    if is_main_2:
-        @bot.gateway.command
-        def on_message(resp):
-            global auto_grab_enabled_2, heart_threshold_2
-            if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
-                return
+            # --- 3. BỘ ĐIỀU PHỐI FARM TRUNG TÂM (PHIÊN BẢN ĐỘNG) ---
+            target_server = next((s for s in farm_servers if s.get('main_channel_id') == channel_id), None)
             
-            msg = resp.parsed.auto()
-            channel_id = msg.get("channel_id")
-
-            # --- KHỐI 1: XỬ LÝ GRAB TOÀN CỤC (SOUL HARVEST) ---
-            if auto_grab_enabled_2 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
+            if target_server and msg.get("author", {}).get("id") == karuta_id and 'dropping 3' in msg.get("content", ""):
                 last_drop_msg_id = msg["id"]
-                def read_yoru_bot_2():
-                    time.sleep(0.6)
+                
+                def central_farm_handler():
                     try:
-                        messages = bot.getMessages(main_channel_id, num=5).json()
-                        for msg_item in messages:
-                            if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                desc = msg_item["embeds"][0].get("description", "")
-                                lines = desc.split('\n')
-                                heart_numbers = []
-                                for line in lines[:3]:
-                                    match = re.search(r'♡(\d+)', line)
-                                    heart_numbers.append(int(match.group(1)) if match else 0)
-                
-                                max_num = max(heart_numbers)
-                                if sum(heart_numbers) > 0 and max_num >= heart_threshold_2:
-                                    max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 1), ("2️⃣", 2), ("3️⃣", 2.8)][max_index]
-                                    print(f"[Bot 2] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
-                                    def grab_2():
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                        time.sleep(2) 
-                                        bot.sendMessage(ktb_channel_id, "kt b")
-                                    threading.Timer(delay, grab_2).start()
-                                break
-                    except Exception as e: 
-                        print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 2): {e}", flush=True)
-                threading.Thread(target=read_yoru_bot_2).start()
-            
-            # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
-            handle_farm_grab(bot, msg, 2)
+                        time.sleep(0.6)
+                        messages = bot.getMessages(channel_id, num=5).json()
+                        yoru_msg_desc = next((item["embeds"][0].get("description", "") for item in messages if item.get("author", {}).get("id") == yoru_bot_id and item.get("embeds")), None)
+                        
+                        if not yoru_msg_desc: return
 
-            if auto_kvi_enabled and kvi_target_account == 'main_2' and channel_id == kvi_channel_id:
-                handle_kvi_message(bot, msg, main_token_2)
-            
-    if is_main_3:
-        @bot.gateway.command
-        def on_message(resp):
-            global auto_grab_enabled_3, heart_threshold_3
-            if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
-                return
-            
-            msg = resp.parsed.auto()
-            channel_id = msg.get("channel_id")
+                        lines = yoru_msg_desc.split('\n')
+                        heart_numbers = [int(match.group(1)) if (match := re.search(r'♡(\d+)', line)) else 0 for line in lines[:3]]
+                        if not any(heart_numbers): return
+                            
+                        bots_to_check = []
+                        bots_to_check.append({
+                            "name": "Alpha", "instance": main_bot, "num": 1,
+                            "enabled": target_server.get('auto_grab_enabled_1', False),
+                            "threshold": int(target_server.get('heart_threshold_1', heart_threshold))
+                        })
+                        for i, bot_instance in enumerate(extra_main_bots):
+                            bot_num = i + 2
+                            bot_name_greek = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
+                            bots_to_check.append({
+                                "name": bot_name_greek, "instance": bot_instance, "num": bot_num,
+                                "enabled": target_server.get(f'auto_grab_enabled_{bot_num}', False),
+                                "threshold": int(target_server.get(f'heart_threshold_{bot_num}', heart_threshold_extra))
+                            })
 
-            # --- KHỐI 1: XỬ LÝ GRAB TOÀN CỤC (SOUL HARVEST) ---
-            if auto_grab_enabled_3 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
-                last_drop_msg_id = msg["id"]
-                def read_yoru_bot_3():
-                    time.sleep(0.6)
-                    try:
-                        messages = bot.getMessages(main_channel_id, num=5).json()
-                        for msg_item in messages:
-                            if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                desc = msg_item["embeds"][0].get("description", "")
-                                lines = desc.split('\n')
-                                heart_numbers = []
-                                for line in lines[:3]:
-                                    match = re.search(r'♡(\d+)', line)
-                                    heart_numbers.append(int(match.group(1)) if match else 0)
-                
-                                max_num = max(heart_numbers)
-                                if sum(heart_numbers) > 0 and max_num >= heart_threshold_3:
-                                    max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 1), ("2️⃣", 2), ("3️⃣", 2.8)][max_index]
-                                    print(f"[Bot 3] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
-                                    def grab_3():
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                        time.sleep(2) 
-                                        bot.sendMessage(ktb_channel_id, "kt b")
-                                    threading.Timer(delay, grab_3).start()
-                                break
-                    except Exception as e: 
-                        print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 3): {e}", flush=True)
-                threading.Thread(target=read_yoru_bot_3).start()
-            # --- KHỐI 2: XỬ LÝ MULTI-FARM (LUÔN CHẠY ĐỂ LẮNG NGHE) ---
-            handle_farm_grab(bot, msg, 3)
+                        max_num = max(heart_numbers)
+                        max_index = heart_numbers.index(max_num)
+                        emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
 
-            if auto_kvi_enabled and kvi_target_account == 'main_3' and channel_id == kvi_channel_id:
-                handle_kvi_message(bot, msg, main_token_3)
-                
-    if is_main_4:
-        @bot.gateway.command
-        def on_message(resp):
-            global auto_grab_enabled_4, heart_threshold_4
-            if not (resp.event.message or (resp.raw and resp.raw.get('t') == 'MESSAGE_UPDATE')):
-                return
-                
-            msg = resp.parsed.auto()
-            channel_id = msg.get("channel_id")
-            
-            if auto_grab_enabled_4 and msg.get("author", {}).get("id") == karuta_id and msg.get("channel_id") == main_channel_id and "is dropping" not in msg.get("content", "") and not msg.get("mentions", []):
-                last_drop_msg_id = msg["id"]
-                def read_yoru_bot_4():
-                    time.sleep(0.6)
-                    try:
-                        messages = bot.getMessages(main_channel_id, num=5).json()
-                        for msg_item in messages:
-                            if msg_item.get("author", {}).get("id") == yoru_bot_id and "embeds" in msg_item and len(msg_item["embeds"]) > 0:
-                                desc = msg_item["embeds"][0].get("description", "")
-                                lines = desc.split('\n')
-                                heart_numbers = []
-                                for line in lines[:3]:
-                                    match = re.search(r'♡(\d+)', line)
-                                    heart_numbers.append(int(match.group(1)) if match else 0)
+                        for bot_info in bots_to_check:
+                            if bot_info["enabled"] and bot_info["instance"] and max_num >= bot_info["threshold"]:
+                                def grab_action(target_bot, target_ktb_channel, b_info):
+                                    print(f"[FARM DISPATCHER] Lệnh grab cho {b_info['name']} tại farm '{target_server['name']}'", flush=True)
+                                    target_bot.addReaction(channel_id, last_drop_msg_id, emoji)
+                                    if target_ktb_channel:
+                                        time.sleep(2)
+                                        target_bot.sendMessage(target_ktb_channel, "kt b")
                                 
-                                max_num = max(heart_numbers)
-                                if sum(heart_numbers) > 0 and max_num >= heart_threshold_4:
-                                    max_index = heart_numbers.index(max_num)
-                                    emoji, delay = [("1️⃣", 1), ("2️⃣", 2), ("3️⃣", 2.8)][max_index]
-                                    print(f"[Bot 4] Chọn dòng {max_index+1} với {max_num} tim -> Emoji {emoji} sau {delay}s", flush=True)
-                                    def grab_4():
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
-                                        time.sleep(2) 
-                                        bot.sendMessage(ktb_channel_id, "kt b")
-                                    threading.Timer(delay, grab_4).start()
-                                break
-                    except Exception as e: 
-                        print(f"Lỗi khi đọc tin nhắn Yoru Bot (Bot 4): {e}", flush=True)
-                threading.Thread(target=read_yoru_bot_4).start()
+                                delay = random.uniform(0.5, 1.5)
+                                threading.Timer(delay, grab_action, args=(bot_info["instance"], target_server.get('ktb_channel_id'), bot_info)).start()
 
-            handle_farm_grab(bot, msg, 4)
+                    except Exception as e:
+                        print(f"Lỗi trong bộ điều phối farm trung tâm: {e}", flush=True)
 
-            if auto_kvi_enabled and kvi_target_account == 'main_4' and channel_id == kvi_channel_id:
-                handle_kvi_message(bot, msg, main_token_4)
-                
+                threading.Thread(target=central_farm_handler).start()
+
+    elif bot_type == 'extra_main':
+        @bot.gateway.command
+        def on_message(resp):
+            # Các bot này chỉ cần nghe lệnh KVI nếu được chỉ định
+            if not resp.event.message: return
+            msg = resp.parsed.auto()
+            channel_id = msg.get("channel_id")
+            
+            current_token = token 
+            
+            # kvi_target_account sẽ so sánh với tên Hy Lạp của bot (Beta, Gamma...)
+            if auto_kvi_enabled and kvi_target_account == bot_name and channel_id == kvi_channel_id:
+                handle_kvi_message(bot, msg, current_token)
+
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
     
@@ -1918,32 +1851,26 @@ if __name__ == "__main__":
     load_farm_settings()
     print("Đang khởi tạo các bot...", flush=True)
     with bots_lock:
+        # Khởi tạo Bot Alpha
         if main_token: 
-            main_bot = create_bot(main_token, is_main=True)
-            # THÊM KHỐI NÀY
+            main_bot = create_bot(main_token, bot_type='alpha', bot_name='Alpha')
             if 'main_1' not in bot_active_states:
                 bot_active_states['main_1'] = True
-                
-        if main_token_2: 
-            main_bot_2 = create_bot(main_token_2, is_main_2=True)
-            # THÊM KHỐI NÀY
-            if 'main_2' not in bot_active_states:
-                bot_active_states['main_2'] = True
-                
-        if main_token_3: 
-            main_bot_3 = create_bot(main_token_3, is_main_3=True)
-            # THÊM KHỐI NÀY
-            if 'main_3' not in bot_active_states:
-                bot_active_states['main_3'] = True
-                
-        if main_token_4: 
-            main_bot_4 = create_bot(main_token_4, is_main_4=True)
-            if 'main_4' not in bot_active_states:
-                bot_active_states['main_4'] = True
-                
+
+        # Khởi tạo các Bot Main phụ
+        for i, tk in enumerate(extra_main_tokens):
+            if tk.strip():
+                bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {i+2}"
+                bot_instance = create_bot(tk.strip(), bot_type='extra_main', bot_name=bot_name)
+                extra_main_bots.append(bot_instance)
+                # Key state vẫn dùng số để tương thích với UI: main_2, main_3, ...
+                if f'main_{i+2}' not in bot_active_states:
+                    bot_active_states[f'main_{i+2}'] = True
+
+        # Khởi tạo các Bot phụ
         for i, token in enumerate(tokens):
             if token.strip():
-                bots.append(create_bot(token.strip()))
+                bots.append(create_bot(token.strip(), bot_type='sub'))
                 if f'sub_{i}' not in bot_active_states:
                     bot_active_states[f'sub_{i}'] = True
 
