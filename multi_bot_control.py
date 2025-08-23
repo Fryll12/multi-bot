@@ -539,20 +539,20 @@ def create_bot(token, bot_type='sub', bot_name='Sub Account'):
                                 print(f"Lỗi khi đọc Yoru Bot (ALPHA): {e}", flush=True)
                         threading.Thread(target=read_yoru_bot_alpha).start()
                         
-                    if event_grab_enabled:
-                        def check_and_grab_event():
-                            try:
-                                time.sleep(5) 
-                                full_msg_obj = bot.getMessage(main_channel_id, last_drop_msg_id).json()
-                                if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
-                                    full_msg_obj = full_msg_obj[0]
-                                if 'reactions' in full_msg_obj:
-                                    if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
-                                        print(f"[EVENT GRAB | Bot 1] Phát hiện dưa hấu! Tiến hành nhặt.", flush=True)
-                                        bot.addReaction(main_channel_id, last_drop_msg_id, "🍉")
-                            except Exception as e:
-                                print(f"Lỗi khi kiểm tra event (Bot 1): {e}", flush=True)
-                        threading.Thread(target=check_and_grab_event).start()            
+                        if event_grab_enabled:
+                            def check_and_grab_event():
+                                try:
+                                    time.sleep(5) 
+                                    full_msg_obj = bot.getMessage(main_channel_id, last_drop_msg_id).json()
+                                    if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0:
+                                        full_msg_obj = full_msg_obj[0]
+                                    if 'reactions' in full_msg_obj:
+                                        if any(reaction['emoji']['name'] == '🍉' for reaction in full_msg_obj['reactions']):
+                                            print(f"[EVENT GRAB | Bot 1] Phát hiện dưa hấu! Tiến hành nhặt.", flush=True)
+                                            bot.addReaction(main_channel_id, last_drop_msg_id, "🍉")
+                                except Exception as e:
+                                    print(f"Lỗi khi kiểm tra event (Bot 1): {e}", flush=True)
+                            threading.Thread(target=check_and_grab_event).start()            
 
             # --- 2. XỬ LÝ KÊNH KVI ---
             # Lưu ý: kvi_target_account giờ sẽ dùng tên như 'Alpha', 'Beta'...
