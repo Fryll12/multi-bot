@@ -611,6 +611,28 @@ def create_bot(token, bot_type='sub', bot_name='Sub Account'):
                                 
                                 delay = random.uniform(0.5, 1.5)
                                 threading.Timer(delay, grab_action, args=(bot_info["instance"], target_server.get('ktb_channel_id'), bot_info)).start()
+                        
+                        # Xử lý Event Grab cho farm (vẫn do Bot 1 đảm nhiệm)
+                        if event_grab_enabled:
+                            def check_farm_event_grab(cid, mid):
+                                try:
+                                    # Đợi 1 chút để người khác react emoji event
+                                    time.sleep(5)
+                                    full_msg_obj = bot.getMessage(cid, mid).json()
+                                    if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0: full_msg_obj = full_msg_obj[0]
+                                    if 'reactions' in full_msg_obj and any(r['emoji']['name'] == '🍉' for r in full_msg_obj['reactions']):
+                                        print(f"[EVENT GRAB | FARM: {target_server['name']}] Phát hiện dưa hấu! Bot 1 nhặt.", flush=True)
+                                        bot.addReaction(cid, mid, "🍉")
+                                except Exception as e:
+                                    print(f"Lỗi khi kiểm tra event farm: {e}", flush=True)
+                            
+                            # Gọi hàm kiểm tra event trong một luồng riêng để không làm chậm quá trình grab thẻ
+                            threading.Thread(target=check_farm_event_grab, args=(channel_id, last_drop_msg_id)).start()
+
+                    except Exception as e:
+                        print(f"Lỗi trong bộ điều phối farm trung tâm: {e}", flush=True)
+
+                threading.Thread(target=central_farm_handler).start()
 
                     except Exception as e:
                         print(f"Lỗi trong bộ điều phối farm trung tâm: {e}", flush=True)
