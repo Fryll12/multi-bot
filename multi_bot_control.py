@@ -82,9 +82,7 @@ def save_settings():
 
     settings = {
         'auto_grab_enabled': auto_grab_enabled, 'heart_threshold': heart_threshold,
-        'auto_grab_enabled_2': auto_grab_enabled_2, 'heart_threshold_2': heart_threshold_2,
-        'auto_grab_enabled_3': auto_grab_enabled_3, 'heart_threshold_3': heart_threshold_3,
-        'auto_grab_enabled_4': auto_grab_enabled_4, 'heart_threshold_4': heart_threshold_4,
+        'auto_grab_enabled_extra': auto_grab_enabled_extra, 'heart_threshold_extra': heart_threshold_extra,
         'event_grab_enabled': event_grab_enabled,
         'spam_enabled': spam_enabled, 'spam_message': spam_message, 'spam_delay': spam_delay,
         'auto_work_enabled': auto_work_enabled, 'work_delay_between_acc': work_delay_between_acc, 'work_delay_after_all': work_delay_after_all,
@@ -135,6 +133,9 @@ def load_settings():
             settings = req.json().get("record", {})
             if settings: # Chỉ load nếu bin không rỗng
                 globals().update(settings)
+                global auto_grab_enabled_extra, heart_threshold_extra
+                auto_grab_enabled_extra = settings.get('auto_grab_enabled_extra', False)
+                heart_threshold_extra = settings.get('heart_threshold_extra', 10)
                 global event_grab_enabled
                 event_grab_enabled = settings.get('event_grab_enabled', False)
                 print("[Settings] Đã tải cài đặt từ JSONBin.io.", flush=True)
@@ -600,7 +601,7 @@ def create_bot(token, bot_type='sub', bot_name='Sub Account'):
                         emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
 
                         for bot_info in bots_to_check:
-                            if bot_info["enabled"] and bot_info["instance"] and max_num >= bot_info["threshold"]:
+                            if bot_info["instance"] and max_num >= bot_info["threshold"]:
                                 def grab_action(target_bot, target_ktb_channel, b_info):
                                     print(f"[FARM DISPATCHER] Lệnh grab cho {b_info['name']} tại farm '{target_server['name']}'", flush=True)
                                     target_bot.addReaction(channel_id, last_drop_msg_id, emoji)
