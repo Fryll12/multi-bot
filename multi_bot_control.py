@@ -628,12 +628,6 @@ def create_bot(token, bot_type='sub', bot_name='Sub Account'):
                             
                             # Gọi hàm kiểm tra event trong một luồng riêng để không làm chậm quá trình grab thẻ
                             threading.Thread(target=check_farm_event_grab, args=(channel_id, last_drop_msg_id)).start()
-
-                    except Exception as e:
-                        print(f"Lỗi trong bộ điều phối farm trung tâm: {e}", flush=True)
-
-                threading.Thread(target=central_farm_handler).start()
-
                     except Exception as e:
                         print(f"Lỗi trong bộ điều phối farm trung tâm: {e}", flush=True)
 
