@@ -1086,10 +1086,18 @@ HTML_TEMPLATE = """
                 
             <div class="panel blood-panel">
                 <h2 data-text="Soul Harvest"><i class="fas fa-crosshairs"></i> Soul Harvest</h2>
-                <div class="grab-section"><h3>ALPHA NODE <span id="harvest-status-1" class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-1" value="{{ heart_threshold }}" min="0"><button type="button" id="harvest-toggle-1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
-                <div class="grab-section"><h3>BETA NODE <span id="harvest-status-2" class="status-badge {{ grab_status_2 }}">{{ grab_text_2 }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-2" value="{{ heart_threshold_2 }}" min="0"><button type="button" id="harvest-toggle-2" class="btn {{ grab_button_class_2 }}">{{ grab_action_2 }}</button></div></div>
-                <div class="grab-section"><h3>GAMMA NODE <span id="harvest-status-3" class="status-badge {{ grab_status_3 }}">{{ grab_text_3 }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-3" value="{{ heart_threshold_3 }}" min="0"><button type="button" id="harvest-toggle-3" class="btn {{ grab_button_class_3 }}">{{ grab_action_3 }}</button></div></div>
-                <div class="grab-section"><h3>DELTA NODE <span id="harvest-status-4" class="status-badge {{ grab_status_4 }}">{{ grab_text_4 }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-4" value="{{ heart_threshold_4 }}" min="0"><button type="button" id="harvest-toggle-4" class="btn {{ grab_button_class_4 }}">{{ grab_action_4 }}</button></div></div>
+            
+                <div class="grab-section"><h3>ALPHA NODE <span id="harvest-status-1" class="status-badge {{ grab_status }}">{{ grab_text }}</span></h3><div class="input-group"><input type="number" id="heart-threshold-1" value="{{ heart_threshold }}" min="0"><button type="button" id="harvest-toggle-1" data-node="1" class="btn {{ grab_button_class }}">{{ grab_action }}</button></div></div>
+            
+                {% for panel in extra_main_panels %}
+                <div class="grab-section">
+                    <h3>{{ panel.name }} NODE <span id="harvest-status-{{ panel.num }}" class="status-badge {{ panel.status }}">{{ panel.text }}</span></h3>
+                    <div class="input-group">
+                        <input type="number" id="heart-threshold-{{ panel.num }}" value="{{ panel.threshold }}" min="0">
+                        <button type="button" id="harvest-toggle-{{ panel.num }}" data-node="{{ panel.num }}" class="{{ panel.btn_class }}">{{ panel.action }}</button>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
 
             <div class="panel ops-panel">
@@ -1221,16 +1229,25 @@ HTML_TEMPLATE = """
             
             <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
                 <div style="display: flex; flex-direction:column; gap: 10px;">
-                    {% for i in range(1, 5) %}
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <span style="font-family: 'Orbitron';">{{ ['ALPHA', 'BETA', 'GAMMA', 'DELTA'][i-1] }}</span>
+                        <span style="font-family: 'Orbitron';">ALPHA</span>
                         <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
-                            <input type="number" class="farm-harvest-threshold" data-node="{{ i }}" value="{{ server['heart_threshold_' ~ i] or 50 }}" min="0">
-                            <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="{{ i }}">{{ 'TẮT' if server['auto_grab_enabled_' ~ i] else 'BẬT' }}</button>
+                            <input type="number" class="farm-harvest-threshold" data-node="1" value="{{ server['heart_threshold_1'] or 15 }}" min="0">
+                            <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="1">{{ 'TẮT' if server['auto_grab_enabled_1'] else 'BẬT' }}</button>
+                        </div>
+                    </div>
+                    {% for bot in main_bots_list %}
+                    {% set bot_num = loop.index + 1 %}
+                    {% set bot_name = GREEK_ALPHABET[loop.index0] if loop.index0 < GREEK_ALPHABET|length else "Main " + bot_num %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <span style="font-family: 'Orbitron';">{{ bot_name.upper() }}</span>
+                        <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
+                            <input type="number" class="farm-harvest-threshold" data-node="{{ bot_num }}" value="{{ server['heart_threshold_' ~ bot_num] or 50 }}" min="0">
+                            <button type="button" class="btn btn-sm farm-harvest-toggle" data-node="{{ bot_num }}">{{ 'TẮT' if server['auto_grab_enabled_' ~ bot_num] else 'BẬT' }}</button>
                         </div>
                     </div>
                     {% endfor %}
-                </div>
+                </div>   
             </div>
 
             <div style="padding-top: 15px; margin-top: 15px; border-top: 1px solid #444;">
@@ -1372,9 +1389,12 @@ HTML_TEMPLATE = """
 
         // --- Event Listeners for Buttons ---
 
-        document.getElementById('sync-all-farms-btn').addEventListener('click', () => {
-            // Chỉ cần gọi API mới đã tạo, không cần gửi dữ liệu gì thêm
-            postData('/api/farm/sync_harvest_all', {}); 
+        document.querySelector('.blood-panel').addEventListener('click', function(e) {
+            if (e.target && e.target.matches('button[id^="harvest-toggle-"]')) {
+                const nodeNum = e.target.id.split('-')[2];
+                const threshold = document.getElementById(`heart-threshold-${nodeNum}`).value;
+                postData('/api/harvest_toggle', { node: parseInt(nodeNum), threshold: threshold });
+            }
         });
         // Soul Harvest
         document.getElementById('harvest-toggle-1').addEventListener('click', () => postData('/api/harvest_toggle', { node: 1, threshold: document.getElementById('heart-threshold-1').value }));
@@ -1492,13 +1512,36 @@ HTML_TEMPLATE = """
 """
 
 # --- FLASK ROUTES ---
+# DÁN TOÀN BỘ HÀM NÀY VÀO
 @app.route("/")
 def index():
-    # This function is now very simple. It just prepares the data for the initial render.
-    grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn btn-necro")
-    grab_status_2, grab_text_2, grab_action_2, grab_button_class_2 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_2 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
-    grab_status_3, grab_text_3, grab_action_3, grab_button_class_3 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_3 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
-    grab_status_4, grab_text_4, grab_action_4, grab_button_class_4 = ("active", "ON", "DISABLE", "btn btn-blood") if auto_grab_enabled_4 else ("inactive", "OFF", "ENABLE", "btn btn-necro")
+    # --- Xử lý cho Bot Alpha ---
+    grab_status, grab_text, grab_action, grab_button_class = ("active", "ON", "DISABLE", "btn-blood") if auto_grab_enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
+    
+    ## --- PHẦN TỰ ĐỘNG TẠO PANEL CHO CÁC BOT MAIN PHỤ ---
+    extra_main_panels = []
+    for i, bot in enumerate(extra_main_bots):
+        bot_num = i + 2
+        bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
+        
+        # Lấy trạng thái chung của các bot main phụ. Lưu ý: các nút này sẽ BẬT/TẮT CÙNG NHAU trên UI chính.
+        # Việc BẬT/TẮT riêng lẻ cho từng bot sẽ được thực hiện trong từng farm.
+        is_enabled = auto_grab_enabled_extra
+        threshold = heart_threshold_extra
+
+        status, text, action, btn_class = ("active", "ON", "DISABLE", "btn-blood") if is_enabled else ("inactive", "OFF", "ENABLE", "btn-necro")
+
+        extra_main_panels.append({
+            "num": bot_num,
+            "name": bot_name.upper(),
+            "status": status,
+            "text": text,
+            "action": action,
+            "btn_class": f"btn {btn_class}",
+            "threshold": threshold
+        })
+
+    # --- Các trạng thái khác ---
     event_grab_action, event_grab_button_class = ("DISABLE", "btn-blood") if event_grab_enabled else ("ENABLE", "btn-necro")
     spam_action, spam_button_class = ("DISABLE", "btn-blood") if spam_enabled else ("ENABLE", "btn-necro")
     work_action, work_button_class = ("DISABLE", "btn-blood") if auto_work_enabled else ("ENABLE", "btn-necro")
@@ -1506,27 +1549,29 @@ def index():
     kvi_action, kvi_button_class = ("DISABLE", "btn-blood") if auto_kvi_enabled else ("ENABLE", "btn-necro")
     reboot_action, reboot_button_class = ("DISABLE", "btn-blood") if auto_reboot_enabled else ("ENABLE", "btn-necro")
     
+    ## --- PHẦN TỰ ĐỘNG TẠO NÚT BẤM VÀ TÙY CHỌN ---
     acc_options = "".join(f'<option value="{i}">{name}</option>' for i, name in enumerate(acc_names[:len(bots)]))
     if main_bot: acc_options += '<option value="main_1">ALPHA NODE (Main)</option>'
-# Tạo tùy chọn và nút bấm reboot cho các bot main phụ một cách tự động
-    for i, bot in enumerate(extra_main_bots):
-        bot_num = i + 2
-        bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
-        acc_options += f'<option value="main_{bot_num}">{bot_name.upper()} NODE (Main)</option>'
-    
-    sub_account_buttons = "".join(f'<button type="button" data-reboot-target="sub_{i}" class="btn btn-necro btn-sm">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
+
+    sub_account_buttons = "" # Khởi tạo chuỗi rỗng
 
     # Thêm nút reboot cho các bot main phụ
     for i, bot in enumerate(extra_main_bots):
         bot_num = i + 2
         bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
+        acc_options += f'<option value="main_{bot_num}">{bot_name.upper()} NODE (Main)</option>'
         sub_account_buttons += f'<button type="button" data-reboot-target="main_{bot_num}" class="btn btn-necro btn-sm">{bot_name.upper()}</button>'
 
+    # Thêm nút reboot cho các bot sub
+    sub_account_buttons += "".join(f'<button type="button" data-reboot-target="sub_{i}" class="btn btn-necro btn-sm">{name}</button>' for i, name in enumerate(acc_names[:len(bots)]))
+
+
     return render_template_string(HTML_TEMPLATE, 
+        # Panel Alpha
         grab_status=grab_status, grab_text=grab_text, grab_action=grab_action, grab_button_class=grab_button_class, heart_threshold=heart_threshold,
-        grab_status_2=grab_status_2, grab_text_2=grab_text_2, grab_action_2=grab_action_2, grab_button_class_2=grab_button_class_2, heart_threshold_2=heart_threshold_2,
-        grab_status_3=grab_status_3, grab_text_3=grab_text_3, grab_action_3=grab_action_3, grab_button_class_3=grab_button_class_3, heart_threshold_3=heart_threshold_3,
-        grab_status_4=grab_status_4, grab_text_4=grab_text_4, grab_action_4=grab_action_4, grab_button_class_4=grab_button_class_4, heart_threshold_4=heart_threshold_4,
+        # Danh sách các panel main phụ
+        extra_main_panels=extra_main_panels,
+        # Các panel khác
         event_grab_action=event_grab_action,
         event_grab_button_class=event_grab_button_class,
         spam_message=spam_message, spam_delay=spam_delay, spam_action=spam_action, spam_button_class=spam_button_class,
@@ -1534,6 +1579,7 @@ def index():
         daily_delay_between_acc=daily_delay_between_acc, daily_delay_after_all=daily_delay_after_all, daily_action=daily_action, daily_button_class=daily_button_class,
         kvi_click_count=kvi_click_count, kvi_click_delay=kvi_click_delay, kvi_loop_delay=kvi_loop_delay, kvi_action=kvi_action, kvi_button_class=kvi_button_class, kvi_target_account=kvi_target_account,
         auto_reboot_delay=auto_reboot_delay, reboot_action=reboot_action, reboot_button_class=reboot_button_class,
+        main_bots_list=extra_main_bots,
         acc_options=acc_options, sub_account_buttons=sub_account_buttons, farm_servers=farm_servers
     )
 @app.route("/api/farm/add", methods=['POST'])
@@ -1639,15 +1685,22 @@ def api_event_grab_toggle():
     
 @app.route("/api/harvest_toggle", methods=['POST'])
 def api_harvest_toggle():
-    global auto_grab_enabled, heart_threshold, auto_grab_enabled_2, heart_threshold_2, auto_grab_enabled_3, heart_threshold_3, auto_grab_enabled_4, heart_threshold_4
+    global auto_grab_enabled, heart_threshold, auto_grab_enabled_extra, heart_threshold_extra
     data = request.get_json()
-    node = data.get('node')
+    node = int(data.get('node'))
     threshold = int(data.get('threshold', 50))
     msg = ""
-    if node == 1: auto_grab_enabled = not auto_grab_enabled; heart_threshold = threshold; msg = f"Auto Grab 1 was {'ENABLED' if auto_grab_enabled else 'DISABLED'}"
-    elif node == 2: auto_grab_enabled_2 = not auto_grab_enabled_2; heart_threshold_2 = threshold; msg = f"Auto Grab 2 was {'ENABLED' if auto_grab_enabled_2 else 'DISABLED'}"
-    elif node == 3: auto_grab_enabled_3 = not auto_grab_enabled_3; heart_threshold_3 = threshold; msg = f"Auto Grab 3 was {'ENABLED' if auto_grab_enabled_3 else 'DISABLED'}"
-    elif node == 4: auto_grab_enabled_4 = not auto_grab_enabled_4; heart_threshold_4 = threshold; msg = f"Auto Grab 4 was {'ENABLED' if auto_grab_enabled_4 else 'DISABLED'}"
+    if node == 1: 
+        auto_grab_enabled = not auto_grab_enabled
+        heart_threshold = threshold
+        msg = f"Auto Grab ALPHA was {'ENABLED' if auto_grab_enabled else 'DISABLED'}"
+    else:
+        # Đây là công tắc chung cho TẤT CẢ các node phụ (Beta, Gamma...) trên UI chính
+        auto_grab_enabled_extra = not auto_grab_enabled_extra
+        heart_threshold_extra = threshold
+        state_text = 'BẬT' if auto_grab_enabled_extra else 'TẮT'
+        msg = f"Auto Grab cho các NODE main phụ đã được {state_text} (cài đặt chung)."
+
     save_settings()
     return jsonify({'status': 'success', 'message': msg})
 
