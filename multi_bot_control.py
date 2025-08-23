@@ -1238,7 +1238,7 @@ HTML_TEMPLATE = """
                     </div>
                     {% for bot in main_bots_list %}
                     {% set bot_num = loop.index + 1 %}
-                    {% set bot_name = GREEK_ALPHABET[loop.index0] if loop.index0 < GREEK_ALPHABET|length else "Main " + bot_num %}
+                    {% set bot_name = GREEK_ALPHABET[loop.index0] if loop.index0 < GREEK_ALPHABET|length else "Main " ~ bot_num %}
                     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                         <span style="font-family: 'Orbitron';">{{ bot_name.upper() }}</span>
                         <div class="input-group" style="margin: 0; flex-grow: 1; margin-left: 10px;">
