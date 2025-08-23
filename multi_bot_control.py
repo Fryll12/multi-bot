@@ -1349,14 +1349,12 @@ HTML_TEMPLATE = """
                 className: `btn ${data.ui_states.event_grab_button_class}` 
                 });
 
+                // Cập nhật cho nút Alpha
                 updateElement('harvest-toggle-1', { textContent: data.ui_states.grab_action, className: `btn ${data.ui_states.grab_button_class}` });
                 updateElement('harvest-status-1', { textContent: data.ui_states.grab_text, className: `status-badge ${data.ui_states.grab_status}` });
-                updateElement('harvest-toggle-2', { textContent: data.ui_states.grab_action_2, className: `btn ${data.ui_states.grab_button_class_2}` });
-                updateElement('harvest-status-2', { textContent: data.ui_states.grab_text_2, className: `status-badge ${data.ui_states.grab_status_2}` });
-                updateElement('harvest-toggle-3', { textContent: data.ui_states.grab_action_3, className: `btn ${data.ui_states.grab_button_class_3}` });
-                updateElement('harvest-status-3', { textContent: data.ui_states.grab_text_3, className: `status-badge ${data.ui_states.grab_status_3}` });
-                updateElement('harvest-toggle-4', { textContent: data.ui_states.grab_action_4, className: `btn ${data.ui_states.grab_button_class_4}` });
-                updateElement('harvest-status-4', { textContent: data.ui_states.grab_text_4, className: `status-badge ${data.ui_states.grab_status_4}` });
+                // Cập nhật cho nút chung Extra Nodes
+                updateElement('harvest-toggle-2', { textContent: data.ui_states.action_extra, className: `btn ${data.ui_states.btn_class_extra}` });
+                updateElement('harvest-status-2', { textContent: data.ui_states.text_extra, className: `status-badge ${data.ui_states.status_extra}` });
                 updateElement('auto-work-toggle-btn', { textContent: `${data.ui_states.work_action} WORK`, className: `btn ${data.ui_states.work_button_class}` });
                 updateElement('auto-daily-toggle-btn', { textContent: `${data.ui_states.daily_action} DAILY`, className: `btn ${data.ui_states.daily_button_class}` });
                 updateElement('auto-reboot-toggle-btn', { textContent: `${data.ui_states.reboot_action} AUTO REBOOT`, className: `btn ${data.ui_states.reboot_button_class}` });
@@ -1883,9 +1881,10 @@ def status():
     
     ui_states = {
         "grab_status": "active" if auto_grab_enabled else "inactive", "grab_text": "ON" if auto_grab_enabled else "OFF", "grab_action": "DISABLE" if auto_grab_enabled else "ENABLE", "grab_button_class": "btn-blood" if auto_grab_enabled else "btn-necro",
-        "grab_status_2": "active" if auto_grab_enabled_2 else "inactive", "grab_text_2": "ON" if auto_grab_enabled_2 else "OFF", "grab_action_2": "DISABLE" if auto_grab_enabled_2 else "ENABLE", "grab_button_class_2": "btn-blood" if auto_grab_enabled_2 else "btn-necro",
-        "grab_status_3": "active" if auto_grab_enabled_3 else "inactive", "grab_text_3": "ON" if auto_grab_enabled_3 else "OFF", "grab_action_3": "DISABLE" if auto_grab_enabled_3 else "ENABLE", "grab_button_class_3": "btn-blood" if auto_grab_enabled_3 else "btn-necro",
-        "grab_status_4": "active" if auto_grab_enabled_4 else "inactive", "grab_text_4": "ON" if auto_grab_enabled_4 else "OFF", "grab_action_4": "DISABLE" if auto_grab_enabled_4 else "ENABLE", "grab_button_class_4": "btn-blood" if auto_grab_enabled_4 else "btn-necro",
+        "status_extra": "active" if auto_grab_enabled_extra else "inactive",
+        "text_extra": "ON" if auto_grab_enabled_extra else "OFF",
+        "action_extra": "DISABLE" if auto_grab_enabled_extra else "ENABLE",
+        "btn_class_extra": "btn-blood" if auto_grab_enabled_extra else "btn-necro",
         "spam_action": "DISABLE" if spam_enabled else "ENABLE", "spam_button_class": "btn-blood" if spam_enabled else "btn-necro",
         "work_action": "DISABLE" if auto_work_enabled else "ENABLE", "work_button_class": "btn-blood" if auto_work_enabled else "btn-necro",
         "daily_action": "DISABLE" if auto_daily_enabled else "ENABLE", "daily_button_class": "btn-blood" if auto_daily_enabled else "btn-necro",
