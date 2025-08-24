@@ -560,78 +560,71 @@ def create_bot(token, bot_type='sub', bot_name='Sub Account'):
             if auto_kvi_enabled and kvi_target_account == 'Alpha' and channel_id == kvi_channel_id:
                 handle_kvi_message(bot, msg, main_token)
                 
-            # --- 3. BỘ ĐIỀU PHỐI FARM TRUNG TÂM (PHIÊN BẢN ĐỘNG) ---
+           # --- 3. BỘ ĐIỀU PHỐI FARM TRUNG TÂM (PHIÊN BẢN TỐI ƯU HÓA) ---
             target_server = next((s for s in farm_servers if s.get('main_channel_id') == channel_id), None)
             
             if target_server and msg.get("author", {}).get("id") == karuta_id and 'dropping 3' in msg.get("content", ""):
                 last_drop_msg_id = msg["id"]
                 
-                def central_farm_handler():
+                # Hàm này sẽ chạy trong một luồng riêng để không làm block gateway
+                def optimized_farm_handler(cid, mid, server_config):
                     try:
-                        time.sleep(0.6)
-                        messages = bot.getMessages(channel_id, num=5).json()
+                        # Chờ Yoru bot phản hồi
+                        time.sleep(0.7)
+                        
+                        messages = bot.getMessages(cid, num=5).json()
                         yoru_msg_desc = next((item["embeds"][0].get("description", "") for item in messages if item.get("author", {}).get("id") == yoru_bot_id and item.get("embeds")), None)
                         
-                        if not yoru_msg_desc: return
+                        if yoru_msg_desc:
+                            lines = yoru_msg_desc.split('\n')
+                            heart_numbers = [int(match.group(1)) if (match := re.search(r'♡(\d+)', line)) else 0 for line in lines[:3]]
+                            if any(heart_numbers):
+                                bots_to_check = []
+                                # Kiểm tra cho Alpha (Node 1)
+                                if server_config.get('auto_grab_enabled_1', False):
+                                    bots_to_check.append({
+                                        "name": "Alpha", "instance": main_bot,
+                                        "threshold": int(server_config.get('heart_threshold_1', heart_threshold))
+                                    })
+                                # Kiểm tra cho tất cả các bot phụ bằng công tắc chung
+                                if server_config.get('auto_grab_enabled_extra', False):
+                                    threshold_extra_farm = int(server_config.get('heart_threshold_extra', heart_threshold_extra))
+                                    for i, bot_instance in enumerate(extra_main_bots):
+                                        bot_name_greek = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {i + 2}"
+                                        bots_to_check.append({
+                                            "name": bot_name_greek, "instance": bot_instance,
+                                            "threshold": threshold_extra_farm
+                                        })
 
-                        lines = yoru_msg_desc.split('\n')
-                        heart_numbers = [int(match.group(1)) if (match := re.search(r'♡(\d+)', line)) else 0 for line in lines[:3]]
-                        if not any(heart_numbers): return
-                
-                        bots_to_check = []                        
-                        # Kiểm tra cho Alpha (Node 1)
-                        if target_server.get('auto_grab_enabled_1', False):
-                            bots_to_check.append({
-                                "name": "Alpha", "instance": main_bot,
-                                "threshold": int(target_server.get('heart_threshold_1', heart_threshold))
-                            })
-                        
-                        # Kiểm tra cho tất cả các bot phụ bằng công tắc chung
-                        if target_server.get('auto_grab_enabled_extra', False):
-                            threshold_extra_farm = int(target_server.get('heart_threshold_extra', heart_threshold_extra))
-                            for i, bot_instance in enumerate(extra_main_bots):
-                                bot_name_greek = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {i + 2}"
-                                bots_to_check.append({
-                                    "name": bot_name_greek, "instance": bot_instance,
-                                    "threshold": threshold_extra_farm
-                                })
+                                max_num = max(heart_numbers)
+                                max_index = heart_numbers.index(max_num)
+                                emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
 
-                        max_num = max(heart_numbers)
-                        max_index = heart_numbers.index(max_num)
-                        emoji = ["1️⃣", "2️⃣", "3️⃣"][max_index]
+                                for bot_info in bots_to_check:
+                                    if bot_info["instance"] and max_num >= bot_info["threshold"]:
+                                        def grab_action(target_bot, target_ktb, b_info):
+                                            print(f"[FARM DISPATCHER] Lệnh grab cho {b_info['name']} tại farm '{server_config['name']}'", flush=True)
+                                            target_bot.addReaction(cid, mid, emoji)
+                                            if target_ktb:
+                                                time.sleep(2)
+                                                target_bot.sendMessage(target_ktb, "kt b")
+                                        
+                                        delay = random.uniform(0.5, 1.5)
+                                        threading.Timer(delay, grab_action, args=(bot_info["instance"], server_config.get('ktb_channel_id'), bot_info)).start()
 
-                        for bot_info in bots_to_check:
-                            if bot_info["instance"] and max_num >= bot_info["threshold"]:
-                                def grab_action(target_bot, target_ktb_channel, b_info):
-                                    print(f"[FARM DISPATCHER] Lệnh grab cho {b_info['name']} tại farm '{target_server['name']}'", flush=True)
-                                    target_bot.addReaction(channel_id, last_drop_msg_id, emoji)
-                                    if target_ktb_channel:
-                                        time.sleep(2)
-                                        target_bot.sendMessage(target_ktb_channel, "kt b")
-                                
-                                delay = random.uniform(0.5, 1.5)
-                                threading.Timer(delay, grab_action, args=(bot_info["instance"], target_server.get('ktb_channel_id'), bot_info)).start()
-                        
-                        # Xử lý Event Grab cho farm (vẫn do Bot 1 đảm nhiệm)
+                        # Tích hợp luôn việc check event vào đây để không tạo thêm thread
                         if event_grab_enabled:
-                            def check_farm_event_grab(cid, mid):
-                                try:
-                                    # Đợi 1 chút để người khác react emoji event
-                                    time.sleep(5)
-                                    full_msg_obj = bot.getMessage(cid, mid).json()
-                                    if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0: full_msg_obj = full_msg_obj[0]
-                                    if 'reactions' in full_msg_obj and any(r['emoji']['name'] == '🍉' for r in full_msg_obj['reactions']):
-                                        print(f"[EVENT GRAB | FARM: {target_server['name']}] Phát hiện dưa hấu! Bot 1 nhặt.", flush=True)
-                                        bot.addReaction(cid, mid, "🍉")
-                                except Exception as e:
-                                    print(f"Lỗi khi kiểm tra event farm: {e}", flush=True)
-                            
-                            # Gọi hàm kiểm tra event trong một luồng riêng để không làm chậm quá trình grab thẻ
-                            threading.Thread(target=check_farm_event_grab, args=(channel_id, last_drop_msg_id)).start()
+                            time.sleep(4.3) # Tổng thời gian chờ sẽ là 0.7 + 4.3 = 5 giây
+                            full_msg_obj = bot.getMessage(cid, mid).json()
+                            if isinstance(full_msg_obj, list) and len(full_msg_obj) > 0: full_msg_obj = full_msg_obj[0]
+                            if 'reactions' in full_msg_obj and any(r['emoji']['name'] == '🍉' for r in full_msg_obj['reactions']):
+                                print(f"[EVENT GRAB | FARM: {server_config['name']}] Phát hiện dưa hấu! Bot 1 nhặt.", flush=True)
+                                bot.addReaction(cid, mid, "🍉")
                     except Exception as e:
-                        print(f"Lỗi trong bộ điều phối farm trung tâm: {e}", flush=True)
+                        print(f"Lỗi trong bộ điều phối farm đã tối ưu: {e}", flush=True)
 
-                threading.Thread(target=central_farm_handler).start()
+                # Chỉ tạo MỘT luồng duy nhất cho toàn bộ quá trình xử lý của drop này
+                threading.Thread(target=optimized_farm_handler, args=(channel_id, last_drop_msg_id, target_server), daemon=True).start()
 
     elif bot_type == 'extra_main':
         @bot.gateway.command
