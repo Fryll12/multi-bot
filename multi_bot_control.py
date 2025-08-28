@@ -607,7 +607,7 @@ def create_bot(token, bot_type='sub', bot_name='Sub Account'):
                                             target_bot.addReaction(cid, mid, emoji)
                                             if target_ktb:
                                                 time.sleep(2)
-                                                target_bot.sendMessage(target_ktb, "kt b")
+                                                target_bot.sendMessage(target_ktb, "kt fs")
                                         
                                         delay = random.uniform(0.5, 1.5)
                                         threading.Timer(delay, grab_action, args=(bot_info["instance"], server_config.get('ktb_channel_id'), bot_info)).start()
