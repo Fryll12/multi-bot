@@ -420,7 +420,7 @@ def handle_farm_grab(bot, msg, bot_num):
                                 def grab_action():
                                     bot.addReaction(channel_id, last_drop_msg_id, emoji)
                                     time.sleep(2)
-                                    bot.sendMessage(ktb_channel_id, "kt b")
+                                    bot.sendMessage(ktb_channel_id, "kt fs")
                                 threading.Timer(delay, grab_action).start()
                             break
                 except Exception as e:
@@ -533,7 +533,7 @@ def create_bot(token, bot_type='sub', bot_name='Sub Account'):
                                             def grab():
                                                 bot.addReaction(main_channel_id, last_drop_msg_id, emoji)
                                                 time.sleep(1)
-                                                bot.sendMessage(ktb_channel_id, "kt b")
+                                                bot.sendMessage(ktb_channel_id, "kt fs")
                                             threading.Timer(delay, grab).start()
                                         break
                             except Exception as e: 
