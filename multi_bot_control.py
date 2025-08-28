@@ -943,7 +943,18 @@ def spam_loop():
         try:
             now = time.time()
             with bots_lock:
-                active_bots = [bot for i, bot in enumerate(bots) if bot and bot_active_states.get(f'sub_{i}', False)]
+                # Tạo một danh sách trống để chứa tất cả các bot sẽ đi spam
+                active_bots = []
+            
+                # Thêm các bot Main phụ (Beta, Gamma,...) nếu chúng đang active
+                for i, bot in enumerate(extra_main_bots):
+                    if bot and bot_active_states.get(f'main_{i+2}', False):
+                        active_bots.append(bot)
+            
+                # Thêm các bot Sub (tài khoản phụ) nếu chúng đang active
+                for i, bot in enumerate(bots):
+                    if bot and bot_active_states.get(f'sub_{i}', False):
+                        active_bots.append(bot)
 
             # --- Điều phối Spam Toàn Cục (GLOBAL) ---
             if spam_enabled and spam_message and spam_channel_id and (now - last_spam_time) >= spam_delay:
