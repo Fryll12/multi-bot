@@ -813,37 +813,32 @@ def run_kvi_bot(token):
     bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
 
 # --- CÁC VÒNG LẶP NỀN (ĐÃ VIẾT LẠI CHO ỔN ĐỊNH) ---
-def auto_work_loop():
-    global last_work_cycle_time
+def auto_daily_loop():
+    global last_daily_cycle_time
     while True:
         try:
-            if auto_work_enabled and (time.time() - last_work_cycle_time) >= work_delay_after_all:
-                print("[Work] Đã đến giờ chạy Auto Work...", flush=True)
-                shared_resource_for_cycle = None
-                work_items = []
-                if main_token_2 and bot_active_states.get('main_2', False): work_items.append({"name": "BETA NODE", "token": main_token_2})
-                if main_token_3 and bot_active_states.get('main_3', False): work_items.append({"name": "GAMMA NODE", "token": main_token_3})
-                if main_token_4 and bot_active_states.get('main_4', False): work_items.append({"name": "DELTA NODE", "token": main_token_4})
+            if auto_daily_enabled and (time.time() - last_daily_cycle_time) >= daily_delay_after_all:
+                print("[Daily] Đã đến giờ chạy Auto Daily...", flush=True)
+                daily_items = []
+            
                 with bots_lock:
-                    sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)]
-                    work_items.extend(sub_account_items)
-                for item in work_items:
-                    if not auto_work_enabled: break
-                    print(f"[Work] Đang chạy acc '{item['name']}'...", flush=True)
-                    # Truyền tài nguyên đã lưu vào hàm, và nhận lại tài nguyên mới nếu có
-                    found_resource = run_work_bot(item['token'].strip(), item['name'], shared_resource=shared_resource_for_cycle)
-                    
-                    # Nếu đây là bot đầu tiên và nó tìm thấy tài nguyên, hãy lưu lại
-                    if found_resource and shared_resource_for_cycle is None:
-                        print(f"✅ [Work] Đã lấy được tài nguyên '{found_resource}' cho chu kỳ này.", flush=True)
-                        shared_resource_for_cycle = found_resource
-                    print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc or 10} giây...", flush=True); time.sleep(work_delay_between_acc or 10)
-                if auto_work_enabled:
-                    print(f"[Work] Hoàn thành chu kỳ.", flush=True)
-                    last_work_cycle_time = time.time();
+                    # Thêm các bot Main phụ
+                    for i, token in enumerate(extra_main_tokens):
+                        bot_num = i + 2
+                        if token.strip() and bot_active_states.get(f'main_{bot_num}', False):
+                            bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
+                            daily_items.append({"name": f"{bot_name.upper()} NODE", "token": token.strip()})
+                    daily_items.extend([{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)])
+                
+                for item in daily_items:
+                    if not auto_daily_enabled: break
+                    print(f"[Daily] Đang chạy acc '{item['name']}'...", flush=True); run_daily_bot(item['token'].strip(), item['name']); print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...", flush=True); time.sleep(daily_delay_between_acc)
+                if auto_daily_enabled:
+                    print(f"[Daily] Hoàn thành chu kỳ.", flush=True)
+                    last_daily_cycle_time = time.time();
             time.sleep(60)
         except Exception as e:
-            print(f"[ERROR in auto_work_loop] {e}", flush=True); time.sleep(60)
+            print(f"[ERROR in auto_daily_loop] {e}", flush=True); time.sleep(60)
 
 def auto_daily_loop():
     global last_daily_cycle_time
@@ -1733,46 +1728,57 @@ def api_manual_ops_main():
     data = request.get_json()
     msg_to_send = data.get('message')
     msg = "No message provided for main accounts."
+    
     if msg_to_send:
         delay = 0
-        # Gửi tin nhắn đến Acc 2 nếu đang hoạt động
-        if main_bot_2 and bot_active_states.get('main_2', False):
-            threading.Timer(delay, main_bot_2.sendMessage, args=(other_channel_id, msg_to_send)).start()
-            delay += 2 # Thêm độ trễ 2 giây cho acc tiếp theo
-        
-        # Gửi tin nhắn đến Acc 3 nếu đang hoạt động
-        if main_bot_3 and bot_active_states.get('main_3', False):
-            threading.Timer(delay, main_bot_3.sendMessage, args=(other_channel_id, msg_to_send)).start()
-            delay += 2
-            
-        # Gửi tin nhắn đến Acc 4 nếu đang hoạt động
-        if main_bot_4 and bot_active_states.get('main_4', False):
-            threading.Timer(delay, main_bot_4.sendMessage, args=(other_channel_id, msg_to_send)).start()
-            
-        msg = f"Sent to Main Accounts (2,3,4): {msg_to_send}"
+        sent_count = 0
+        with bots_lock:
+            for i, bot in enumerate(extra_main_bots):
+                bot_num = i + 2
+                if bot and bot_active_states.get(f'main_{bot_num}', False):
+                    threading.Timer(delay, bot.sendMessage, args=(other_channel_id, msg_to_send)).start()
+                    delay += 2  # Thêm độ trễ 2 giây cho acc tiếp theo
+                    sent_count += 1
+        msg = f"Sent to {sent_count} active main account(s): {msg_to_send}"
         
     return jsonify({'status': 'success', 'message': msg})
     
 @app.route("/api/inject_codes", methods=['POST'])
 def api_inject_codes():
-    global main_bot, main_bot_2, main_bot_3, main_bot_4, bots
+    global main_bot, extra_main_bots, bots # Chỉ cần extra_main_bots
     try:
         data = request.get_json()
-        target_id_str, delay_val, prefix, codes_list = data.get("acc_index"), float(data.get("delay", 1.0)), data.get("prefix", ""), [c.strip() for c in data.get("codes", "").split(',') if c.strip()]
+        target_id_str = data.get("acc_index")
+        delay_val = float(data.get("delay", 1.0))
+        prefix = data.get("prefix", "")
+        codes_list = [c.strip() for c in data.get("codes", "").split(',') if c.strip()]
+        
         target_bot, target_name = None, ""
-        if target_id_str == 'main_1': target_bot, target_name = main_bot, "ALPHA"
-        elif target_id_str == 'main_2': target_bot, target_name = main_bot_2, "BETA"
-        elif target_id_str == 'main_3': target_bot, target_name = main_bot_3, "GAMMA"
-        elif target_id_str == 'main_4': target_bot, target_name = main_bot_4, "DELTA"
+        
+        if target_id_str == 'main_1':
+            target_bot, target_name = main_bot, "ALPHA"
+        elif target_id_str.startswith('main_'):
+            try:
+                list_index = int(target_id_str.split('_')[1]) - 2
+                if 0 <= list_index < len(extra_main_bots):
+                    target_bot = extra_main_bots[list_index]
+                    target_name = GREEK_ALPHABET[list_index] if list_index < len(GREEK_ALPHABET) else f"Main {list_index + 2}"
+            except (ValueError, IndexError):
+                pass 
         else:
             acc_idx = int(target_id_str)
-            if acc_idx < len(bots): target_bot, target_name = bots[acc_idx], acc_names[acc_idx]
+            if acc_idx < len(bots):
+                target_bot, target_name = bots[acc_idx], acc_names[acc_idx]
+
         if target_bot:
             with bots_lock:
-                for i, code in enumerate(codes_list): threading.Timer(delay_val * i, target_bot.sendMessage, args=(other_channel_id, f"{prefix} {code}" if prefix else code)).start()
+                for i, code in enumerate(codes_list):
+                    threading.Timer(delay_val * i, target_bot.sendMessage, args=(other_channel_id, f"{prefix} {code}" if prefix else code)).start()
             msg = f"Injecting {len(codes_list)} codes to '{target_name}'."
-        else: msg = "Error: Invalid account selected for injection."
-    except Exception as e: msg = f"Code Injection Error: {e}"
+        else:
+            msg = "Error: Invalid account selected for injection."
+    except Exception as e:
+        msg = f"Code Injection Error: {e}"
     return jsonify({'status': 'success', 'message': msg})
 
 @app.route("/api/labor_toggle", methods=['POST'])
