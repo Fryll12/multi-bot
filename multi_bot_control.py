@@ -812,33 +812,44 @@ def run_kvi_bot(token):
     while state["step"] != 2 and time.time() < timeout: time.sleep(0.5)
     bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
 
-# --- CÁC VÒNG LẶP NỀN (ĐÃ VIẾT LẠI CHO ỔN ĐỊNH) ---
-def auto_daily_loop():
-    global last_daily_cycle_time
+def auto_work_loop():
+    global last_work_cycle_time
     while True:
         try:
-            if auto_daily_enabled and (time.time() - last_daily_cycle_time) >= daily_delay_after_all:
-                print("[Daily] Đã đến giờ chạy Auto Daily...", flush=True)
-                daily_items = []
-            
+            if auto_work_enabled and (time.time() - last_work_cycle_time) >= work_delay_after_all:
+                print("[Work] Đã đến giờ chạy Auto Work...", flush=True)
+                shared_resource_for_cycle = None
+                work_items = []
+                
+                # --- PHẦN THAY ĐỔI ---
+                # Thêm các bot Main phụ vào danh sách làm việc
                 with bots_lock:
-                    # Thêm các bot Main phụ
                     for i, token in enumerate(extra_main_tokens):
                         bot_num = i + 2
                         if token.strip() and bot_active_states.get(f'main_{bot_num}', False):
                             bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
-                            daily_items.append({"name": f"{bot_name.upper()} NODE", "token": token.strip()})
-                    daily_items.extend([{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)])
+                            work_items.append({"name": f"{bot_name.upper()} NODE", "token": token.strip()})
                 
-                for item in daily_items:
-                    if not auto_daily_enabled: break
-                    print(f"[Daily] Đang chạy acc '{item['name']}'...", flush=True); run_daily_bot(item['token'].strip(), item['name']); print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...", flush=True); time.sleep(daily_delay_between_acc)
-                if auto_daily_enabled:
-                    print(f"[Daily] Hoàn thành chu kỳ.", flush=True)
-                    last_daily_cycle_time = time.time();
+                    # Thêm các bot phụ (không thay đổi)
+                    sub_account_items = [{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)]
+                    work_items.extend(sub_account_items)
+                # --- KẾT THÚC THAY ĐỔI ---
+
+                for item in work_items:
+                    if not auto_work_enabled: break
+                    print(f"[Work] Đang chạy acc '{item['name']}'...", flush=True)
+                    found_resource = run_work_bot(item['token'].strip(), item['name'], shared_resource=shared_resource_for_cycle)
+                    
+                    if found_resource and shared_resource_for_cycle is None:
+                        print(f"✅ [Work] Đã lấy được tài nguyên '{found_resource}' cho chu kỳ này.", flush=True)
+                        shared_resource_for_cycle = found_resource
+                    print(f"[Work] Acc '{item['name']}' xong, chờ {work_delay_between_acc or 10} giây...", flush=True); time.sleep(work_delay_between_acc or 10)
+                if auto_work_enabled:
+                    print(f"[Work] Hoàn thành chu kỳ.", flush=True)
+                    last_work_cycle_time = time.time();
             time.sleep(60)
         except Exception as e:
-            print(f"[ERROR in auto_daily_loop] {e}", flush=True); time.sleep(60)
+            print(f"[ERROR in auto_work_loop] {e}", flush=True); time.sleep(60)
 
 def auto_daily_loop():
     global last_daily_cycle_time
