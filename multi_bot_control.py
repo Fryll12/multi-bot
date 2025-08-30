@@ -858,14 +858,25 @@ def auto_daily_loop():
             if auto_daily_enabled and (time.time() - last_daily_cycle_time) >= daily_delay_after_all:
                 print("[Daily] Đã đến giờ chạy Auto Daily...", flush=True)
                 daily_items = []
-                if main_token_2 and bot_active_states.get('main_2', False): daily_items.append({"name": "BETA NODE", "token": main_token_2})
-                if main_token_3 and bot_active_states.get('main_3', False): daily_items.append({"name": "GAMMA NODE", "token": main_token_3})
-                if main_token_4 and bot_active_states.get('main_4', False): daily_items.append({"name": "DELTA NODE", "token": main_token_4})
+            
                 with bots_lock:
+                    # Thêm các bot Main phụ
+                    for i, token in enumerate(extra_main_tokens):
+                        bot_num = i + 2
+                        if token.strip() and bot_active_states.get(f'main_{bot_num}', False):
+                            bot_name = GREEK_ALPHABET[i] if i < len(GREEK_ALPHABET) else f"Main {bot_num}"
+                            daily_items.append({"name": f"{bot_name.upper()} NODE", "token": token.strip()})
+                            
+                    # Thêm các bot Sub
                     daily_items.extend([{"name": acc_names[i] if i < len(acc_names) else f"Sub {i+1}", "token": token} for i, token in enumerate(tokens) if token.strip() and bot_active_states.get(f'sub_{i}', False)])
+                
                 for item in daily_items:
                     if not auto_daily_enabled: break
-                    print(f"[Daily] Đang chạy acc '{item['name']}'...", flush=True); run_daily_bot(item['token'].strip(), item['name']); print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...", flush=True); time.sleep(daily_delay_between_acc)
+                    print(f"[Daily] Đang chạy acc '{item['name']}'...", flush=True)
+                    run_daily_bot(item['token'].strip(), item['name'])
+                    print(f"[Daily] Acc '{item['name']}' xong, chờ {daily_delay_between_acc} giây...", flush=True)
+                    time.sleep(daily_delay_between_acc)
+
                 if auto_daily_enabled:
                     print(f"[Daily] Hoàn thành chu kỳ.", flush=True)
                     last_daily_cycle_time = time.time();
