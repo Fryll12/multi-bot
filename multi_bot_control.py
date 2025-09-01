@@ -582,20 +582,6 @@ def create_bot(token, bot_type='sub', bot_name='Sub Account'):
                 # Chỉ tạo MỘT luồng duy nhất cho toàn bộ quá trình xử lý của drop này
                 threading.Thread(target=optimized_farm_handler, args=(channel_id, last_drop_msg_id, target_server), daemon=True).start()
 
-    elif bot_type == 'extra_main':
-        @bot.gateway.command
-        def on_message(resp):
-            # Các bot này chỉ cần nghe lệnh KVI nếu được chỉ định
-            if not resp.event.message: return
-            msg = resp.parsed.auto()
-            channel_id = msg.get("channel_id")
-            
-            current_token = token 
-            
-            # kvi_target_account sẽ so sánh với tên Hy Lạp của bot (Beta, Gamma...)
-            if auto_kvi_enabled and kvi_target_account == bot_name and channel_id == kvi_channel_id:
-                handle_kvi_message(bot, msg, current_token)
-
     threading.Thread(target=bot.gateway.run, daemon=True).start()
     return bot
     
@@ -839,33 +825,22 @@ def auto_daily_loop():
             time.sleep(60)
         except Exception as e:
             print(f"[ERROR in auto_daily_loop] {e}", flush=True); time.sleep(60)
-
+            
 def auto_kvi_loop():
-    global last_kvi_cycle_time, main_bot, extra_main_bots
+    global last_kvi_cycle_time
     time.sleep(20) 
     while True:
         try:
-            target_bot = None
-            
-            # --- LOGIC MỚI, LINH HOẠT HƠN ---
-            if kvi_target_account == 'main_1': 
-                target_bot = main_bot
-            elif kvi_target_account.startswith('main_'):
-                try:
-                    # Chuyển 'main_2' -> index 0, 'main_3' -> index 1, ...
-                    list_index = int(kvi_target_account.split('_')[1]) - 2
-                    
-                    # Kiểm tra xem index có hợp lệ trong danh sách bot không
-                    if 0 <= list_index < len(extra_main_bots):
-                        target_bot = extra_main_bots[list_index]
-                except (ValueError, IndexError):
-                    # Bỏ qua nếu tên target không hợp lệ (ví dụ: main_abc)
-                    pass
-            
-            if auto_kvi_enabled and target_bot and bot_active_states.get(kvi_target_account, False):
-                if (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
-                    start_kvi_session(target_bot)
-                    last_kvi_cycle_time = time.time()
+            # Luôn nhắm đến main_bot (Alpha)
+            if (auto_kvi_enabled and 
+                main_bot and 
+                bot_active_states.get('main_1', False) and 
+                (time.time() - last_kvi_cycle_time) >= kvi_loop_delay):
+                
+                print("🚀 [KVI] Gửi lệnh 'kvi' từ Alpha Node...", flush=True)
+                if kvi_channel_id:
+                    main_bot.sendMessage(kvi_channel_id, "kvi")
+                last_kvi_cycle_time = time.time()
             
             time.sleep(60)
         except Exception as e: 
@@ -1195,9 +1170,6 @@ HTML_TEMPLATE = """
                     <label>Account</label>
                     <select id="kvi-target-account">
                         <option value="main_1" {{ 'selected' if kvi_target_account == 'main_1' }}>ALPHA NODE (Main 1)</option>
-                        <option value="main_2" {{ 'selected' if kvi_target_account == 'main_2' }}>BETA NODE (Main 2)</option>
-                        <option value="main_3" {{ 'selected' if kvi_target_account == 'main_3' }}>GAMMA NODE (Main 3)</option>
-                        <option value="main_4" {{ 'selected' if kvi_target_account == 'main_4' }}>DELTA NODE (Main 4)</option>
                     </select>
                 </div>
                 <div class="input-group"><label>Clicks</label><input type="number" id="kvi-click-count" value="{{ kvi_click_count }}"></div>
