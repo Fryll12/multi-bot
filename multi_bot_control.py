@@ -146,15 +146,71 @@ def load_settings():
     except Exception as e:
         print(f"[Settings] Exception khi tải cài đặt: {e}", flush=True)
         
-def kvi_click_button(token, channel_id, guild_id, message_id, application_id, button_data):
-    """Hàm click nút dành riêng cho KVI"""
-    custom_id = button_data.get("custom_id");
-    if not custom_id: return
-    headers = {"Authorization": token, "Content-Type": "application/json"}
-    session_id = 'a' + ''.join(random.choices('0123456789abcdef', k=31))
-    payload = { "type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": session_id, "data": {"component_type": 2, "custom_id": custom_id} }
-    try: requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
-    except Exception as e: print(f"🔥 [KVI CLICK LỖI] {e}", flush=True)
+def kvi_click_button(bot_instance, token, channel_id, guild_id, message_id, application_id, button_data):
+    """
+    Hàm click nút KVI đã được NÂNG CẤP toàn diện, áp dụng logic từ file lite.
+    Bao gồm xử lý rate limit và retry.
+    """
+    try:
+        # Kiểm tra điều kiện đầu vào
+        if not bot_instance or not bot_instance.gateway.session_id:
+            print("[KVI CLICK] LỖI: Bot chưa kết nối hoặc không có session_id.", flush=True)
+            return
+
+        custom_id = button_data.get("custom_id")
+        if not custom_id:
+            print("[KVI CLICK] LỖI: Button không có custom_id.", flush=True)
+            return
+
+        headers = {"Authorization": token}
+        max_retries = 10  # Giảm số lần thử lại để tránh treo quá lâu
+
+        for attempt in range(max_retries):
+            # Luôn lấy session_id mới nhất trước mỗi lần thử
+            session_id = bot_instance.gateway.session_id
+            
+            payload = {
+                "type": 3,
+                "guild_id": guild_id,
+                "channel_id": channel_id,
+                "message_id": message_id,
+                "application_id": application_id,
+                "session_id": session_id,
+                "data": {
+                    "component_type": 2,
+                    "custom_id": custom_id
+                }
+            }
+            
+            try:
+                r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+                
+                # Thành công
+                if 200 <= r.status_code < 300:
+                    print(f"[KVI CLICK] INFO: Click thành công nút '{custom_id}'!", flush=True)
+                    return True # Thoát khỏi hàm khi đã click thành công
+
+                # Bị Rate Limit
+                elif r.status_code == 429:
+                    retry_after = r.json().get("retry_after", 1.0)
+                    print(f"[KVI CLICK] WARN: Bị rate limit! Thử lại sau {retry_after:.2f}s...", flush=True)
+                    time.sleep(retry_after)
+
+                # Các lỗi khác
+                else:
+                    print(f"[KVI CLICK] LỖI (Lần {attempt + 1}): Click thất bại! (Status: {r.status_code}, Response: {r.text})", flush=True)
+                    time.sleep(1.5) # Chờ một chút trước khi thử lại
+
+            except requests.exceptions.RequestException as e:
+                print(f"[KVI CLICK] LỖI KẾT NỐI (Lần {attempt + 1}): {e}. Thử lại sau 3s...", flush=True)
+                time.sleep(3)
+
+        print(f"[KVI CLICK] LỖI NGHIÊM TRỌNG: Đã thử click {max_retries} lần không thành công.", flush=True)
+        return False
+
+    except Exception as e:
+        print(f"[KVI CLICK] LỖI NGOẠI LỆ không xác định: {e}", flush=True)
+        return False
 
 def start_kvi_session(bot_instance):
     """Gửi lệnh kvi để bắt đầu"""
@@ -174,53 +230,46 @@ def parse_kvi_embed_data(embed):
     
 def handle_kvi_message(bot, msg, token_for_click):
     """
-    Hàm xử lý logic KVI đã được đơn giản hóa để CHỈ CHỌN NGẪU NHIÊN.
+    Hàm xử lý logic KVI, đã cập nhật để truyền bot instance thay vì token.
+    Sử dụng phiên bản kvi_click_button mới, ổn định hơn.
     """
     global kvi_session_state
     
-    # Chỉ xử lý tin nhắn từ Karuta có embed
-    if msg.get("author", {}).get("id") == karuta_id and msg.get("embeds"):
-        # Lấy các thông tin cần thiết cho việc click nút
-        kvi_session_state.update({"message_id": msg.get("id"), "guild_id": msg.get("guild_id")})
-        embed = msg["embeds"][0]
-        description = embed.get("description", "")
-        buttons = msg.get("components")
+    if not (msg.get("author", {}).get("id") == karuta_id and msg.get("embeds") and msg.get("components")):
+        return
 
-        # Bỏ qua việc check kết quả (tăng/giảm điểm) vì không cần học nữa
+    # Lấy các thông tin cần thiết
+    kvi_session_state.update({"message_id": msg.get("id"), "guild_id": msg.get("guild_id")})
+    embed = msg["embeds"][0]
+    buttons = msg.get("components")
+    
+    time.sleep(random.uniform(1.8, 2.5))
 
-        if not buttons: 
-            return # Nếu không có nút thì không làm gì cả
-            
-        time.sleep(random.uniform(1.8, 2.5)) # Giữ lại delay ngẫu nhiên
+    character_name, question, num_choices = parse_kvi_embed_data(embed)
+
+    # Nếu là màn hình câu hỏi
+    if character_name and question and num_choices > 0:
+        print(f"\n[KVI] Đã nhận diện màn hình CÂU HỎI cho: {character_name}", flush=True)
+        print("🎲 [KVI THỬ] Chọn một câu trả lời ngẫu nhiên...", flush=True)
+        chosen_button_num = random.randint(1, num_choices)
         
-        # Nếu đây là tin nhắn CÓ CÂU HỎI (chứa 1️⃣)
-        if "1️⃣" in description:
-            character_name, question, num_choices = parse_kvi_embed_data(embed)
-            
-            # Chỉ cần num_choices để biết có bao nhiêu lựa chọn
-            if not num_choices > 0: 
-                return
+        try:
+            button_to_click = buttons[0]['components'][chosen_button_num - 1]
+            print(f"    -> Chọn ngẫu nhiên nút số {chosen_button_num}", flush=True)
+            # Truyền bot instance và token vào hàm click mới
+            kvi_click_button(bot, token_for_click, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
+        except (IndexError, TypeError) as e:
+            print(f"🔥 [KVI LỖI] Không tìm thấy/chọn được nút ngẫu nhiên. Lỗi: {e}", flush=True)
 
-            print(f"\n[KVI] Nhân vật: {character_name}\n[KVI] Câu hỏi: {question}", flush=True)
-            print("🎲 [KVI THỬ] Bỏ qua logic học và Hatsune. QUYẾT ĐỊNH: Chọn ngẫu nhiên.", flush=True)
-
-            # Chọn một số ngẫu nhiên từ 1 đến số lượng lựa chọn
-            chosen_button_num = random.randint(1, num_choices)
-            
-            try:
-                # Click vào nút tương ứng với số đã chọn
-                button_to_click = buttons[0]['components'][chosen_button_num - 1]
-                print(f"    -> Chọn ngẫu nhiên nút số {chosen_button_num}", flush=True)
-                kvi_click_button(token_for_click, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
-            except (IndexError, TypeError) as e:
-                print(f"🔥 [KVI LỖI] Không tìm thấy/chọn được nút ngẫu nhiên. Lỗi: {e}", flush=True)
-        
-        # Nếu là các màn hình khác (Bắt đầu, Tiếp tục,...)
-        else:
-            print("\n▶️  [KVI] Bắt đầu/Tiếp tục...", flush=True)
-            # Luôn click vào nút đầu tiên
+    # Nếu là màn hình hành động
+    else:
+        print("\n▶️  [KVI] Đã nhận diện màn hình HÀNH ĐỘNG (Bắt đầu/Tiếp tục...)", flush=True)
+        try:
             button_to_click = buttons[0]['components'][0]
-            kvi_click_button(token_for_click, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
+            # Truyền bot instance và token vào hàm click mới
+            kvi_click_button(bot, token_for_click, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
+        except (IndexError, TypeError) as e:
+            print(f"🔥 [KVI LỖI] Không tìm thấy nút hành động. Lỗi: {e}", flush=True)
             
 def save_farm_settings():
     """Lưu cài đặt của các server farm vào Bin riêng."""
