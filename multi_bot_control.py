@@ -730,31 +730,73 @@ def run_daily_bot(token, acc_name):
     while state["step"] != 2 and time.time() < timeout: time.sleep(1)
     bot.gateway.close(); print(f"[Daily][{acc_name}] {'SUCCESS: Click xong 2 lần.' if state['step'] == 2 else 'FAIL: Không click đủ 2 lần.'}", flush=True)
 
+# THAY THẾ TOÀN BỘ HÀM NÀY
 def run_kvi_bot(token):
     bot = discum.Client(token=token, log={"console": False, "file": False})
-    headers, state = {"Authorization": token, "Content-Type": "application/json"}, {"step": 0, "click_count": 0, "message_id": None, "guild_id": None}
+    state = {"step": 0, "click_count": 0, "message_id": None, "guild_id": None}
+
+    # Hàm nhấn nút đã được sửa lại để dùng session_id thật
     def click_button(channel_id, message_id, custom_id, application_id, guild_id):
         try:
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json={"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": "aaa", "data": {"component_type": 2, "custom_id": custom_id}})
-            print(f"[KVI] Click {state['click_count']+1}: {custom_id} - Status {r.status_code}", flush=True)
-        except Exception as e: print(f"[KVI] Click Error: {e}", flush=True)
+            if not bot.gateway.session_id: return
+            headers = {"Authorization": token}
+            payload = {"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": bot.gateway.session_id, "data": {"component_type": 2, "custom_id": custom_id}}
+            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+            print(f"[KVI-Spam] Click {state['click_count']+1}: {custom_id} - Status {r.status_code}", flush=True)
+        except Exception as e:
+            print(f"[KVI-Spam] Click Error: {e}", flush=True)
+
     @bot.gateway.command
     def on_event(resp):
+        if state["click_count"] >= kvi_click_count:
+            bot.gateway.close()
+            return
+            
+        # Chỉ quan tâm đến tin nhắn mới hoặc tin nhắn được cập nhật
         if not (resp.event.message or resp.raw.get("t") == "MESSAGE_UPDATE"): return
+        
         m = resp.parsed.auto()
-        channel_id, author_id, message_id, guild_id, app_id = str(m.get("channel_id")), str(m.get("author", {}).get("id", "")), m.get("id", ""), m.get("guild_id", ""), m.get("application_id", karuta_id)
-        if channel_id != kvi_channel_id or author_id != karuta_id or "components" not in m or not m["components"]: return
-        btn = next((b for comp in m["components"] if comp["type"] == 1 and comp["components"] for b in comp["components"] if b["type"] == 2), None)
-        if not btn: return
+        
+        # Lọc đúng tin nhắn KVI
+        if not (str(m.get("channel_id")) == kvi_channel_id and str(m.get("author", {}).get("id", "")) == karuta_id and "components" in m and m["components"]):
+            return
+
+        # Lấy nút đầu tiên (button 0)
+        try:
+            button_to_click = m["components"][0]["components"][0]
+            custom_id = button_to_click.get("custom_id")
+            if not custom_id: return
+        except (IndexError, TypeError):
+            return # Bỏ qua nếu không tìm thấy nút
+
+        # Nếu là tin nhắn đầu tiên, lưu id lại
         if resp.event.message and state["step"] == 0:
-            state["message_id"], state["guild_id"], state["step"] = message_id, guild_id, 1; click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id); state["click_count"] += 1
-        elif resp.raw.get("t") == "MESSAGE_UPDATE" and message_id == state["message_id"] and state["click_count"] < kvi_click_count:
-            time.sleep(kvi_click_delay); click_button(channel_id, message_id, btn["custom_id"], app_id, guild_id); state["click_count"] += 1
-            if state["click_count"] >= kvi_click_count: print("[KVI] DONE. Đã click đủ.", flush=True); state["step"] = 2; bot.gateway.close()
-    print("[KVI] Bắt đầu...", flush=True); threading.Thread(target=bot.gateway.run, daemon=True).start(); time.sleep(1); bot.sendMessage(kvi_channel_id, "kvi")
-    timeout = time.time() + (kvi_click_count * kvi_click_delay) + 15
-    while state["step"] != 2 and time.time() < timeout: time.sleep(0.5)
-    bot.gateway.close(); print(f"[KVI] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
+            state["message_id"] = m.get("id", "")
+            state["guild_id"] = m.get("guild_id", "")
+            state["step"] = 1
+            click_button(kvi_channel_id, state["message_id"], custom_id, karuta_id, state["guild_id"])
+            state["click_count"] += 1
+        
+        # Nếu là tin nhắn cập nhật, tiếp tục click
+        elif resp.raw.get("t") == "MESSAGE_UPDATE" and m.get("id") == state["message_id"]:
+            time.sleep(kvi_click_delay)
+            click_button(kvi_channel_id, state["message_id"], custom_id, karuta_id, state["guild_id"])
+            state["click_count"] += 1
+
+    # Khối chạy chính
+    print("[KVI-Spam] Bắt đầu...", flush=True)
+    threading.Thread(target=bot.gateway.run, daemon=True).start()
+    time.sleep(4)
+    bot.sendMessage(kvi_channel_id, "kvi")
+    
+    timeout_duration = (kvi_click_count * (kvi_click_delay + 2)) + 15
+    timeout = time.time() + timeout_duration
+    
+    while state["click_count"] < kvi_click_count and time.time() < timeout:
+        time.sleep(1)
+        
+    bot.gateway.close()
+    print(f"[KVI-Spam] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
 
 def auto_work_loop():
     global last_work_cycle_time
@@ -830,20 +872,15 @@ def auto_daily_loop():
             
 def auto_kvi_loop():
     global last_kvi_cycle_time
-    time.sleep(20) 
     while True:
         try:
-            # Luôn nhắm đến main_bot (Alpha)
-            if (auto_kvi_enabled and 
-                main_bot and 
-                bot_active_states.get('main_1', False) and 
-                (time.time() - last_kvi_cycle_time) >= kvi_loop_delay):
+            if auto_kvi_enabled and (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
+                print("🚀 [KVI-Spam] Bắt đầu chu kỳ spam click KVI...", flush=True)
                 
-                print("🚀 [KVI] Gửi lệnh 'kvi' từ Alpha Node...", flush=True)
-                if kvi_channel_id:
-                    main_bot.sendMessage(kvi_channel_id, "kvi")
+                # Chạy bot spam click trong luồng riêng
+                threading.Thread(target=run_kvi_bot, args=(main_token,)).start()
+                
                 last_kvi_cycle_time = time.time()
-            
             time.sleep(60)
         except Exception as e: 
             print(f"[ERROR in auto_kvi_loop] {e}", flush=True)
