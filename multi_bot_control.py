@@ -512,10 +512,12 @@ def create_bot(token, bot_type='sub', bot_name='Sub Account'):
                             threading.Thread(target=check_and_grab_event).start()            
 
             # --- 2. XỬ LÝ KÊNH KVI ---
-            # Lưu ý: kvi_target_account giờ sẽ dùng tên như 'Alpha', 'Beta'...
-            if auto_kvi_enabled and kvi_target_account == 'Alpha' and channel_id == kvi_channel_id:
-                handle_kvi_message(bot, msg, main_token)
-                
+            # Thêm dòng print này để gỡ lỗi
+            print(f"[DEBUG] Nhận được tin nhắn từ kênh {channel_id}. Kênh KVI mong muốn là {kvi_channel_id}", flush=True)
+            
+            # Dòng if bạn vừa sửa
+            if auto_kvi_enabled and channel_id == kvi_channel_id:
+                handle_kvi_message(bot, msg, main_token)                
            # --- 3. BỘ ĐIỀU PHỐI FARM TRUNG TÂM (PHIÊN BẢN TỐI ƯU HÓA) ---
             target_server = next((s for s in farm_servers if s.get('main_channel_id') == channel_id), None)
             
