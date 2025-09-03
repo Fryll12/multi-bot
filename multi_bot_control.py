@@ -145,6 +145,57 @@ def load_settings():
             print(f"[Settings] Lỗi khi tải cài đặt từ JSONBin.io: {req.status_code} - {req.text}", flush=True)
     except Exception as e:
         print(f"[Settings] Exception khi tải cài đặt: {e}", flush=True)
+
+# DÁN HÀM MỚI NÀY VÀO
+def robust_click_button(bot_instance, token, channel_id, guild_id, message_id, application_id, custom_id, source=""):
+    """
+    Hàm click nút đa năng, được nâng cấp với khả năng retry và xử lý rate limit.
+    """
+    try:
+        if not bot_instance or not bot_instance.gateway.session_id:
+            print(f"[{source}] LỖI: Bot chưa kết nối hoặc không có session_id.", flush=True)
+            return False
+
+        headers = {"Authorization": token}
+        max_retries = 15 
+
+        for attempt in range(max_retries):
+            session_id = bot_instance.gateway.session_id
+            
+            payload = {
+                "type": 3,
+                "guild_id": guild_id,
+                "channel_id": channel_id,
+                "message_id": message_id,
+                "application_id": application_id,
+                "session_id": session_id,
+                "data": { "component_type": 2, "custom_id": custom_id }
+            }
+            
+            try:
+                r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
+                
+                if 200 <= r.status_code < 300:
+                    print(f"[{source}] INFO: Click thành công nút '{custom_id}'!", flush=True)
+                    return True
+
+                elif r.status_code == 429:
+                    retry_after = r.json().get("retry_after", 1.0)
+                    print(f"[{source}] WARN: Bị rate limit! Thử lại sau {retry_after:.2f}s...", flush=True)
+                    time.sleep(retry_after)
+                else:
+                    print(f"[{source}] LỖI (Lần {attempt + 1}): Click thất bại! (Status: {r.status_code})", flush=True)
+                    time.sleep(1.5)
+
+            except requests.exceptions.RequestException as e:
+                print(f"[{source}] LỖI KẾT NỐI (Lần {attempt + 1}): {e}. Thử lại sau 3s...", flush=True)
+                time.sleep(3)
+
+        print(f"[{source}] LỖI NGHIÊM TRỌNG: Đã thử click {max_retries} lần không thành công.", flush=True)
+        return False
+    except Exception as e:
+        print(f"[{source}] LỖI NGOẠI LỆ không xác định trong hàm click: {e}", flush=True)
+        return False
         
 def kvi_click_button(bot_instance, token, channel_id, guild_id, message_id, application_id, button_data):
     """
@@ -731,72 +782,60 @@ def run_daily_bot(token, acc_name):
     bot.gateway.close(); print(f"[Daily][{acc_name}] {'SUCCESS: Click xong 2 lần.' if state['step'] == 2 else 'FAIL: Không click đủ 2 lần.'}", flush=True)
 
 # THAY THẾ TOÀN BỘ HÀM NÀY
-def run_kvi_bot(token):
-    bot = discum.Client(token=token, log={"console": False, "file": False})
-    state = {"step": 0, "click_count": 0, "message_id": None, "guild_id": None}
-
-    # Hàm nhấn nút đã được sửa lại để dùng session_id thật
-    def click_button(channel_id, message_id, custom_id, application_id, guild_id):
-        try:
-            if not bot.gateway.session_id: return
-            headers = {"Authorization": token}
-            payload = {"type": 3, "guild_id": guild_id, "channel_id": channel_id, "message_id": message_id, "application_id": application_id, "session_id": bot.gateway.session_id, "data": {"component_type": 2, "custom_id": custom_id}}
-            r = requests.post("https://discord.com/api/v9/interactions", headers=headers, json=payload, timeout=10)
-            print(f"[KVI-Spam] Click {state['click_count']+1}: {custom_id} - Status {r.status_code}", flush=True)
-        except Exception as e:
-            print(f"[KVI-Spam] Click Error: {e}", flush=True)
+def run_kvi_spam_clicker(token):
+    bot = discum.Client(token=token, log=False)
+    state = {"click_count": 0, "message_id": None, "guild_id": None, "stop": False}
 
     @bot.gateway.command
     def on_event(resp):
-        if state["click_count"] >= kvi_click_count:
-            bot.gateway.close()
-            return
+        if state["stop"] or (kvi_click_count > 0 and state["click_count"] >= kvi_click_count):
+            state["stop"] = True; bot.gateway.close(); return
             
-        # Chỉ quan tâm đến tin nhắn mới hoặc tin nhắn được cập nhật
         if not (resp.event.message or resp.raw.get("t") == "MESSAGE_UPDATE"): return
         
         m = resp.parsed.auto()
         
-        # Lọc đúng tin nhắn KVI
-        if not (str(m.get("channel_id")) == kvi_channel_id and str(m.get("author", {}).get("id", "")) == karuta_id and "components" in m and m["components"]):
-            return
+        if not (str(m.get("channel_id")) == kvi_channel_id and str(m.get("author", {}).get("id", "")) == karuta_id and "components" in m and m["components"]): return
 
-        # Lấy nút đầu tiên (button 0)
         try:
             button_to_click = m["components"][0]["components"][0]
             custom_id = button_to_click.get("custom_id")
             if not custom_id: return
-        except (IndexError, TypeError):
-            return # Bỏ qua nếu không tìm thấy nút
+        except (IndexError, TypeError): return
 
-        # Nếu là tin nhắn đầu tiên, lưu id lại
-        if resp.event.message and state["step"] == 0:
-            state["message_id"] = m.get("id", "")
-            state["guild_id"] = m.get("guild_id", "")
-            state["step"] = 1
-            click_button(kvi_channel_id, state["message_id"], custom_id, karuta_id, state["guild_id"])
-            state["click_count"] += 1
+        current_msg_id = m.get("id")
+        # Nếu là tin nhắn đầu tiên, lưu lại ID
+        if state["message_id"] is None:
+            state["message_id"] = current_msg_id
+            state["guild_id"] = m.get("guild_id")
         
-        # Nếu là tin nhắn cập nhật, tiếp tục click
-        elif resp.raw.get("t") == "MESSAGE_UPDATE" and m.get("id") == state["message_id"]:
-            time.sleep(kvi_click_delay)
-            click_button(kvi_channel_id, state["message_id"], custom_id, karuta_id, state["guild_id"])
-            state["click_count"] += 1
+        # Chỉ click nếu ID tin nhắn khớp với tin nhắn đầu tiên
+        if current_msg_id == state["message_id"]:
+            print(f"[KVI-Spam] Chuẩn bị click lần {state['click_count'] + 1}...", flush=True)
+            if robust_click_button(bot, token, kvi_channel_id, state["guild_id"], state["message_id"], karuta_id, custom_id, source="KVI-Spam"):
+                state["click_count"] += 1
+                time.sleep(kvi_click_delay) # Chờ sau mỗi cú click thành công
+            else:
+                state["stop"] = True # Dừng nếu click thất bại
+                bot.gateway.close()
 
     # Khối chạy chính
-    print("[KVI-Spam] Bắt đầu...", flush=True)
+    print("[KVI-Spam] Bắt đầu phiên...", flush=True)
     threading.Thread(target=bot.gateway.run, daemon=True).start()
-    time.sleep(4)
+    time.sleep(4) # Chờ bot kết nối
     bot.sendMessage(kvi_channel_id, "kvi")
     
-    timeout_duration = (kvi_click_count * (kvi_click_delay + 2)) + 15
-    timeout = time.time() + timeout_duration
+    # Thêm 1 giây chờ sau khi gửi lệnh theo yêu cầu của bạn
+    print("[KVI-Spam] Đã gửi lệnh, chờ 1 giây trước khi lắng nghe...", flush=True)
+    time.sleep(1) 
     
-    while state["click_count"] < kvi_click_count and time.time() < timeout:
+    timeout = time.time() + (kvi_click_count * (kvi_click_delay + 5)) + 20
+    
+    while not state["stop"] and time.time() < timeout:
         time.sleep(1)
         
     bot.gateway.close()
-    print(f"[KVI-Spam] {'SUCCESS. Đã click xong.' if state['click_count'] >= kvi_click_count else f'FAIL. Chỉ click được {state['click_count']} / {kvi_click_count} lần.'}", flush=True)
+    print(f"[KVI-Spam] Hoàn thành phiên. Đã click {state['click_count']} / {kvi_click_count} lần.", flush=True)
 
 def auto_work_loop():
     global last_work_cycle_time
@@ -876,10 +915,7 @@ def auto_kvi_loop():
         try:
             if auto_kvi_enabled and (time.time() - last_kvi_cycle_time) >= kvi_loop_delay:
                 print("🚀 [KVI-Spam] Bắt đầu chu kỳ spam click KVI...", flush=True)
-                
-                # Chạy bot spam click trong luồng riêng
-                threading.Thread(target=run_kvi_bot, args=(main_token,)).start()
-                
+                threading.Thread(target=run_kvi_spam_clicker, args=(main_token,)).start()
                 last_kvi_cycle_time = time.time()
             time.sleep(60)
         except Exception as e: 
