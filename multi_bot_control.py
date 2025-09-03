@@ -278,49 +278,6 @@ def parse_kvi_embed_data(embed):
     question = question_match.group(1).strip() if question_match else None
     num_choices = len([line for line in description.split('\n') if re.match(r'^\d️⃣', line)])
     return character_name, question, num_choices
-    
-def handle_kvi_message(bot, msg, token_for_click):
-    """
-    Hàm xử lý logic KVI, đã cập nhật để truyền bot instance thay vì token.
-    Sử dụng phiên bản kvi_click_button mới, ổn định hơn.
-    """
-    global kvi_session_state
-    
-    if not (msg.get("author", {}).get("id") == karuta_id and msg.get("embeds") and msg.get("components")):
-        return
-
-    # Lấy các thông tin cần thiết
-    kvi_session_state.update({"message_id": msg.get("id"), "guild_id": msg.get("guild_id")})
-    embed = msg["embeds"][0]
-    buttons = msg.get("components")
-    
-    time.sleep(random.uniform(1.8, 2.5))
-
-    character_name, question, num_choices = parse_kvi_embed_data(embed)
-
-    # Nếu là màn hình câu hỏi
-    if character_name and question and num_choices > 0:
-        print(f"\n[KVI] Đã nhận diện màn hình CÂU HỎI cho: {character_name}", flush=True)
-        print("🎲 [KVI THỬ] Chọn một câu trả lời ngẫu nhiên...", flush=True)
-        chosen_button_num = random.randint(1, num_choices)
-        
-        try:
-            button_to_click = buttons[0]['components'][chosen_button_num - 1]
-            print(f"    -> Chọn ngẫu nhiên nút số {chosen_button_num}", flush=True)
-            # Truyền bot instance và token vào hàm click mới
-            kvi_click_button(bot, token_for_click, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
-        except (IndexError, TypeError) as e:
-            print(f"🔥 [KVI LỖI] Không tìm thấy/chọn được nút ngẫu nhiên. Lỗi: {e}", flush=True)
-
-    # Nếu là màn hình hành động
-    else:
-        print("\n▶️  [KVI] Đã nhận diện màn hình HÀNH ĐỘNG (Bắt đầu/Tiếp tục...)", flush=True)
-        try:
-            button_to_click = buttons[0]['components'][0]
-            # Truyền bot instance và token vào hàm click mới
-            kvi_click_button(bot, token_for_click, kvi_channel_id, kvi_session_state["guild_id"], kvi_session_state["message_id"], karuta_id, button_to_click)
-        except (IndexError, TypeError) as e:
-            print(f"🔥 [KVI LỖI] Không tìm thấy nút hành động. Lỗi: {e}", flush=True)
             
 def save_farm_settings():
     """Lưu cài đặt của các server farm vào Bin riêng."""
